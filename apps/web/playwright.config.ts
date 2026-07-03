@@ -19,12 +19,13 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "pnpm run build && pnpm run db:reset && pnpm run start -- --port " + PORT,
+    command: "pnpm run build && pnpm run db:reset && pnpm run start",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
     env: {
       STUDIOBOOK_DB_PATH: ".data/e2e.db",
+      PORT: String(PORT),
     },
   },
 });
