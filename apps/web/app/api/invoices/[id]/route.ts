@@ -11,9 +11,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 // GET /api/invoices/:id — invoice with member + line items.
 export async function GET(_request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
-    const { db } = await resolveStudio();
+    const { repos } = await resolveStudio();
     const { id } = await params;
-    return ok(await getInvoiceDetail(db, id));
+    return ok(await getInvoiceDetail(repos, id));
   });
 }
 
@@ -21,9 +21,9 @@ export async function GET(_request: Request, { params }: RouteContext): Promise<
 export async function PATCH(request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { db } = await resolveStudio();
+    const { repos } = await resolveStudio();
     const { id } = await params;
     const { status } = updateInvoiceStatusSchema.parse(await request.json());
-    return ok(await updateInvoiceStatus(db, id, status));
+    return ok(await updateInvoiceStatus(repos, id, status));
   });
 }

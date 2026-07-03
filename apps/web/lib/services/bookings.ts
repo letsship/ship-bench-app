@@ -1,8 +1,6 @@
-import { and, eq } from "drizzle-orm";
 import { newId } from "@/lib/db/ids";
-import { bookings, classSessions, classTypes, members } from "@/lib/db/schema";
-import type { ClassSession, Member } from "@/lib/db/schema";
-import type { Db } from "@/lib/db/types";
+import type { Repositories } from "@/lib/db/repos/types";
+import type { ClassSession, Member } from "@/lib/db/types";
 import {
   type BookingDenyReason,
   canBook,
@@ -36,31 +34,23 @@ function recipientOf(member: Member): { memberId: string; email: string; name: s
   return { memberId: member.id, email: member.email, name: member.name };
 }
 
-async function summaryOf(db: Db, session: ClassSession): Promise<SessionSummary> {
-  const [type] = await db
-    .select({ name: classTypes.name })
-    .from(classTypes)
-    .where(eq(classTypes.id, session.classTypeId))
-    .limit(1);
+async function summaryOf(repos: Repositories, session: ClassSession): Promise<SessionSummary> {
+  const classType = await repos.classTypes.getById(session.classTypeId);
   return {
-    title: type?.name ?? "Class",
+    title: classType?.name ?? "Class",
     startsAt: session.startsAt,
     instructor: session.instructor,
   };
 }
 
-async function loadMember(db: Db, memberId: string): Promise<Member> {
-  const [member] = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
+async function loadMember(repos: Repositories, memberId: string): Promise<Member> {
+  const member = await repos.members.getById(memberId);
   if (!member) throw new HttpError(404, "not_found", "Member not found");
   return member;
 }
 
-async function loadSession(db: Db, sessionId: string): Promise<ClassSession> {
-  const [session] = await db
-    .select()
-    .from(classSessions)
-    .where(eq(classSessions.id, sessionId))
-    .limit(1);
+async function loadSession(repos: Repositories, sessionId: string): Promise<ClassSession> {
+  const session = await repos.classSessions.getById(sessionId);
   if (!session) throw new HttpError(404, "not_found", "Class session not found");
   return session;
 }
@@ -71,18 +61,14 @@ export interface BookingResult {
 }
 
 export async function createBooking(
-  db: Db,
+  repos: Repositories,
   provider: NotificationProvider,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
-  const { settings } = await getStudioContext(db);
-  const session = await loadSession(db, input.sessionId);
-  const member = await loadMember(db, input.memberId);
-
-  const sessionBookings = await db
-    .select({ status: bookings.status, memberId: bookings.memberId })
-    .from(bookings)
-    .where(eq(bookings.sessionId, session.id));
+  const { settings } = await getStudioContext(repos);
+  const session = await loadSession(repos, input.sessionId);
+  const member = await loadMember(repos, input.memberId);
+  const sessionBookings = await repos.bookings.listBySession(session.id);
 
   const decision = canBook({
     sessionStatus: session.status,
@@ -98,15 +84,20 @@ export async function createBooking(
   }
 
   const bookingId = newId("bkg");
-  await db
-    .insert(bookings)
-    .values({ id: bookingId, sessionId: session.id, memberId: member.id, status: decision.status });
+  await repos.bookings.insert({
+    id: bookingId,
+    sessionId: session.id,
+    memberId: member.id,
+    status: decision.status,
+    bookedAt: nowIso(),
+    cancelledAt: null,
+  });
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
-      db,
+      repos,
       provider,
-      bookingConfirmation(recipientOf(member), await summaryOf(db, session)),
+      bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   }
   return { bookingId, status: decision.status };
@@ -118,14 +109,14 @@ export interface CancelResult {
 }
 
 export async function cancelBooking(
-  db: Db,
+  repos: Repositories,
   provider: NotificationProvider,
   bookingId: string,
 ): Promise<CancelResult> {
-  const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+  const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
-  const session = await loadSession(db, booking.sessionId);
-  const { settings } = await getStudioContext(db);
+  const session = await loadSession(repos, booking.sessionId);
+  const { settings } = await getStudioContext(repos);
 
   const decision = canCancel({
     bookingStatus: booking.status,
@@ -141,48 +132,43 @@ export async function cancelBooking(
     throw new HttpError(409, `cancel_${decision.reason}`, message);
   }
 
-  await db
-    .update(bookings)
-    .set({ status: "cancelled", cancelledAt: nowIso() })
-    .where(eq(bookings.id, bookingId));
+  await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
   const promotedMemberId = isSeatTaking(booking.status)
-    ? await promoteFromWaitlist(db, provider, session)
+    ? await promoteFromWaitlist(repos, provider, session)
     : null;
 
-  const member = await loadMember(db, booking.memberId);
+  const member = await loadMember(repos, booking.memberId);
   await enqueueAndDispatch(
-    db,
+    repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(db, session), decision.refundEligible),
+    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 
 async function promoteFromWaitlist(
-  db: Db,
+  repos: Repositories,
   provider: NotificationProvider,
   session: ClassSession,
 ): Promise<string | null> {
-  const waitlisted = await db
-    .select({ id: bookings.id, bookedAt: bookings.bookedAt, memberId: bookings.memberId })
-    .from(bookings)
-    .where(and(eq(bookings.sessionId, session.id), eq(bookings.status, "waitlisted")));
-
+  const waitlisted = (await repos.bookings.listBySession(session.id)).filter(
+    (booking) => booking.status === "waitlisted",
+  );
   const promoteId = pickWaitlistPromotion(
-    waitlisted.map((entry) => ({ id: entry.id, bookedAt: entry.bookedAt ?? "" })),
+    waitlisted.map((entry) => ({ id: entry.id, bookedAt: entry.bookedAt })),
   );
   if (!promoteId) return null;
 
   const promoted = waitlisted.find((entry) => entry.id === promoteId);
   if (!promoted) return null;
 
-  await db.update(bookings).set({ status: "booked" }).where(eq(bookings.id, promoteId));
-  const member = await loadMember(db, promoted.memberId);
+  await repos.bookings.update(promoteId, { status: "booked" });
+  const member = await loadMember(repos, promoted.memberId);
   await enqueueAndDispatch(
-    db,
+    repos,
     provider,
-    waitlistPromotion(recipientOf(member), await summaryOf(db, session)),
+    waitlistPromotion(recipientOf(member), await summaryOf(repos, session)),
   );
   return promoted.memberId;
 }

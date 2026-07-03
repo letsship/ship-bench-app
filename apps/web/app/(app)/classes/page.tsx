@@ -9,11 +9,11 @@ import { AddClassForm } from "./add-class-form";
 export const dynamic = "force-dynamic";
 
 export default async function ClassesPage() {
-  const { db, ctx } = await resolveStudio();
+  const { repos, ctx } = await resolveStudio();
   const timeZone = ctx.studio.timezone;
   const [sessions, classTypes] = await Promise.all([
-    listSessions(db, ctx.studio.id, { from: new Date().toISOString() }),
-    listClassTypes(db, ctx.studio.id),
+    listSessions(repos, ctx.studio.id, { from: new Date().toISOString() }),
+    listClassTypes(repos, ctx.studio.id),
   ]);
   const days = groupByDay(sessions, (session) => session.startsAt, timeZone);
 

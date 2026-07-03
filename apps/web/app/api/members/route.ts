@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 // GET /api/members — the studio's members.
 export async function GET(): Promise<Response> {
   return handle(async () => {
-    const { db, ctx } = await resolveStudio();
-    return ok(await listMembers(db, ctx.studio.id));
+    const { repos, ctx } = await resolveStudio();
+    return ok(await listMembers(repos, ctx.studio.id));
   });
 }
 
@@ -18,8 +18,8 @@ export async function GET(): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { db, ctx } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const input = createMemberSchema.parse(await request.json());
-    return created(await createMember(db, ctx.studio.id, input));
+    return created(await createMember(repos, ctx.studio.id, input));
   });
 }

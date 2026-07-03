@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
-import { studioSettings, studios } from "@/lib/db/schema";
-import type { Studio, StudioSettings } from "@/lib/db/schema";
-import type { Db } from "@/lib/db/types";
+import type { Repositories } from "@/lib/db/repos/types";
+import type { Studio, StudioSettings } from "@/lib/db/types";
 import { HttpError } from "@/lib/http";
 
 export interface StudioContext {
@@ -11,27 +9,17 @@ export interface StudioContext {
 
 // Studiobook is single-studio in the demo dataset: resolve the one studio and
 // its settings. A missing studio means the database was never seeded.
-export async function getStudioContext(db: Db): Promise<StudioContext> {
-  const [studio] = await db.select().from(studios).limit(1);
+export async function getStudioContext(repos: Repositories): Promise<StudioContext> {
+  const studio = await repos.studios.getFirst();
   if (!studio) {
-    throw new HttpError(503, "not_provisioned", "No studio has been provisioned. Run `pnpm db:seed`.");
+    throw new HttpError(503, "not_provisioned", "No studio has been provisioned. Seed the database.");
   }
-  const [settings] = await db
-    .select()
-    .from(studioSettings)
-    .where(eq(studioSettings.studioId, studio.id))
-    .limit(1);
+  const settings = await repos.settings.getByStudioId(studio.id);
   if (!settings) {
-    throw new HttpError(503, "not_provisioned", "Studio settings are missing. Run `pnpm db:reset`.");
+    throw new HttpError(503, "not_provisioned", "Studio settings are missing. Reseed the database.");
   }
   return { studio, settings };
 }
-
-export type NotificationSettingKey =
-  | "notifyBookingConfirmations"
-  | "notifyCancellations"
-  | "notifyWaitlistPromotions"
-  | "notifyInvoices";
 
 export interface UpdateSettingsInput {
   taxRateBps?: number;
@@ -44,15 +32,9 @@ export interface UpdateSettingsInput {
 }
 
 export async function updateSettings(
-  db: Db,
+  repos: Repositories,
   studioId: string,
   input: UpdateSettingsInput,
 ): Promise<StudioSettings> {
-  const [updated] = await db
-    .update(studioSettings)
-    .set(input)
-    .where(eq(studioSettings.studioId, studioId))
-    .returning();
-  if (!updated) throw new HttpError(404, "not_found", "Studio settings not found");
-  return updated;
+  return repos.settings.update(studioId, input);
 }

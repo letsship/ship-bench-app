@@ -1,6 +1,4 @@
-import { eq } from "drizzle-orm";
-import { invoices } from "@/lib/db/schema";
-import type { Db } from "@/lib/db/types";
+import type { Repositories } from "@/lib/db/repos/types";
 import {
   type MonthlyRevenueRow,
   type RevenueTotals,
@@ -16,16 +14,19 @@ export interface RevenueReport {
   timezone: string;
 }
 
-export async function getRevenueReport(db: Db, ctx: StudioContext): Promise<RevenueReport> {
-  const rows = await db
-    .select({
-      status: invoices.status,
-      issuedAt: invoices.issuedAt,
-      totalCents: invoices.totalCents,
-    })
-    .from(invoices)
-    .where(eq(invoices.studioId, ctx.studio.id));
-  const monthly = monthlyRevenue(rows, ctx.studio.timezone);
+export async function getRevenueReport(
+  repos: Repositories,
+  ctx: StudioContext,
+): Promise<RevenueReport> {
+  const invoices = await repos.invoices.listByStudio(ctx.studio.id);
+  const monthly = monthlyRevenue(
+    invoices.map((invoice) => ({
+      status: invoice.status,
+      issuedAt: invoice.issuedAt,
+      totalCents: invoice.totalCents,
+    })),
+    ctx.studio.timezone,
+  );
   return {
     rows: monthly,
     totals: revenueTotals(monthly),

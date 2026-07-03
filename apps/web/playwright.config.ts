@@ -3,9 +3,6 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3100;
 const BASE_URL = `http://localhost:${PORT}`;
 
-// Smoke specs run against a production `next start` server. The webServer
-// command builds the app, resets a throwaway seeded sqlite database, then
-// starts the server — so the suite is self-contained.
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -18,13 +15,16 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Smoke specs run against a production `next start` server in fake-backends
+  // mode (seeded in-memory repositories + fake email provider), so the suite is
+  // self-contained — no Supabase/Postgres or Resend account needed.
   webServer: {
-    command: "pnpm run build && pnpm run db:reset && pnpm run start",
+    command: "pnpm run build && pnpm run start",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
     env: {
-      STUDIOBOOK_DB_PATH: ".data/e2e.db",
+      USE_FAKE_BACKENDS: "1",
       PORT: String(PORT),
     },
   },

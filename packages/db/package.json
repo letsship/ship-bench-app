@@ -1,0 +1,6 @@
+{
+  "name": "@studiobook/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Studiobook database — raw SQL migrations (Postgres/Supabase)."
+}

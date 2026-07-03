@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 // calendar subscription. No auth: calendar clients can't send cookies.
 export async function GET(): Promise<Response> {
   return handle(async () => {
-    const { db, ctx } = await resolveStudio();
-    const sessions = await listSessions(db, ctx.studio.id, { from: new Date().toISOString() });
+    const { repos, ctx } = await resolveStudio();
+    const sessions = await listSessions(repos, ctx.studio.id, { from: new Date().toISOString() });
     const events: CalendarEvent[] = sessions.map((session) => ({
       uid: `${session.id}@studiobook`,
       title: session.classTypeName,

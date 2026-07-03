@@ -10,10 +10,10 @@ export const dynamic = "force-dynamic";
 // GET /api/classes?from=&to= — scheduled class sessions with live occupancy.
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
-    const { db, ctx } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const from = request.nextUrl.searchParams.get("from") ?? undefined;
     const to = request.nextUrl.searchParams.get("to") ?? undefined;
-    return ok(await listSessions(db, ctx.studio.id, { from, to }));
+    return ok(await listSessions(repos, ctx.studio.id, { from, to }));
   });
 }
 
@@ -21,8 +21,8 @@ export async function GET(request: NextRequest): Promise<Response> {
 export async function POST(request: NextRequest): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { db, ctx } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const input = createSessionSchema.parse(await request.json());
-    return created(await createSession(db, ctx.studio.id, input));
+    return created(await createSession(repos, ctx.studio.id, input));
   });
 }

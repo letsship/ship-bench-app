@@ -13,13 +13,13 @@ export const dynamic = "force-dynamic";
 const CANCELLABLE = new Set(["booked", "waitlisted"]);
 
 export default async function BookingsPage() {
-  const { db, ctx } = await resolveStudio();
+  const { repos, ctx } = await resolveStudio();
   const timeZone = ctx.studio.timezone;
   const nowIso = new Date().toISOString();
   const [rows, sessions, members] = await Promise.all([
-    listBookingRows(db, ctx.studio.id, { from: nowIso }),
-    listSessions(db, ctx.studio.id, { from: nowIso }),
-    listMembers(db, ctx.studio.id),
+    listBookingRows(repos, ctx.studio.id, { from: nowIso }),
+    listSessions(repos, ctx.studio.id, { from: nowIso }),
+    listMembers(repos, ctx.studio.id),
   ]);
   const days = groupByDay(rows, (row) => row.startsAt, timeZone);
 

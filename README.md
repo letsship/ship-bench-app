@@ -13,95 +13,117 @@ Everything here is hand-authored.
 
 - **Monorepo**: pnpm workspaces + Turborepo. One app, `apps/web`.
 - **Web**: Next.js 16 (App Router, React 19), TypeScript strict, Tailwind v4.
-- **Database**: Drizzle ORM over SQLite — Cloudflare **D1** in production, a
-  local **better-sqlite3** file for dev / `next start` / tests.
+- **Database**: **Supabase** (Postgres 17 + `@supabase/supabase-js`). All data
+  access goes through thin **repositories** (`lib/db/repos/`); route handlers and
+  domain logic never touch supabase-js directly.
+- **Email**: the real **Resend** SDK, behind a provider-agnostic notification
+  adapter + an outbox table.
 - **Deploy**: `@opennextjs/cloudflare` to a Cloudflare Worker.
-- **Tests**: Vitest (unit + integration) and Playwright (browser smoke).
+- **Tests**: Vitest (unit + integration) and Playwright (browser smoke), both
+  fully hermetic — they run against in-memory repository fakes + a fake email
+  provider, so `pnpm test` needs no Supabase, no Resend, and no native modules.
+
+## The repository seam
+
+The linchpin of the architecture is `lib/db/repos/`:
+
+- `types.ts` — the `Repositories` interface (one typed repo per entity).
+- `supabase.ts` — the production implementation over supabase-js.
+- `fakes.ts` — an in-memory implementation for tests + the local fake-backends
+  mode.
+- `index.ts` — `resolveRepositories()` picks the implementation.
+
+Services (`lib/services/`) take `Repositories` by dependency injection and
+compose it with the pure domain logic (`lib/domain/`). Swapping the persistence
+layer means writing a new set of repositories — nothing above the interface
+changes.
+
+## Fake-backends mode
+
+Set `USE_FAKE_BACKENDS=1` to run the whole app against a seeded in-memory store
+and a no-op email provider — no Supabase or Resend account required. Tests use it
+implicitly (via `__setTestRepositories`), Playwright runs `next start` with it,
+and `pnpm --filter @studiobook/web dev:fake` serves local dev with it.
 
 ## Layout
 
 ```
 apps/web/
-  app/                     Next.js App Router
-    (marketing)            landing "/" + "/login" (magic-link STUB)
-    (app)/                 authed console: dashboard, classes, bookings,
-                           members, invoices, invoices/[id], settings, reports
-    api/                   route handlers: classes, bookings, members,
-                           invoices, ical, export
+  app/                     Next.js App Router (marketing, /login stub, console, api/)
   lib/
     domain/                PURE business logic (capacity, booking rules,
                            invoices, TZ-safe dates, CSV, iCal, reports, money)
-    db/                    Drizzle schema, client, seed data + tooling
-    notifications/         provider seam (mailjay SDK + adapter) + outbox
-    services/              DB-backed services shared by routes and pages
+    db/
+      types.ts             entity types
+      repos/               the repository seam (types, supabase, fakes, mapping)
+      seed-data.ts         single-source demo dataset
+    supabase/              @supabase/ssr + service-role client factories
+    notifications/         provider seam (Resend adapter + fake) + outbox
+    services/              repository-backed services shared by routes + pages
     auth/                  dev session-cookie stub
-  drizzle/                 generated migrations + seed.sql
+    env.ts                 Zod-validated environment access
   e2e/                     Playwright smoke specs
-packages/config-typescript/  shared tsconfig bases
-ship.yml                     SHIP preview-deploy manifest
+packages/db/migrations/    raw SQL migrations (Postgres)
+supabase/                  Supabase CLI config (migrations symlinks packages/db)
+ship.yml                   SHIP preview-deploy manifest
 ```
 
 ## Getting started
 
+Fastest path (no Supabase needed):
+
 ```bash
-pnpm install            # builds the better-sqlite3 native binding automatically
-pnpm --filter @studiobook/web db:reset   # migrate + seed a local sqlite db
-pnpm --filter @studiobook/web dev        # http://localhost:3000
+pnpm install
+pnpm --filter @studiobook/web dev:fake   # http://localhost:3000, seeded in-memory
+```
+
+Against a real local Supabase:
+
+```bash
+pnpm install
+pnpm db:start          # boots the local Supabase stack (Docker)
+pnpm db:reset          # applies packages/db/migrations + seeds supabase/seed.sql
+# set NEXT_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY / SUPABASE_SECRET_KEY (see .env.example)
+pnpm --filter @studiobook/web dev
 ```
 
 Sign in at `/login` with any email — the magic-link flow is a **stub** that sets
-a signed dev cookie (there is no real email or identity provider).
+a signed dev cookie (Studiobook's own auth is separate from Supabase Auth).
 
 ## Common commands
-
-Run from the repo root (Turborepo fans them out):
 
 | Command | What it does |
 |---|---|
 | `pnpm build` | `next build` |
-| `pnpm test` | Vitest unit + integration suite |
+| `pnpm test` | Vitest unit + integration (hermetic, ~180 tests) |
 | `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit` |
-| `pnpm --filter @studiobook/web e2e` | Playwright smoke (builds, seeds, `next start`, runs specs) |
-| `pnpm --filter @studiobook/web db:reset` | Drop, migrate, and reseed the local db |
-| `pnpm --filter @studiobook/web db:generate` | Regenerate Drizzle migrations from the schema |
-| `pnpm --filter @studiobook/web db:emit-seed-sql` | Regenerate `drizzle/seed.sql` |
+| `pnpm --filter @studiobook/web e2e` | Playwright smoke (builds, runs `next start` in fake mode) |
+| `pnpm db:start` / `pnpm db:reset` | boot local Supabase / apply migrations + seed |
+| `pnpm db:types` | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
+| `pnpm --filter @studiobook/web db:seed-sql` | regenerate `supabase/seed.sql` |
 
-The local database path is `apps/web/.data/studiobook.db` by default; override
-with `STUDIOBOOK_DB_PATH`.
+## Environment
 
-## Domain logic
-
-The pure functions in `lib/domain/*` are the heart of the app and carry the most
-tests:
-
-- **capacity** — occupancy math (which booking statuses hold a seat, waitlist).
-- **booking-rules** — whether a member may book/cancel, waitlist promotion, and
-  refund eligibility against the studio's cancellation window.
-- **invoices** — subtotal/tax/total from line items, refunds, status transitions.
-- **dates** — timezone-safe day/month bucketing (studios store UTC; the schedule
-  and reports bucket in the studio's IANA timezone).
-- **csv / ical** — RFC-correct exports (quoting, line folding, escaping).
-- **reports** — monthly revenue recognised from invoices.
-
-## Notification provider seam
-
-`lib/notifications/` isolates all email behind a `NotificationProvider`
-interface. The only concrete adapter today is **mailjay** — a self-contained
-(fictional) vendor SDK in `mailjay-sdk.ts` with an injectable transport that
-defaults to an in-memory recorder, so the app sends "notifications" with no
-vendor account. Notifications are written to a `notification_outbox` table and
-delivered by a dispatcher that honours per-member and per-studio opt-outs.
+See `apps/web/.env.example`. The Supabase URL + publishable key are public;
+`SUPABASE_SECRET_KEY` and `RESEND_API_KEY` are secrets and must never be
+committed. Env is validated with Zod in `lib/env.ts` and only read when a
+Supabase/email client is actually constructed (so fake mode needs none of it).
 
 ## Deploying a preview (Cloudflare)
 
 `ship.yml` wires `.github/workflows/deploy-preview.yml` for SHIP's deploy stage.
-On `action=deploy` it provisions an ephemeral per-PR D1 database, applies
-migrations, seeds it from `drizzle/seed.sql`, builds with OpenNext, and deploys a
-`*.workers.dev` Worker; `action=delete` tears both down on PR close. Deploying
-outside SHIP needs a Cloudflare account with `CLOUDFLARE_API_TOKEN` +
-`CLOUDFLARE_ACCOUNT_ID` and a D1 database bound as `DB` (see
-`apps/web/wrangler.jsonc`).
+On `action=deploy` it builds with OpenNext (Supabase URL + publishable key
+injected at build time) and deploys a `*.workers.dev` Worker, then sets
+`SUPABASE_SECRET_KEY` + `RESEND_API_KEY` as Worker secrets; `action=delete` tears
+the Worker down on PR close.
 
-> Note: `drizzle/seed.sql` is a snapshot with dates anchored to when it was
-> generated. Run `db:emit-seed-sql` to refresh it so preview demos land on the
-> current week.
+> Limitation: preview environments share **one seeded Supabase project** — there
+> is no ephemeral per-PR database. Point the workflow's `SUPABASE_*` /
+> `RESEND_API_KEY` GitHub secrets at a dedicated preview project.
+
+## Migrations
+
+Migrations are raw SQL in `packages/db/migrations/`, numbered sequentially
+(`0001_init.sql`). `supabase/migrations` is a symlink to that directory, so
+`supabase db reset` applies them and then seeds from `supabase/seed.sql` (which
+is generated from the app's own seed data — run `db:seed-sql` to refresh it).

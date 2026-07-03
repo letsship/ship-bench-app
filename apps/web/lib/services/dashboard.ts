@@ -1,8 +1,6 @@
-import { and, eq, gte, isNull } from "drizzle-orm";
-import { classSessions, invoices, members, notificationOutbox } from "@/lib/db/schema";
-import type { Db } from "@/lib/db/types";
+import type { Repositories } from "@/lib/db/repos/types";
 import { dayKey } from "@/lib/domain/dates";
-import { listSessions, type SessionView } from "./classes";
+import { type SessionView, listSessions } from "./classes";
 import type { StudioContext } from "./studio";
 
 export interface DashboardStats {
@@ -17,52 +15,32 @@ export interface DashboardData {
   stats: DashboardStats;
 }
 
-async function countRows(db: Db, query: Promise<{ id: string }[]>): Promise<number> {
-  return (await query).length;
-}
-
-export async function getDashboard(db: Db, ctx: StudioContext): Promise<DashboardData> {
+export async function getDashboard(
+  repos: Repositories,
+  ctx: StudioContext,
+): Promise<DashboardData> {
   const nowIso = new Date().toISOString();
   const todayKey = dayKey(nowIso, ctx.studio.timezone);
 
-  const sessions = await listSessions(db, ctx.studio.id);
+  const sessions = await listSessions(repos, ctx.studio.id);
   const today = sessions.filter(
     (session) => dayKey(session.startsAt, ctx.studio.timezone) === todayKey,
   );
 
-  const [activeMembers, upcomingSessions, openInvoices, pendingNotifications] = await Promise.all([
-    countRows(
-      db,
-      db
-        .select({ id: members.id })
-        .from(members)
-        .where(and(eq(members.studioId, ctx.studio.id), eq(members.status, "active"))),
-    ),
-    countRows(
-      db,
-      db
-        .select({ id: classSessions.id })
-        .from(classSessions)
-        .where(and(eq(classSessions.studioId, ctx.studio.id), gte(classSessions.startsAt, nowIso))),
-    ),
-    countRows(
-      db,
-      db
-        .select({ id: invoices.id })
-        .from(invoices)
-        .where(and(eq(invoices.studioId, ctx.studio.id), eq(invoices.status, "open"))),
-    ),
-    countRows(
-      db,
-      db
-        .select({ id: notificationOutbox.id })
-        .from(notificationOutbox)
-        .where(isNull(notificationOutbox.sentAt)),
-    ),
+  const [members, upcoming, invoices, pending] = await Promise.all([
+    repos.members.listByStudio(ctx.studio.id),
+    repos.classSessions.listByStudio(ctx.studio.id, { from: nowIso }),
+    repos.invoices.listByStudio(ctx.studio.id),
+    repos.outbox.listPending(),
   ]);
 
   return {
     today,
-    stats: { activeMembers, upcomingSessions, openInvoices, pendingNotifications },
+    stats: {
+      activeMembers: members.filter((member) => member.status === "active").length,
+      upcomingSessions: upcoming.length,
+      openInvoices: invoices.filter((invoice) => invoice.status === "open").length,
+      pendingNotifications: pending.length,
+    },
   };
 }

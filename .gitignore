@@ -14,11 +14,9 @@ next-env.d.ts
 .wrangler
 .dev.vars
 
-# local database (seeded sqlite for dev + next start)
-*.db
-*.db-shm
-*.db-wal
-.data
+# supabase local stack artifacts
+supabase/.branches
+supabase/.temp
 
 # test / playwright output
 coverage

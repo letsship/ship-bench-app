@@ -9,10 +9,10 @@ import { NewInvoiceForm } from "./new-invoice-form";
 export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage() {
-  const { db, ctx } = await resolveStudio();
+  const { repos, ctx } = await resolveStudio();
   const [invoices, members] = await Promise.all([
-    listInvoices(db, ctx.studio.id),
-    listMembers(db, ctx.studio.id),
+    listInvoices(repos, ctx.studio.id),
+    listMembers(repos, ctx.studio.id),
   ]);
 
   return (

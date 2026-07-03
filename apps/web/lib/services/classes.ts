@@ -1,8 +1,6 @@
-import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import { newId } from "@/lib/db/ids";
-import { bookings, classSessions, classTypes } from "@/lib/db/schema";
-import type { ClassType } from "@/lib/db/schema";
-import type { Db } from "@/lib/db/types";
+import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import type { Booking, ClassSession, ClassType } from "@/lib/db/types";
 import { type Occupancy, computeOccupancy } from "@/lib/domain/capacity";
 import { HttpError } from "@/lib/http";
 import type { CreateClassTypeInput, CreateSessionInput } from "@/lib/validation";
@@ -21,150 +19,99 @@ export interface SessionView {
   occupancy: Occupancy;
 }
 
-export interface SessionRange {
-  from?: string;
-  to?: string;
-}
-
-export async function listClassTypes(db: Db, studioId: string): Promise<ClassType[]> {
-  return db
-    .select()
-    .from(classTypes)
-    .where(eq(classTypes.studioId, studioId))
-    .orderBy(asc(classTypes.name));
+export async function listClassTypes(repos: Repositories, studioId: string): Promise<ClassType[]> {
+  return repos.classTypes.listByStudio(studioId);
 }
 
 export async function createClassType(
-  db: Db,
+  repos: Repositories,
   studioId: string,
   input: CreateClassTypeInput,
 ): Promise<ClassType> {
-  const [classType] = await db
-    .insert(classTypes)
-    .values({
-      id: newId("ct"),
-      studioId,
-      name: input.name,
-      description: input.description ?? null,
-      color: input.color ?? "#6b7280",
-      defaultCapacity: input.defaultCapacity,
-      defaultPriceCents: input.defaultPriceCents,
-    })
-    .returning();
-  return classType;
+  return repos.classTypes.insert({
+    id: newId("ct"),
+    studioId,
+    name: input.name,
+    description: input.description ?? null,
+    color: input.color ?? "#6b7280",
+    defaultCapacity: input.defaultCapacity,
+    defaultPriceCents: input.defaultPriceCents,
+    createdAt: new Date().toISOString(),
+  });
 }
 
-// Occupancy for a batch of sessions in one bookings query (no N+1).
-async function occupancyBySession(
-  db: Db,
-  sessionIds: string[],
-): Promise<Map<string, { status: string }[]>> {
-  const grouped = new Map<string, { status: string }[]>();
-  if (sessionIds.length === 0) return grouped;
-  const rows = await db
-    .select({ sessionId: bookings.sessionId, status: bookings.status })
-    .from(bookings)
-    .where(inArray(bookings.sessionId, sessionIds));
-  for (const row of rows) {
-    const bucket = grouped.get(row.sessionId);
-    if (bucket) bucket.push({ status: row.status });
-    else grouped.set(row.sessionId, [{ status: row.status }]);
+function groupBookings(bookings: Booking[]): Map<string, Booking[]> {
+  const grouped = new Map<string, Booking[]>();
+  for (const booking of bookings) {
+    const bucket = grouped.get(booking.sessionId);
+    if (bucket) bucket.push(booking);
+    else grouped.set(booking.sessionId, [booking]);
   }
   return grouped;
 }
 
+function toView(
+  session: ClassSession,
+  classType: ClassType | undefined,
+  bookings: Booking[],
+): SessionView {
+  return {
+    id: session.id,
+    classTypeId: session.classTypeId,
+    classTypeName: classType?.name ?? "Class",
+    classTypeColor: classType?.color ?? "#6b7280",
+    instructor: session.instructor,
+    startsAt: session.startsAt,
+    endsAt: session.endsAt,
+    capacity: session.capacity,
+    priceCents: session.priceCents,
+    status: session.status,
+    occupancy: computeOccupancy(session.capacity, bookings),
+  };
+}
+
 export async function listSessions(
-  db: Db,
+  repos: Repositories,
   studioId: string,
   range: SessionRange = {},
 ): Promise<SessionView[]> {
-  const filters = [eq(classSessions.studioId, studioId)];
-  if (range.from) filters.push(gte(classSessions.startsAt, range.from));
-  if (range.to) filters.push(lt(classSessions.startsAt, range.to));
-
-  const rows = await db
-    .select({
-      id: classSessions.id,
-      classTypeId: classSessions.classTypeId,
-      classTypeName: classTypes.name,
-      classTypeColor: classTypes.color,
-      instructor: classSessions.instructor,
-      startsAt: classSessions.startsAt,
-      endsAt: classSessions.endsAt,
-      capacity: classSessions.capacity,
-      priceCents: classSessions.priceCents,
-      status: classSessions.status,
-    })
-    .from(classSessions)
-    .innerJoin(classTypes, eq(classTypes.id, classSessions.classTypeId))
-    .where(and(...filters))
-    .orderBy(asc(classSessions.startsAt));
-
-  const occupancy = await occupancyBySession(
-    db,
-    rows.map((row) => row.id),
+  const sessions = await repos.classSessions.listByStudio(studioId, range);
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const bySession = groupBookings(await repos.bookings.listBySessionIds(sessions.map((s) => s.id)));
+  return sessions.map((session) =>
+    toView(session, typeById.get(session.classTypeId), bySession.get(session.id) ?? []),
   );
-  return rows.map((row) => ({
-    ...row,
-    occupancy: computeOccupancy(row.capacity, occupancy.get(row.id) ?? []),
-  }));
 }
 
-export async function getSessionView(db: Db, id: string): Promise<SessionView> {
-  const [session] = await listSessionsById(db, [id]);
+export async function getSessionView(repos: Repositories, id: string): Promise<SessionView> {
+  const session = await repos.classSessions.getById(id);
   if (!session) throw new HttpError(404, "not_found", "Class session not found");
-  return session;
-}
-
-async function listSessionsById(db: Db, ids: string[]): Promise<SessionView[]> {
-  const rows = await db
-    .select({
-      id: classSessions.id,
-      classTypeId: classSessions.classTypeId,
-      classTypeName: classTypes.name,
-      classTypeColor: classTypes.color,
-      instructor: classSessions.instructor,
-      startsAt: classSessions.startsAt,
-      endsAt: classSessions.endsAt,
-      capacity: classSessions.capacity,
-      priceCents: classSessions.priceCents,
-      status: classSessions.status,
-    })
-    .from(classSessions)
-    .innerJoin(classTypes, eq(classTypes.id, classSessions.classTypeId))
-    .where(inArray(classSessions.id, ids));
-  const occupancy = await occupancyBySession(db, ids);
-  return rows.map((row) => ({
-    ...row,
-    occupancy: computeOccupancy(row.capacity, occupancy.get(row.id) ?? []),
-  }));
+  const classType = await repos.classTypes.getById(session.classTypeId);
+  const bookings = await repos.bookings.listBySession(id);
+  return toView(session, classType ?? undefined, bookings);
 }
 
 export async function createSession(
-  db: Db,
+  repos: Repositories,
   studioId: string,
   input: CreateSessionInput,
 ): Promise<SessionView> {
-  const [classType] = await db
-    .select()
-    .from(classTypes)
-    .where(and(eq(classTypes.id, input.classTypeId), eq(classTypes.studioId, studioId)))
-    .limit(1);
-  if (!classType) throw new HttpError(400, "bad_request", "Unknown class type for this studio");
-
-  const [session] = await db
-    .insert(classSessions)
-    .values({
-      id: newId("cs"),
-      studioId,
-      classTypeId: input.classTypeId,
-      instructor: input.instructor,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt,
-      capacity: input.capacity,
-      priceCents: input.priceCents ?? classType.defaultPriceCents,
-      status: "scheduled",
-    })
-    .returning();
-  return getSessionView(db, session.id);
+  const classType = await repos.classTypes.getById(input.classTypeId);
+  if (!classType || classType.studioId !== studioId) {
+    throw new HttpError(400, "bad_request", "Unknown class type for this studio");
+  }
+  const session = await repos.classSessions.insert({
+    id: newId("cs"),
+    studioId,
+    classTypeId: input.classTypeId,
+    instructor: input.instructor,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    capacity: input.capacity,
+    priceCents: input.priceCents ?? classType.defaultPriceCents,
+    status: "scheduled",
+    createdAt: new Date().toISOString(),
+  });
+  return getSessionView(repos, session.id);
 }

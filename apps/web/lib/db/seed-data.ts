@@ -1,40 +1,21 @@
 import { newId } from "./ids";
+import type { SeedData } from "./repos/fakes";
 import type {
-  NewBooking,
-  NewClassSession,
-  NewClassType,
-  NewInvoice,
-  NewInvoiceLineItem,
-  NewMember,
-  NewNotificationOutboxRow,
-  NewStudio,
-} from "./schema";
-import type { StudioSettings } from "./schema";
+  Booking,
+  ClassSession,
+  ClassType,
+  Invoice,
+  InvoiceLineItem,
+  Member,
+  NotificationOutboxRow,
+  Studio,
+  StudioSettings,
+} from "./types";
 
-// Single source of the demo dataset. Consumed by scripts/seed.ts (inserts into
-// the local sqlite database) and scripts/emit-seed-sql.ts (renders drizzle/
-// seed.sql for the ephemeral preview D1). Given a `now`, sessions are placed on
+// Single source of the demo dataset, producing plain entity rows. Consumed by
+// the in-memory fakes (tests + fake-backends mode) and by scripts/emit-seed-sql
+// (renders packages/db/seed.sql for Supabase). Given a `now`, sessions land on
 // calendar days around today so the dashboard always has "today's classes".
-
-export interface SeedData {
-  studio: NewStudio;
-  settings: StudioSettings;
-  members: NewMember[];
-  classTypes: NewClassType[];
-  sessions: NewClassSession[];
-  bookings: NewBooking[];
-  invoices: NewInvoice[];
-  lineItems: NewInvoiceLineItem[];
-  outbox: NewNotificationOutboxRow[];
-}
-
-// Class types with the required-at-build fields narrowed to non-optional, so
-// sessions can read capacity/price without undefined checks.
-type SeededClassType = NewClassType & {
-  id: string;
-  defaultCapacity: number;
-  defaultPriceCents: number;
-};
 
 const DAY_MS = 86_400_000;
 
@@ -69,7 +50,7 @@ const CLASS_TYPE_SEED = [
 
 const INSTRUCTORS = ["Noor", "Sanne", "Tomás", "Priya", "Wouter"] as const;
 
-function buildStudio(): { studio: NewStudio; settings: StudioSettings } {
+function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
   const studioId = newId("stu");
   return {
     studio: {
@@ -77,6 +58,7 @@ function buildStudio(): { studio: NewStudio; settings: StudioSettings } {
       name: "Riverbank Movement",
       slug: "riverbank",
       timezone: "Europe/Amsterdam",
+      createdAt: monthsAgoIso(now, 6, 1),
     },
     settings: {
       studioId,
@@ -92,8 +74,8 @@ function buildStudio(): { studio: NewStudio; settings: StudioSettings } {
   };
 }
 
-function buildMembers(studioId: string): NewMember[] {
-  return MEMBER_SEED.map((member) => ({
+function buildMembers(now: Date, studioId: string): Member[] {
+  return MEMBER_SEED.map((member, index) => ({
     id: newId("mem"),
     studioId,
     name: member.name,
@@ -102,10 +84,11 @@ function buildMembers(studioId: string): NewMember[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }
 
-function buildClassTypes(studioId: string): SeededClassType[] {
+function buildClassTypes(now: Date, studioId: string): ClassType[] {
   return CLASS_TYPE_SEED.map((type) => ({
     id: newId("ct"),
     studioId,
@@ -114,12 +97,13 @@ function buildClassTypes(studioId: string): SeededClassType[] {
     color: type.color,
     defaultCapacity: type.capacity,
     defaultPriceCents: type.price,
+    createdAt: monthsAgoIso(now, 6, 2),
   }));
 }
 
 // Three sessions a day from a week ago to a week ahead.
-function buildSessions(now: Date, studioId: string, classTypes: SeededClassType[]): NewClassSession[] {
-  const sessions: NewClassSession[] = [];
+function buildSessions(now: Date, studioId: string, classTypes: ClassType[]): ClassSession[] {
+  const sessions: ClassSession[] = [];
   let counter = 0;
   for (let dayOffset = -6; dayOffset <= 8; dayOffset += 1) {
     for (const hour of [8, 12, 17]) {
@@ -134,6 +118,7 @@ function buildSessions(now: Date, studioId: string, classTypes: SeededClassType[
         capacity: type.defaultCapacity,
         priceCents: type.defaultPriceCents,
         status: "scheduled",
+        createdAt: monthsAgoIso(now, 1, 1),
       });
       counter += 1;
     }
@@ -141,15 +126,21 @@ function buildSessions(now: Date, studioId: string, classTypes: SeededClassType[
   return sessions;
 }
 
-// Book members onto sessions: past sessions resolve to attended/no-show, future
-// sessions to booked, and one near-future session is filled to capacity with a
-// short waitlist to exercise occupancy + waitlist logic.
-function buildBookings(
-  now: Date,
-  members: NewMember[],
-  sessions: NewClassSession[],
-): NewBooking[] {
-  const bookings: NewBooking[] = [];
+function newBooking(sessionId: string, memberId: string, status: string, now: Date): Booking {
+  return {
+    id: newId("bkg"),
+    sessionId,
+    memberId,
+    status,
+    bookedAt: new Date(now.getTime() - DAY_MS).toISOString(),
+    cancelledAt: null,
+  };
+}
+
+// Past sessions resolve to attended/no-show, future sessions to booked, and one
+// near-future small session is filled to capacity with a short waitlist.
+function buildBookings(now: Date, members: Member[], sessions: ClassSession[]): Booking[] {
+  const bookings: Booking[] = [];
   const nowMs = now.getTime();
   sessions.forEach((session, index) => {
     const isPast = new Date(session.startsAt).getTime() < nowMs;
@@ -157,45 +148,35 @@ function buildBookings(
     for (let i = 0; i < attendeeCount; i += 1) {
       const member = members[(index + i) % members.length];
       if (member.status !== "active") continue;
-      let status = "booked";
-      if (isPast) status = i % 5 === 0 ? "no_show" : "attended";
-      bookings.push({
-        id: newId("bkg"),
-        sessionId: session.id,
-        memberId: member.id,
-        status,
-        cancelledAt: null,
-      });
+      const status = isPast ? (i % 5 === 0 ? "no_show" : "attended") : "booked";
+      bookings.push(newBooking(session.id, member.id, status, now));
     }
   });
-  fillWaitlistSession(members, sessions, bookings, nowMs);
+  fillWaitlistSession(now, members, sessions, bookings);
   return bookings;
 }
 
-// Find the first upcoming small-capacity session and fill it plus a waitlist.
 function fillWaitlistSession(
-  members: NewMember[],
-  sessions: NewClassSession[],
-  bookings: NewBooking[],
-  nowMs: number,
+  now: Date,
+  members: Member[],
+  sessions: ClassSession[],
+  bookings: Booking[],
 ): void {
   const target = sessions.find(
-    (session) => new Date(session.startsAt).getTime() > nowMs && session.capacity <= 8,
+    (session) => new Date(session.startsAt).getTime() > now.getTime() && session.capacity <= 8,
   );
   if (!target) return;
   const active = members.filter((member) => member.status === "active");
-  const existing = new Set(
-    bookings.filter((b) => b.sessionId === target.id).map((b) => b.memberId),
-  );
+  const existing = new Set(bookings.filter((b) => b.sessionId === target.id).map((b) => b.memberId));
   let seatsLeft = target.capacity - existing.size;
   let waitlistLeft = 2;
   for (const member of active) {
     if (existing.has(member.id)) continue;
     if (seatsLeft > 0) {
-      bookings.push({ id: newId("bkg"), sessionId: target.id, memberId: member.id, status: "booked", cancelledAt: null });
+      bookings.push(newBooking(target.id, member.id, "booked", now));
       seatsLeft -= 1;
     } else if (waitlistLeft > 0) {
-      bookings.push({ id: newId("bkg"), sessionId: target.id, memberId: member.id, status: "waitlisted", cancelledAt: null });
+      bookings.push(newBooking(target.id, member.id, "waitlisted", now));
       waitlistLeft -= 1;
     }
   }
@@ -221,11 +202,11 @@ const INVOICE_SEED: InvoiceSeed[] = [
 function buildInvoices(
   now: Date,
   studioId: string,
-  members: NewMember[],
+  members: Member[],
   taxRateBps: number,
-): { invoices: NewInvoice[]; lineItems: NewInvoiceLineItem[] } {
-  const invoices: NewInvoice[] = [];
-  const lineItems: NewInvoiceLineItem[] = [];
+): { invoices: Invoice[]; lineItems: InvoiceLineItem[] } {
+  const invoices: Invoice[] = [];
+  const lineItems: InvoiceLineItem[] = [];
   INVOICE_SEED.forEach((seed, index) => {
     const invoiceId = newId("inv");
     const member = members[seed.memberIndex];
@@ -260,36 +241,42 @@ function buildInvoices(
       issuedAt,
       dueAt: new Date(new Date(issuedAt).getTime() + 14 * DAY_MS).toISOString(),
       paidAt: seed.status === "paid" ? issuedAt : null,
+      createdAt: issuedAt,
     });
   });
   return { invoices, lineItems };
 }
 
-function buildOutbox(now: Date, members: NewMember[]): NewNotificationOutboxRow[] {
-  const sentAt = new Date(now.getTime() - DAY_MS).toISOString();
+function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
+  const createdAt = new Date(now.getTime() - 2 * DAY_MS).toISOString();
   return [
     {
       id: newId("nof"),
       memberId: members[0].id,
       kind: "booking_confirmation",
       payload: JSON.stringify({ subject: "You're booked", body: "See you soon!", data: {} }),
-      sentAt,
-      providerMessageId: "mj_seededdelivery0001",
+      createdAt,
+      sentAt: new Date(now.getTime() - DAY_MS).toISOString(),
+      providerMessageId: "re_seededdelivery0001",
+      error: null,
     },
     {
       id: newId("nof"),
       memberId: members[1].id,
       kind: "invoice_issued",
       payload: JSON.stringify({ subject: "Invoice ready", body: "Your invoice is ready.", data: {} }),
+      createdAt,
       sentAt: null,
+      providerMessageId: null,
+      error: null,
     },
   ];
 }
 
 export function buildSeed(now: Date = new Date()): SeedData {
-  const { studio, settings } = buildStudio();
-  const members = buildMembers(studio.id);
-  const classTypes = buildClassTypes(studio.id);
+  const { studio, settings } = buildStudio(now);
+  const members = buildMembers(now, studio.id);
+  const classTypes = buildClassTypes(now, studio.id);
   const sessions = buildSessions(now, studio.id, classTypes);
   const bookings = buildBookings(now, members, sessions);
   const { invoices, lineItems } = buildInvoices(now, studio.id, members, settings.taxRateBps);

@@ -1,6 +1,4 @@
-import { and, asc, eq, gte, lt } from "drizzle-orm";
-import { bookings, classSessions, classTypes, members } from "@/lib/db/schema";
-import type { Db } from "@/lib/db/types";
+import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 
 export interface BookingRow {
   id: string;
@@ -12,36 +10,36 @@ export interface BookingRow {
   status: string;
 }
 
-export interface BookingRange {
-  from?: string;
-  to?: string;
-}
-
-// Flat list of bookings joined to member + session + class type, ordered by
-// session start. The /bookings page buckets these by day.
+// Flat list of bookings joined (in-memory) to member + session + class type,
+// ordered by session start. The /bookings page buckets these by day. The join
+// happens here in the service so repositories stay single-entity.
 export async function listBookingRows(
-  db: Db,
+  repos: Repositories,
   studioId: string,
-  range: BookingRange = {},
+  range: SessionRange = {},
 ): Promise<BookingRow[]> {
-  const filters = [eq(classSessions.studioId, studioId)];
-  if (range.from) filters.push(gte(classSessions.startsAt, range.from));
-  if (range.to) filters.push(lt(classSessions.startsAt, range.to));
+  const sessions = await repos.classSessions.listByStudio(studioId, range);
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const members = await repos.members.listByStudio(studioId);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
 
-  return db
-    .select({
-      id: bookings.id,
-      memberName: members.name,
-      className: classTypes.name,
-      classColor: classTypes.color,
-      instructor: classSessions.instructor,
-      startsAt: classSessions.startsAt,
-      status: bookings.status,
+  return bookings
+    .map((booking) => {
+      const session = sessionById.get(booking.sessionId);
+      const classType = session ? typeById.get(session.classTypeId) : undefined;
+      const member = memberById.get(booking.memberId);
+      return {
+        id: booking.id,
+        memberName: member?.name ?? "—",
+        className: classType?.name ?? "Class",
+        classColor: classType?.color ?? "#6b7280",
+        instructor: session?.instructor ?? "",
+        startsAt: session?.startsAt ?? "",
+        status: booking.status,
+      };
     })
-    .from(bookings)
-    .innerJoin(classSessions, eq(classSessions.id, bookings.sessionId))
-    .innerJoin(classTypes, eq(classTypes.id, classSessions.classTypeId))
-    .innerJoin(members, eq(members.id, bookings.memberId))
-    .where(and(...filters))
-    .orderBy(asc(classSessions.startsAt));
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }

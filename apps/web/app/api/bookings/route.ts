@@ -12,10 +12,10 @@ export const dynamic = "force-dynamic";
 // GET /api/bookings?from=&to= — bookings joined to member + session.
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
-    const { db, ctx } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const from = request.nextUrl.searchParams.get("from") ?? undefined;
     const to = request.nextUrl.searchParams.get("to") ?? undefined;
-    return ok(await listBookingRows(db, ctx.studio.id, { from, to }));
+    return ok(await listBookingRows(repos, ctx.studio.id, { from, to }));
   });
 }
 
@@ -23,8 +23,8 @@ export async function GET(request: NextRequest): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { db } = await resolveStudio();
+    const { repos } = await resolveStudio();
     const input = createBookingSchema.parse(await request.json());
-    return created(await createBooking(db, createNotificationProvider(), input));
+    return created(await createBooking(repos, createNotificationProvider(), input));
   });
 }

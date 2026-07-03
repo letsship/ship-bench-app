@@ -13,13 +13,18 @@
     "test": "turbo run test",
     "clean": "turbo run clean",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local --schema public > apps/web/lib/db/database.types.ts"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
+    "supabase": "^2.20.0",
     "turbo": "^2.8.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild", "sharp", "workerd"]
+    "onlyBuiltDependencies": ["esbuild", "sharp", "supabase", "workerd"]
   }
 }

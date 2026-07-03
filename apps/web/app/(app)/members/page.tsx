@@ -8,8 +8,8 @@ import { OptOutToggle } from "./opt-out-toggle";
 export const dynamic = "force-dynamic";
 
 export default async function MembersPage() {
-  const { db, ctx } = await resolveStudio();
-  const members = await listMembers(db, ctx.studio.id);
+  const { repos, ctx } = await resolveStudio();
+  const members = await listMembers(repos, ctx.studio.id);
 
   return (
     <>

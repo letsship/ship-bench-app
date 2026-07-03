@@ -13,8 +13,8 @@ function monthLabel(month: string): string {
 }
 
 export default async function ReportsPage() {
-  const { db, ctx } = await resolveStudio();
-  const report = await getRevenueReport(db, ctx);
+  const { repos, ctx } = await resolveStudio();
+  const report = await getRevenueReport(repos, ctx);
 
   return (
     <>

@@ -12,14 +12,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { db, ctx } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const type = request.nextUrl.searchParams.get("type") ?? "members";
 
     let csv: string;
     if (type === "members") {
-      csv = membersToCsv(await listMembers(db, ctx.studio.id));
+      csv = membersToCsv(await listMembers(repos, ctx.studio.id));
     } else if (type === "invoices") {
-      csv = invoicesToCsv(await listInvoices(db, ctx.studio.id));
+      csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
     } else {
       return badRequest(`Unknown export type: ${type}`);
     }

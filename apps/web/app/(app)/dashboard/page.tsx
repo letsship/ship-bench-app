@@ -7,8 +7,8 @@ import { EmptyState, PageHeader, StatCard, StatusBadge } from "../_components/ui
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { db, ctx } = await resolveStudio();
-  const { today, stats } = await getDashboard(db, ctx);
+  const { repos, ctx } = await resolveStudio();
+  const { today, stats } = await getDashboard(repos, ctx);
   const timeZone = ctx.studio.timezone;
 
   return (

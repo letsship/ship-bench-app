@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 // GET /api/invoices — invoices with member name, newest first.
 export async function GET(): Promise<Response> {
   return handle(async () => {
-    const { db, ctx } = await resolveStudio();
-    return ok(await listInvoices(db, ctx.studio.id));
+    const { repos, ctx } = await resolveStudio();
+    return ok(await listInvoices(repos, ctx.studio.id));
   });
 }
 
@@ -19,8 +19,8 @@ export async function GET(): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { db, ctx } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const input = createInvoiceSchema.parse(await request.json());
-    return created(await createInvoice(db, createNotificationProvider(), ctx.studio.id, input));
+    return created(await createInvoice(repos, createNotificationProvider(), ctx.studio.id, input));
   });
 }

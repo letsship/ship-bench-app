@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 // GET /api/classes/types — the class catalog (Vinyasa Flow, Wheel Throwing, …).
 export async function GET(): Promise<Response> {
   return handle(async () => {
-    const { db, ctx } = await resolveStudio();
-    return ok(await listClassTypes(db, ctx.studio.id));
+    const { repos, ctx } = await resolveStudio();
+    return ok(await listClassTypes(repos, ctx.studio.id));
   });
 }
 
@@ -18,8 +18,8 @@ export async function GET(): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { db, ctx } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const input = createClassTypeSchema.parse(await request.json());
-    return created(await createClassType(db, ctx.studio.id, input));
+    return created(await createClassType(repos, ctx.studio.id, input));
   });
 }

@@ -17,12 +17,12 @@ export default async function InvoiceDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { db, ctx } = await resolveStudio();
+  const { repos, ctx } = await resolveStudio();
   const { id } = await params;
 
   let detail: Awaited<ReturnType<typeof getInvoiceDetail>>;
   try {
-    detail = await getInvoiceDetail(db, id);
+    detail = await getInvoiceDetail(repos, id);
   } catch (error) {
     if (error instanceof HttpError && error.status === 404) notFound();
     throw error;
