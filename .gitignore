@@ -1,0 +1,35 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# next / turbo / opennext build output
+.next
+.open-next
+.turbo
+dist
+next-env.d.ts
+*.tsbuildinfo
+
+# cloudflare / wrangler
+.wrangler
+.dev.vars
+
+# local database (seeded sqlite for dev + next start)
+*.db
+*.db-shm
+*.db-wal
+.data
+
+# test / playwright output
+coverage
+playwright-report
+test-results
+.playwright
+
+# env + editor
+.env
+.env.local
+.env.*.local
+.DS_Store
+.idea
+.vscode

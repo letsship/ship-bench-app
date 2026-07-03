@@ -1,0 +1,180 @@
+name: deploy-preview
+
+# Ephemeral per-PR preview deploy of apps/web, dispatched by the SHIP
+# orchestrator's deploying stage via workflow_dispatch (wiring lives in
+# ship.yml at the repo root).
+#
+# On a successful deploy this workflow creates a GitHub Deployment + a
+# `success` deployment status carrying { pr_number, workerName } in the
+# payload and the live preview URL as `environment_url`. The SHIP GitHub App
+# is subscribed to `deployment_status`, so that webhook routes the
+# orchestrator back to resume the suspended pipeline -> QA smoke test.
+#
+#   action=deploy : provision an ephemeral D1 db (named <worker_name>-db),
+#                   apply migrations, seed it, build (OpenNext) + deploy a
+#                   *.workers.dev Worker named <worker_name>, then signal
+#                   deployment_status.
+#   action=delete : tear down the preview Worker AND its ephemeral D1 db on
+#                   PR merge/close (fire-and-forget; no callback expected).
+#
+# NOTE: this file must live on the DEFAULT branch for workflow_dispatch to
+# resolve it; ship.yml is read at the PR head SHA.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "deploy | delete"
+        required: true
+        type: string
+      worker_name:
+        description: "Per-PR Cloudflare Worker name"
+        required: true
+        type: string
+      config_file:
+        description: "Path to the wrangler config (repo-root relative)"
+        required: true
+        type: string
+      env_name:
+        description: "Deployment environment name"
+        required: true
+        type: string
+      ref:
+        description: "Branch to deploy"
+        required: true
+        type: string
+      account_subdomain:
+        description: "Account workers.dev subdomain"
+        required: true
+        type: string
+      pr_number:
+        # Sent on deploy, omitted on delete — MUST be optional so the delete
+        # dispatch doesn't 422 "Unexpected inputs provided".
+        description: "PR number (deploy only)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  # The Actions GITHUB_TOKEN creates the Deployment + status the orchestrator
+  # listens for.
+  deployments: write
+
+env:
+  # The ephemeral D1 database name is derived from the per-PR worker name, so
+  # deploy + delete resolve the same database without extra plumbing.
+  DB_NAME: ${{ inputs.worker_name }}-db
+
+jobs:
+  preview:
+    name: ${{ inputs.action }} preview ${{ inputs.worker_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --- DELETE: tear down the preview Worker + its ephemeral D1 db ---
+      # Best-effort; the orchestrator expects no callback for a delete.
+      - name: Delete preview worker + database
+        if: inputs.action == 'delete'
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          CONFIG="$(basename "${{ inputs.config_file }}")"
+          pnpm exec wrangler delete -c "$CONFIG" --name "${{ inputs.worker_name }}" || true
+          pnpm exec wrangler d1 delete "$DB_NAME" -y || true
+
+      # --- DEPLOY: provision D1, migrate + seed, build, deploy ---
+
+      # Create (or reuse) the ephemeral per-PR D1 database and capture its id.
+      # `d1 create` is not idempotent, so on a re-dispatch we fall back to
+      # resolving the id from `d1 list`.
+      - name: Provision ephemeral D1 database
+        if: inputs.action == 'deploy'
+        id: d1
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler d1 create "$DB_NAME" || echo "database may already exist, resolving id"
+          DB_ID="$(pnpm exec wrangler d1 list --json | jq -r --arg n "$DB_NAME" '.[] | select(.name == $n) | .uuid')"
+          if [ -z "$DB_ID" ]; then echo "could not resolve D1 database id for $DB_NAME" >&2; exit 1; fi
+          echo "db_id=$DB_ID" >> "$GITHUB_OUTPUT"
+
+      # Strip jsonc comments and inject the resolved D1 binding into a runtime
+      # config so the preview Worker binds the ephemeral database.
+      - name: Materialize runtime wrangler config
+        if: inputs.action == 'deploy'
+        working-directory: apps/web
+        env:
+          DB_ID: ${{ steps.d1.outputs.db_id }}
+        run: |
+          CONFIG="$(basename "${{ inputs.config_file }}")"
+          node scripts/inject-d1-binding.mjs "$CONFIG" "$DB_NAME" "$DB_ID" > wrangler.preview.runtime.json
+
+      - name: Apply migrations + seed to the ephemeral database
+        if: inputs.action == 'deploy'
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler d1 migrations apply "$DB_NAME" --remote -c wrangler.preview.runtime.json
+          pnpm exec wrangler d1 execute "$DB_NAME" --remote --file=drizzle/seed.sql -c wrangler.preview.runtime.json
+
+      - name: Build apps/web for Cloudflare (OpenNext)
+        if: inputs.action == 'deploy'
+        run: pnpm --filter @studiobook/web build:cf
+
+      - name: Deploy preview worker
+        if: inputs.action == 'deploy'
+        id: deploy
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # Route-less config + per-PR name override -> *.workers.dev only.
+          pnpm exec wrangler deploy -c wrangler.preview.runtime.json --name "${{ inputs.worker_name }}"
+          echo "url=https://${{ inputs.worker_name }}.${{ inputs.account_subdomain }}.workers.dev" >> "$GITHUB_OUTPUT"
+
+      - name: Signal deployment status to SHIP
+        if: inputs.action == 'deploy'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          ENV_NAME: ${{ inputs.env_name }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          WORKER_NAME: ${{ inputs.worker_name }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          SHA="$(git rev-parse HEAD)"
+          DEP_ID="$(jq -n \
+            --arg ref "$SHA" \
+            --arg env "$ENV_NAME" \
+            --arg pr "$PR_NUMBER" \
+            --arg wn "$WORKER_NAME" \
+            '{ref:$ref, environment:$env, auto_merge:false, required_contexts:[], description:"Studiobook preview environment", payload:{pr_number:$pr, workerName:$wn}}' \
+            | gh api "repos/$REPO/deployments" --input - --jq .id)"
+          gh api "repos/$REPO/deployments/$DEP_ID/statuses" \
+            -f state=success \
+            -f environment_url="$PREVIEW_URL" \
+            -f log_url="$RUN_URL" \
+            -f description="Preview deployed"

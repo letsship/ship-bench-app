@@ -1,0 +1,17 @@
+{
+  "extends": "@studiobook/config-typescript/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "next-env.d.ts"],
+  "exclude": [
+    "node_modules",
+    ".next",
+    ".open-next",
+    "e2e",
+    "playwright.config.ts"
+  ]
+}

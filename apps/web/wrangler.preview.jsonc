@@ -1,0 +1,26 @@
+{
+  // Route-less preview config — deploys to *.workers.dev ONLY, never a custom
+  // domain. The per-PR worker name is supplied by the SHIP orchestrator via
+  // `wrangler deploy --name`, and the deploy-preview workflow injects the
+  // ephemeral D1 binding (name + id) into a materialized runtime config
+  // (scripts/inject-d1-binding.mjs) before deploying.
+  "name": "studiobook-preview",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "studiobook-preview",
+      "database_id": "PLACEHOLDER_INJECTED_AT_DEPLOY",
+      "migrations_dir": "drizzle",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+}

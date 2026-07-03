@@ -1,0 +1,52 @@
+{
+  "name": "@studiobook/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint app lib scripts",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:reset": "tsx scripts/reset.ts",
+    "db:emit-seed-sql": "tsx scripts/emit-seed-sql.ts",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.16.5",
+    "drizzle-orm": "^0.44.2",
+    "next": "^16.1.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.0.14"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@next/eslint-plugin-next": "^16.0.0",
+    "@playwright/test": "^1.50.0",
+    "@studiobook/config-typescript": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "better-sqlite3": "^12.2.0",
+    "drizzle-kit": "^0.31.1",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^6.1.0",
+    "tailwindcss": "^4.1.8",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.21.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.67.0"
+  }
+}

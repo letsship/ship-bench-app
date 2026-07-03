@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["NODE_ENV", "STUDIOBOOK_DB_PATH", "STUDIOBOOK_SESSION_SECRET"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": true,
+      "inputs": ["app/**", "lib/**", "drizzle/**", "vitest.config.*", "package.json"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

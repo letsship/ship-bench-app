@@ -1,0 +1,8 @@
+node_modules
+.next
+.open-next
+.turbo
+dist
+drizzle
+pnpm-lock.yaml
+*.db
