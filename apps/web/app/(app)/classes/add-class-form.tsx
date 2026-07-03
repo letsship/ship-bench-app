@@ -100,8 +100,10 @@ export function AddClassForm({ classTypes }: { classTypes: ClassTypeOption[] }) 
           className="sb-input"
           value={startAt}
           onChange={(event) => setStartAt(event.target.value)}
-          required
         />
+        <p className="mt-1 text-xs text-[var(--color-muted)]">
+          Leave blank to schedule for tomorrow morning.
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
