@@ -81,8 +81,8 @@ Against a real local Supabase:
 
 ```bash
 pnpm install
-pnpm db:start          # boots the local Supabase stack (Docker)
-pnpm db:reset          # applies packages/db/migrations + seeds supabase/seed.sql
+pnpm supabase:start    # boots the local Supabase stack (Docker)
+pnpm supabase:reset    # applies packages/db/migrations + seeds supabase/seed.sql
 # set NEXT_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY / SUPABASE_SECRET_KEY (see .env.example)
 pnpm --filter @studiobook/web dev
 ```
@@ -98,8 +98,9 @@ a signed dev cookie (Studiobook's own auth is separate from Supabase Auth).
 | `pnpm test` | Vitest unit + integration (hermetic, ~180 tests) |
 | `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit` |
 | `pnpm --filter @studiobook/web e2e` | Playwright smoke (builds, runs `next start` in fake mode) |
-| `pnpm db:start` / `pnpm db:reset` | boot local Supabase / apply migrations + seed |
-| `pnpm db:types` | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
+| `pnpm supabase:start` / `pnpm supabase:reset` | boot local Supabase / apply migrations + seed |
+| `pnpm supabase:migrate` | apply pending migrations to the running local db |
+| `pnpm supabase:types` | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
 | `pnpm --filter @studiobook/web db:seed-sql` | regenerate `supabase/seed.sql` |
 
 ## Environment

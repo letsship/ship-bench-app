@@ -14,10 +14,11 @@
     "clean": "turbo run clean",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local --schema public > apps/web/lib/db/database.types.ts"
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:migrate": "supabase migration up",
+    "supabase:types": "supabase gen types typescript --local --schema public > apps/web/lib/db/database.types.ts"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
