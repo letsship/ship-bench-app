@@ -1,8 +1,8 @@
 import type { Occupancy } from "./capacity";
 import { hoursBetween, isBefore } from "./dates";
 
-// Booking + cancellation policy. Pure decisions over minimal shapes so both the
-// API route handlers and hidden benchmark tests can exercise every branch.
+// Booking + cancellation policy. Pure decisions over minimal shapes so the
+// API route handlers and tests can exercise every branch.
 
 export type BookingStatus = "booked" | "waitlisted" | "attended" | "no_show" | "cancelled";
 

@@ -1,10 +1,9 @@
 import { Resend } from "resend";
 import type { NotificationProvider } from "./types";
 
-// The real Resend adapter behind the provider-agnostic contract. This is the
-// concrete email vendor the fixture ships on; a future benchmark task migrates
-// it to Cloudflare Email Service by writing a sibling adapter — nothing upstream
-// of this file references Resend.
+// The Resend adapter behind the provider-agnostic contract. Nothing upstream
+// of this file references Resend directly — vendors are swappable behind
+// NotificationProvider.
 
 export interface ResendConfig {
   apiKey: string;

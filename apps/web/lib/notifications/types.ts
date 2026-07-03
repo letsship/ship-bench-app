@@ -1,7 +1,6 @@
 // The provider-agnostic notification contract. The outbox dispatcher and the
 // message builders depend only on this interface; concrete vendors (today:
-// mailjay) implement it. This seam is the substrate for a future
-// email-provider migration.
+// Resend) implement it.
 
 export type NotificationKind =
   | "booking_confirmation"

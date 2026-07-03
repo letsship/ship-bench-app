@@ -24,7 +24,7 @@ export async function createMember(
     throw new HttpError(409, "conflict", `A member with email ${input.email} already exists`);
   }
   return repos.members.insert({
-    id: newId("mem"),
+    id: newId(),
     studioId,
     name: input.name,
     email: input.email,

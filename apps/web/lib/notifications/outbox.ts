@@ -31,7 +31,7 @@ export async function enqueueNotification(
   repos: Repositories,
   message: NotificationMessage,
 ): Promise<string> {
-  const id = newId("nof");
+  const id = newId();
   await repos.outbox.insert({
     id,
     memberId: message.recipient.memberId,

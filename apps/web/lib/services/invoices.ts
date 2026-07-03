@@ -74,7 +74,7 @@ export async function createInvoice(
   const totals = computeInvoiceTotals(input.lineItems, settings.taxRateBps);
   const existingCount = await repos.invoices.countByStudio(studioId);
   const issuedAt = new Date().toISOString();
-  const invoiceId = newId("inv");
+  const invoiceId = newId();
 
   const invoice = await repos.invoices.insert({
     id: invoiceId,
@@ -95,7 +95,7 @@ export async function createInvoice(
 
   await repos.invoiceLineItems.insertMany(
     input.lineItems.map((line) => ({
-      id: newId("ili"),
+      id: newId(),
       invoiceId,
       description: line.description,
       quantity: line.quantity,

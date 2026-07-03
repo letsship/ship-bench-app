@@ -51,7 +51,7 @@ const CLASS_TYPE_SEED = [
 const INSTRUCTORS = ["Noor", "Sanne", "Tomás", "Priya", "Wouter"] as const;
 
 function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
-  const studioId = newId("stu");
+  const studioId = newId();
   return {
     studio: {
       id: studioId,
@@ -76,7 +76,7 @@ function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
 
 function buildMembers(now: Date, studioId: string): Member[] {
   return MEMBER_SEED.map((member, index) => ({
-    id: newId("mem"),
+    id: newId(),
     studioId,
     name: member.name,
     email: member.email,
@@ -90,7 +90,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
 
 function buildClassTypes(now: Date, studioId: string): ClassType[] {
   return CLASS_TYPE_SEED.map((type) => ({
-    id: newId("ct"),
+    id: newId(),
     studioId,
     name: type.name,
     description: `${type.name} — a ${type.kind} class at Riverbank Movement.`,
@@ -109,7 +109,7 @@ function buildSessions(now: Date, studioId: string, classTypes: ClassType[]): Cl
     for (const hour of [8, 12, 17]) {
       const type = classTypes[counter % classTypes.length];
       sessions.push({
-        id: newId("cs"),
+        id: newId(),
         studioId,
         classTypeId: type.id,
         instructor: INSTRUCTORS[counter % INSTRUCTORS.length],
@@ -128,7 +128,7 @@ function buildSessions(now: Date, studioId: string, classTypes: ClassType[]): Cl
 
 function newBooking(sessionId: string, memberId: string, status: string, now: Date): Booking {
   return {
-    id: newId("bkg"),
+    id: newId(),
     sessionId,
     memberId,
     status,
@@ -208,14 +208,14 @@ function buildInvoices(
   const invoices: Invoice[] = [];
   const lineItems: InvoiceLineItem[] = [];
   INVOICE_SEED.forEach((seed, index) => {
-    const invoiceId = newId("inv");
+    const invoiceId = newId();
     const member = members[seed.memberIndex];
     let subtotal = 0;
     for (const line of seed.lines) {
       const amount = line.quantity * line.unit;
       if (!line.refunded) subtotal += amount;
       lineItems.push({
-        id: newId("ili"),
+        id: newId(),
         invoiceId,
         description: line.description,
         quantity: line.quantity,
@@ -251,7 +251,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
   const createdAt = new Date(now.getTime() - 2 * DAY_MS).toISOString();
   return [
     {
-      id: newId("nof"),
+      id: newId(),
       memberId: members[0].id,
       kind: "booking_confirmation",
       payload: JSON.stringify({ subject: "You're booked", body: "See you soon!", data: {} }),
@@ -261,7 +261,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
       error: null,
     },
     {
-      id: newId("nof"),
+      id: newId(),
       memberId: members[1].id,
       kind: "invoice_issued",
       payload: JSON.stringify({ subject: "Invoice ready", body: "Your invoice is ready.", data: {} }),

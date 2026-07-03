@@ -83,7 +83,7 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
-  const bookingId = newId("bkg");
+  const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
     sessionId: session.id,

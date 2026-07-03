@@ -29,7 +29,7 @@ export async function createClassType(
   input: CreateClassTypeInput,
 ): Promise<ClassType> {
   return repos.classTypes.insert({
-    id: newId("ct"),
+    id: newId(),
     studioId,
     name: input.name,
     description: input.description ?? null,
@@ -102,7 +102,7 @@ export async function createSession(
     throw new HttpError(400, "bad_request", "Unknown class type for this studio");
   }
   const session = await repos.classSessions.insert({
-    id: newId("cs"),
+    id: newId(),
     studioId,
     classTypeId: input.classTypeId,
     instructor: input.instructor,
