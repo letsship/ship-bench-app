@@ -28,6 +28,14 @@ export interface SeedData {
   outbox: NewNotificationOutboxRow[];
 }
 
+// Class types with the required-at-build fields narrowed to non-optional, so
+// sessions can read capacity/price without undefined checks.
+type SeededClassType = NewClassType & {
+  id: string;
+  defaultCapacity: number;
+  defaultPriceCents: number;
+};
+
 const DAY_MS = 86_400_000;
 
 function atUtc(now: Date, dayOffset: number, hour: number): string {
@@ -85,7 +93,7 @@ function buildStudio(): { studio: NewStudio; settings: StudioSettings } {
 }
 
 function buildMembers(studioId: string): NewMember[] {
-  return MEMBER_SEED.map((member, index) => ({
+  return MEMBER_SEED.map((member) => ({
     id: newId("mem"),
     studioId,
     name: member.name,
@@ -97,7 +105,7 @@ function buildMembers(studioId: string): NewMember[] {
   }));
 }
 
-function buildClassTypes(studioId: string): NewClassType[] {
+function buildClassTypes(studioId: string): SeededClassType[] {
   return CLASS_TYPE_SEED.map((type) => ({
     id: newId("ct"),
     studioId,
@@ -110,7 +118,7 @@ function buildClassTypes(studioId: string): NewClassType[] {
 }
 
 // Three sessions a day from a week ago to a week ahead.
-function buildSessions(now: Date, studioId: string, classTypes: NewClassType[]): NewClassSession[] {
+function buildSessions(now: Date, studioId: string, classTypes: SeededClassType[]): NewClassSession[] {
   const sessions: NewClassSession[] = [];
   let counter = 0;
   for (let dayOffset = -6; dayOffset <= 8; dayOffset += 1) {
