@@ -70,14 +70,44 @@ ship.yml                   SHIP preview-deploy manifest
 
 ## Getting started
 
-Fastest path (no Supabase needed):
+### Quick start (no database)
+
+The fastest way to get Studiobook running in front of you — no Supabase CLI,
+Docker, or account setup required:
 
 ```bash
 pnpm install
-pnpm --filter @studiobook/web dev:fake   # http://localhost:3000, seeded in-memory
+pnpm --filter @studiobook/web dev:fake   # http://localhost:3000
 ```
 
-Against a real local Supabase:
+`dev:fake` sets `USE_FAKE_BACKENDS=1`, which swaps in the in-memory repository
+fakes (`lib/db/repos/fakes.ts`) and a no-op email provider instead of Supabase
+and Resend.
+
+What you'll see:
+
+- A demo studio, **Riverbank Movement**, already seeded with 8 demo members, 5
+  class types (Vinyasa Flow, Yin & Restore, Reformer Pilates, Wheel Throwing,
+  Hand Building), and a schedule of upcoming class sessions with bookings and
+  waitlists — so the console isn't empty on first load.
+- Sign in at `/login` with **any email address**. The login form is a dev-only
+  stub (`lib/auth/session.ts`) that mints a signed session cookie directly —
+  there's no real credential check, no magic link actually sent, and no
+  password.
+
+What behaves differently in this mode:
+
+- **Emails aren't sent.** Notifications land in an in-memory outbox
+  (`lib/notifications/`) instead of going through Resend.
+- **Data resets on restart.** Members, bookings, invoices, and the outbox all
+  live in memory and reset back to the seed dataset every time the dev server
+  restarts — nothing persists.
+
+This is also how the test suite and Playwright smoke tests run (see
+[Fake-backends mode](#fake-backends-mode) below), so anything you see here is
+also what CI sees.
+
+### Against a real local Supabase
 
 ```bash
 pnpm install
@@ -92,16 +122,16 @@ a signed dev cookie (Studiobook's own auth is separate from Supabase Auth).
 
 ## Common commands
 
-| Command | What it does |
-|---|---|
-| `pnpm build` | `next build` |
-| `pnpm test` | Vitest unit + integration (hermetic, ~180 tests) |
-| `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit` |
-| `pnpm --filter @studiobook/web e2e` | Playwright smoke (builds, runs `next start` in fake mode) |
-| `pnpm supabase:start` / `pnpm supabase:reset` | boot local Supabase / apply migrations + seed |
-| `pnpm supabase:migrate` | apply pending migrations to the running local db |
-| `pnpm supabase:types` | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
-| `pnpm --filter @studiobook/web db:seed-sql` | regenerate `supabase/seed.sql` |
+| Command                                       | What it does                                                         |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| `pnpm build`                                  | `next build`                                                         |
+| `pnpm test`                                   | Vitest unit + integration (hermetic, ~180 tests)                     |
+| `pnpm lint` / `pnpm typecheck`                | ESLint / `tsc --noEmit`                                              |
+| `pnpm --filter @studiobook/web e2e`           | Playwright smoke (builds, runs `next start` in fake mode)            |
+| `pnpm supabase:start` / `pnpm supabase:reset` | boot local Supabase / apply migrations + seed                        |
+| `pnpm supabase:migrate`                       | apply pending migrations to the running local db                     |
+| `pnpm supabase:types`                         | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
+| `pnpm --filter @studiobook/web db:seed-sql`   | regenerate `supabase/seed.sql`                                       |
 
 ## Environment
 
