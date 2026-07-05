@@ -18,8 +18,8 @@ version: 1
 
 agents:
   reviewer:
-    harness: codex
-    model: codex
+    harness: claude-code
+    model: sonnet
 
 deployments:
   # The orchestrator reads the `preview` entry specifically.
