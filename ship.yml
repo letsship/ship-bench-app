@@ -15,8 +15,15 @@
 # pinned to claude-code here so the default pipeline never depends on OpenAI
 # quota (planner/builder/qa already default to claude).
 version: 1
+# MANAGED baseBranch by bench-runner
+baseBranch: base/B1
 
+# MANAGED BY bench-runner — config epoch. Do not edit by hand during an experiment.
+# config: sonnet
 agents:
+  builder:
+    harness: claude-code
+    model: claude-sonnet-4-6
   reviewer:
     harness: claude-code
     model: sonnet
