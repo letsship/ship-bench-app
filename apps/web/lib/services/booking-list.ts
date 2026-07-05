@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,22 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Bookings export for accounting: same join as listBookingRows, but filtered
+// to an inclusive-both-ends [from, to] window on the session start time.
+// listByStudio's SessionRange filter is exclusive on `to` — that's the right
+// behavior for the calendar/dashboard/upcoming callers that share it, so the
+// inclusive bound needed here is applied locally instead of widening it.
+export async function listBookingRowsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  return rows.filter((row) => {
+    if (range.from && row.startsAt < range.from) return false;
+    if (range.to && row.startsAt > range.to) return false;
+    return true;
+  });
 }
