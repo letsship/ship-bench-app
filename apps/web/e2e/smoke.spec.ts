@@ -43,6 +43,8 @@ test("an operator can schedule a new class from the UI", async ({ page }) => {
   await expect(page.getByTestId("schedule").getByText("E2E Tester").first()).toBeVisible();
 });
 
+// Default-timezone regression counterpart to the US-timezone hydration check
+// in dashboard-timezone.spec.ts.
 test("the dashboard renders with zero console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {

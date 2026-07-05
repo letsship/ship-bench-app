@@ -13,13 +13,20 @@ export interface DashboardStats {
 export interface DashboardData {
   today: SessionView[];
   stats: DashboardStats;
+  todayIso: string;
+}
+
+export interface GetDashboardOptions {
+  now?: () => string;
 }
 
 export async function getDashboard(
   repos: Repositories,
   ctx: StudioContext,
+  options: GetDashboardOptions = {},
 ): Promise<DashboardData> {
-  const nowIso = new Date().toISOString();
+  const now = options.now ?? (() => new Date().toISOString());
+  const nowIso = now();
   const todayKey = dayKey(nowIso, ctx.studio.timezone);
 
   const sessions = await listSessions(repos, ctx.studio.id);
@@ -36,6 +43,7 @@ export async function getDashboard(
 
   return {
     today,
+    todayIso: nowIso,
     stats: {
       activeMembers: members.filter((member) => member.status === "active").length,
       upcomingSessions: upcoming.length,
