@@ -1,8 +1,9 @@
 import { occupancyPercent } from "@/lib/domain/capacity";
-import { formatDayLabel, formatTime } from "@/lib/format";
+import { formatTime } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getDashboard } from "@/lib/services/dashboard";
-import { EmptyState, PageHeader, StatCard, StatusBadge } from "../_components/ui";
+import { EmptyState, StatCard, StatusBadge } from "../_components/ui";
+import { TodayHeading } from "./today-heading";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        title="Today at the studio"
-        subtitle={formatDayLabel(new Date().toISOString(), timeZone)}
-      />
+      <TodayHeading />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active members" value={stats.activeMembers} />
