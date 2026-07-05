@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { type BookingRow, filterBookingRowsByRange, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,45 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("email");
+  });
+
+  it("filterBookingRowsByRange includes rows exactly on the from/to boundaries", () => {
+    const row = (startsAt: string): BookingRow => ({
+      id: startsAt,
+      memberName: "M",
+      email: "m@e.co",
+      className: "Yoga",
+      classColor: "#111111",
+      instructor: "I",
+      startsAt,
+      status: "booked",
+    });
+    const rows = [
+      row("2026-06-01T00:00:00.000Z"),
+      row("2026-06-15T00:00:00.000Z"),
+      row("2026-06-30T00:00:00.000Z"),
+    ];
+
+    const inBounds = filterBookingRowsByRange(rows, {
+      from: "2026-06-01T00:00:00.000Z",
+      to: "2026-06-30T00:00:00.000Z",
+    });
+    expect(inBounds).toHaveLength(3);
+
+    const fromOnly = filterBookingRowsByRange(rows, { from: "2026-06-15T00:00:00.000Z" });
+    expect(fromOnly.map((r) => r.startsAt)).toEqual([
+      "2026-06-15T00:00:00.000Z",
+      "2026-06-30T00:00:00.000Z",
+    ]);
+
+    const toOnly = filterBookingRowsByRange(rows, { to: "2026-06-15T00:00:00.000Z" });
+    expect(toOnly.map((r) => r.startsAt)).toEqual([
+      "2026-06-01T00:00:00.000Z",
+      "2026-06-15T00:00:00.000Z",
+    ]);
+
+    const unbounded = filterBookingRowsByRange(rows, {});
+    expect(unbounded).toHaveLength(3);
   });
 });

@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,18 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Inclusive-both-ends filter over `startsAt`, unlike the repo-level
+// `SessionRange` filtering (which treats `to` as exclusive for the
+// calendar/day views). ISO-8601 UTC timestamps compare correctly as strings.
+export function filterBookingRowsByRange(
+  rows: readonly BookingRow[],
+  range: SessionRange = {},
+): BookingRow[] {
+  return rows.filter((row) => {
+    if (range.from !== undefined && row.startsAt < range.from) return false;
+    if (range.to !== undefined && row.startsAt > range.to) return false;
+    return true;
+  });
 }

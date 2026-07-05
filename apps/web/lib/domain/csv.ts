@@ -1,6 +1,8 @@
 // RFC 4180 CSV serialization. A field is quoted when it contains a comma,
 // quote, or newline; embedded quotes are doubled. Rows are joined with CRLF.
 
+import type { BookingRow } from "@/lib/services/booking-list";
+
 export interface CsvColumn<T> {
   header: string;
   value: (row: T) => unknown;
@@ -57,5 +59,15 @@ export function invoicesToCsv(invoices: readonly InvoiceRow[]): string {
     { header: "Issued", value: (invoice) => invoice.issuedAt },
     { header: "Total", value: (invoice) => (invoice.totalCents / 100).toFixed(2) },
     { header: "Currency", value: (invoice) => invoice.currency },
+  ]);
+}
+
+export function bookingsToCsv(rows: readonly BookingRow[]): string {
+  return toCsv(rows, [
+    { header: "Starts", value: (row) => row.startsAt },
+    { header: "Class", value: (row) => row.className },
+    { header: "Member", value: (row) => row.memberName },
+    { header: "Email", value: (row) => row.email },
+    { header: "Status", value: (row) => row.status },
   ]);
 }

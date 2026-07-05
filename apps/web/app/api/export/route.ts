@@ -2,13 +2,14 @@ import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { badRequest, handle } from "@/lib/http";
 import { resolveStudio } from "@/lib/services/context";
-import { invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
+import { bookingsToCsv, invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
+import { filterBookingRowsByRange, listBookingRows } from "@/lib/services/booking-list";
 import { listInvoices } from "@/lib/services/invoices";
 import { listMembers } from "@/lib/services/members";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/export?type=members|invoices — a CSV download.
+// GET /api/export?type=members|invoices|bookings — a CSV download.
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
     await requireSession();
@@ -20,6 +21,19 @@ export async function GET(request: NextRequest): Promise<Response> {
       csv = membersToCsv(await listMembers(repos, ctx.studio.id));
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
+    } else if (type === "bookings") {
+      const fromParam = request.nextUrl.searchParams.get("from");
+      const toParam = request.nextUrl.searchParams.get("to");
+      if (fromParam !== null && Number.isNaN(Date.parse(fromParam))) {
+        return badRequest(`Invalid from date: ${fromParam}`);
+      }
+      if (toParam !== null && Number.isNaN(Date.parse(toParam))) {
+        return badRequest(`Invalid to date: ${toParam}`);
+      }
+      const from = fromParam !== null ? new Date(fromParam).toISOString() : undefined;
+      const to = toParam !== null ? new Date(toParam).toISOString() : undefined;
+      const rows = await listBookingRows(repos, ctx.studio.id);
+      csv = bookingsToCsv(filterBookingRowsByRange(rows, { from, to }));
     } else {
       return badRequest(`Unknown export type: ${type}`);
     }

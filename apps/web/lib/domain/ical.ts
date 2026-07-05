@@ -31,7 +31,10 @@ export function escapeICalText(value: string): string {
 export function formatICalDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) throw new RangeError(`Invalid ISO timestamp: ${iso}`);
-  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return date
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 // Fold content lines to 75 octets with a leading space on continuations
