@@ -9,5 +9,6 @@ export const createServiceClient = () => {
   const env = serverEnv();
   return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
+    db: { schema: env.SUPABASE_SCHEMA },
   });
 };
