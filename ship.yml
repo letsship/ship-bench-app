@@ -8,9 +8,18 @@
 #
 # Studiobook is a benchmark fixture: apps/web (a Next.js app deployed via
 # @opennextjs/cloudflare) is deployed as an ephemeral *.workers.dev Worker
-# per PR and torn down on PR close. No `agents` block yet — the bench runner
-# writes the per-role agent config when it drives a benchmark task.
+# per PR and torn down on PR close. The bench runner overwrites the `agents`
+# block per config epoch when it drives a benchmark task; the block below is
+# the reliable ALL-CLAUDE default used for manual runs and Track A (which
+# varies only the builder). The platform default reviewer is codex/OpenAI —
+# pinned to claude-code here so the default pipeline never depends on OpenAI
+# quota (planner/builder/qa already default to claude).
 version: 1
+
+agents:
+  reviewer:
+    harness: claude-code
+    model: sonnet
 
 deployments:
   # The orchestrator reads the `preview` entry specifically.
