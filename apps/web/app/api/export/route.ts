@@ -6,8 +6,18 @@ import { bookingsToCsv, invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
 import { listBookingExportRows } from "@/lib/services/booking-list";
 import { listInvoices } from "@/lib/services/invoices";
 import { listMembers } from "@/lib/services/members";
+import { isoDatetime } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+// Validates the query param (throwing a ZodError -> 400 via handle()) and
+// normalizes it to a UTC ISO string, so the string comparisons in
+// listBookingExportRows and the repo layer compare like-formatted timestamps
+// regardless of what offset the caller passed in.
+function normalizeRangeBound(value: string | null): string | undefined {
+  if (!value) return undefined;
+  return new Date(isoDatetime.parse(value)).toISOString();
+}
 
 // GET /api/export?type=members|invoices|bookings[&from=&to=] — a CSV download.
 export async function GET(request: NextRequest): Promise<Response> {
@@ -22,8 +32,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
     } else if (type === "bookings") {
-      const from = request.nextUrl.searchParams.get("from") ?? undefined;
-      const to = request.nextUrl.searchParams.get("to") ?? undefined;
+      const from = normalizeRangeBound(request.nextUrl.searchParams.get("from"));
+      const to = normalizeRangeBound(request.nextUrl.searchParams.get("to"));
       csv = bookingsToCsv(await listBookingExportRows(repos, ctx.studio.id, { from, to }));
     } else {
       return badRequest(`Unknown export type: ${type}`);

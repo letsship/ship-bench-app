@@ -3,7 +3,7 @@ import { z } from "zod";
 // Zod schemas for every API input boundary. Route handlers parse request bodies
 // through these before touching the database.
 
-const isoDatetime = z
+export const isoDatetime = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid ISO datetime" });
 
