@@ -47,17 +47,24 @@ export async function listBookingRows(
 
 // For the accounting export: `classSessions.listByStudio` treats `range.to`
 // as exclusive (used elsewhere, e.g. the bookings page), but this export
-// needs an inclusive upper bound. Fetch with only the (already-inclusive)
-// lower bound and filter `to` in-memory so the shared range semantics stay
-// unchanged for other callers.
+// needs an inclusive-both-ends range. Fetch every session and filter by
+// parsed instants here, rather than delegating to the repo's exclusive-`to`
+// string comparison — comparing raw ISO strings would mis-include/exclude
+// timestamps that use a different offset or fractional-second precision than
+// what's stored.
 export async function listBookingExportRows(
   repos: Repositories,
   studioId: string,
   range: SessionRange = {},
 ): Promise<BookingExportRow[]> {
-  const sessions = (await repos.classSessions.listByStudio(studioId, { from: range.from })).filter(
-    (session) => !range.to || session.startsAt <= range.to,
-  );
+  const fromMs = range.from ? Date.parse(range.from) : undefined;
+  const toMs = range.to ? Date.parse(range.to) : undefined;
+  const sessions = (await repos.classSessions.listByStudio(studioId)).filter((session) => {
+    const startsAtMs = Date.parse(session.startsAt);
+    if (fromMs !== undefined && startsAtMs < fromMs) return false;
+    if (toMs !== undefined && startsAtMs > toMs) return false;
+    return true;
+  });
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
   const classTypes = await repos.classTypes.listByStudio(studioId);
   const typeById = new Map(classTypes.map((type) => [type.id, type]));

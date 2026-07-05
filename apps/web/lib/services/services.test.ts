@@ -380,4 +380,16 @@ describe("listBookingExportRows", () => {
     expect(row.className).toBe("Yoga");
     expect(row.status).toBe("booked");
   });
+
+  it("compares bounds as instants, not raw strings, so an equivalent offset spelling still includes the boundary", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    // Same instant as END, but with an explicit +00:00 offset instead of `Z` and
+    // no fractional seconds — a naive string comparison against stored ISO
+    // strings would sort this differently and drop the boundary session.
+    const rows = await listBookingExportRows(repos, "s1", {
+      from: "2026-06-01T00:00:00+00:00",
+      to: "2026-06-30T00:00:00+00:00",
+    });
+    expect(rows.map((r) => r.startsAt)).toEqual([START, MID, END]);
+  });
 });
