@@ -174,4 +174,32 @@ describe("listBookingsForExport", () => {
     const rows = await listBookingsForExport(repos, STUDIO_ID, {});
     expect(rows[0].email).toBe("chiara@example.com");
   });
+
+  it("includes the to-boundary session when to is given with a +00:00 offset instead of Z", async () => {
+    const repos = createInMemoryRepositories(seed());
+    const rows = await listBookingsForExport(repos, STUDIO_ID, {
+      to: "2026-06-30T23:59:59+00:00",
+    });
+    expect(rows.some((row) => row.id === "booking-sess-to")).toBe(true);
+    expect(rows.some((row) => row.id === "booking-sess-after")).toBe(false);
+  });
+
+  it("includes the from-boundary session when from is given without milliseconds", async () => {
+    const repos = createInMemoryRepositories(seed());
+    const rows = await listBookingsForExport(repos, STUDIO_ID, {
+      from: "2026-06-01T00:00:00Z",
+    });
+    expect(rows.some((row) => row.id === "booking-sess-from")).toBe(true);
+    expect(rows.some((row) => row.id === "booking-sess-before")).toBe(false);
+  });
+
+  it("normalizes a non-UTC offset from-bound to the equivalent UTC instant", async () => {
+    const repos = createInMemoryRepositories(seed());
+    const rows = await listBookingsForExport(repos, STUDIO_ID, {
+      // 02:00+02:00 is 00:00Z, exactly the sess-from boundary.
+      from: "2026-06-01T02:00:00+02:00",
+    });
+    expect(rows.some((row) => row.id === "booking-sess-from")).toBe(true);
+    expect(rows.some((row) => row.id === "booking-sess-before")).toBe(false);
+  });
 });
