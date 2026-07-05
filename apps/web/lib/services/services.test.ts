@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingExportRows, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,61 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("listBookingExportRows", () => {
+  const START = "2026-06-01T00:00:00.000Z";
+  const MID = "2026-06-15T00:00:00.000Z";
+  const END = "2026-06-30T00:00:00.000Z";
+
+  function exportSeed(): SeedData {
+    return baseSeed({
+      classTypes: [classType("ct1")],
+      members: [member("m1")],
+      sessions: [
+        session("s1", { startsAt: START, endsAt: START }),
+        session("s2", { startsAt: MID, endsAt: MID }),
+        session("s3", { startsAt: END, endsAt: END }),
+      ],
+      bookings: [
+        booking("b1", "m1", { sessionId: "s1" }),
+        booking("b2", "m1", { sessionId: "s2" }),
+        booking("b3", "m1", { sessionId: "s3" }),
+      ],
+    });
+  }
+
+  it("returns everything for an unbounded range", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingExportRows(repos, "s1");
+    expect(rows.map((r) => r.startsAt)).toEqual([START, MID, END]);
+  });
+
+  it("applies a from-only lower bound", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingExportRows(repos, "s1", { from: MID });
+    expect(rows.map((r) => r.startsAt)).toEqual([MID, END]);
+  });
+
+  it("applies a to-only upper bound, inclusive", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingExportRows(repos, "s1", { to: MID });
+    expect(rows.map((r) => r.startsAt)).toEqual([START, MID]);
+  });
+
+  it("includes a session starting exactly at the `to` boundary", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingExportRows(repos, "s1", { from: START, to: END });
+    expect(rows.map((r) => r.startsAt)).toEqual([START, MID, END]);
+  });
+
+  it("includes member name, email, class name and status", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const [row] = await listBookingExportRows(repos, "s1", { to: START });
+    expect(row.memberName).toBe("m1");
+    expect(row.email).toBe("m1@e.co");
+    expect(row.className).toBe("Yoga");
+    expect(row.status).toBe("booked");
   });
 });
