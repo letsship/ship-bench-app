@@ -16,12 +16,13 @@ Everything here is hand-authored.
 - **Database**: **Supabase** (Postgres 17 + `@supabase/supabase-js`). All data
   access goes through thin **repositories** (`lib/db/repos/`); route handlers and
   domain logic never touch supabase-js directly.
-- **Email**: the real **Resend** SDK, behind a provider-agnostic notification
+- **Email**: **Cloudflare Email**, behind a provider-agnostic notification
   adapter + an outbox table.
 - **Deploy**: `@opennextjs/cloudflare` to a Cloudflare Worker.
 - **Tests**: Vitest (unit + integration) and Playwright (browser smoke), both
   fully hermetic — they run against in-memory repository fakes + a fake email
-  provider, so `pnpm test` needs no Supabase, no Resend, and no native modules.
+  provider, so `pnpm test` needs no Supabase, no Cloudflare Email, and no
+  native modules.
 
 ## The repository seam
 
@@ -41,7 +42,7 @@ changes.
 ## Fake-backends mode
 
 Set `USE_FAKE_BACKENDS=1` to run the whole app against a seeded in-memory store
-and a no-op email provider — no Supabase or Resend account required. Tests use it
+and a no-op email provider — no Supabase or Cloudflare Email account required. Tests use it
 implicitly (via `__setTestRepositories`), Playwright runs `next start` with it,
 and `pnpm --filter @studiobook/web dev:fake` serves local dev with it.
 
@@ -58,7 +59,7 @@ apps/web/
       repos/               the repository seam (types, supabase, fakes, mapping)
       seed-data.ts         single-source demo dataset
     supabase/              @supabase/ssr + service-role client factories
-    notifications/         provider seam (Resend adapter + fake) + outbox
+    notifications/         provider seam (Cloudflare Email adapter + fake) + outbox
     services/              repository-backed services shared by routes + pages
     auth/                  dev session-cookie stub
     env.ts                 Zod-validated environment access
@@ -92,35 +93,36 @@ a signed dev cookie (Studiobook's own auth is separate from Supabase Auth).
 
 ## Common commands
 
-| Command | What it does |
-|---|---|
-| `pnpm build` | `next build` |
-| `pnpm test` | Vitest unit + integration (hermetic, ~180 tests) |
-| `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit` |
-| `pnpm --filter @studiobook/web e2e` | Playwright smoke (builds, runs `next start` in fake mode) |
-| `pnpm supabase:start` / `pnpm supabase:reset` | boot local Supabase / apply migrations + seed |
-| `pnpm supabase:migrate` | apply pending migrations to the running local db |
-| `pnpm supabase:types` | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
-| `pnpm --filter @studiobook/web db:seed-sql` | regenerate `supabase/seed.sql` |
+| Command                                       | What it does                                                         |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| `pnpm build`                                  | `next build`                                                         |
+| `pnpm test`                                   | Vitest unit + integration (hermetic, ~180 tests)                     |
+| `pnpm lint` / `pnpm typecheck`                | ESLint / `tsc --noEmit`                                              |
+| `pnpm --filter @studiobook/web e2e`           | Playwright smoke (builds, runs `next start` in fake mode)            |
+| `pnpm supabase:start` / `pnpm supabase:reset` | boot local Supabase / apply migrations + seed                        |
+| `pnpm supabase:migrate`                       | apply pending migrations to the running local db                     |
+| `pnpm supabase:types`                         | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
+| `pnpm --filter @studiobook/web db:seed-sql`   | regenerate `supabase/seed.sql`                                       |
 
 ## Environment
 
 See `apps/web/.env.example`. The Supabase URL + publishable key are public;
-`SUPABASE_SECRET_KEY` and `RESEND_API_KEY` are secrets and must never be
-committed. Env is validated with Zod in `lib/env.ts` and only read when a
-Supabase/email client is actually constructed (so fake mode needs none of it).
+`SUPABASE_SECRET_KEY` and `CLOUDFLARE_EMAIL_API_TOKEN` are secrets and must
+never be committed. Env is validated with Zod in `lib/env.ts` and only read
+when a Supabase/email client is actually constructed (so fake mode needs none
+of it).
 
 ## Deploying a preview (Cloudflare)
 
 `ship.yml` wires `.github/workflows/deploy-preview.yml` for SHIP's deploy stage.
 On `action=deploy` it builds with OpenNext (Supabase URL + publishable key
 injected at build time) and deploys a `*.workers.dev` Worker, then sets
-`SUPABASE_SECRET_KEY` + `RESEND_API_KEY` as Worker secrets; `action=delete` tears
-the Worker down on PR close.
+`SUPABASE_SECRET_KEY` + `CLOUDFLARE_EMAIL_API_TOKEN` as Worker secrets;
+`action=delete` tears the Worker down on PR close.
 
 > Limitation: preview environments share **one seeded Supabase project** — there
 > is no ephemeral per-PR database. Point the workflow's `SUPABASE_*` /
-> `RESEND_API_KEY` GitHub secrets at a dedicated preview project.
+> `CLOUDFLARE_EMAIL_API_TOKEN` GitHub secrets at a dedicated preview project.
 
 ## Migrations
 
