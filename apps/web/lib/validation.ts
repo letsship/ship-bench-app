@@ -3,9 +3,14 @@ import { z } from "zod";
 // Zod schemas for every API input boundary. Route handlers parse request bodies
 // through these before touching the database.
 
-const isoDatetime = z
+export const isoDatetime = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid ISO datetime" });
+
+export const exportBookingsRangeSchema = z.object({
+  from: isoDatetime.optional(),
+  to: isoDatetime.optional(),
+});
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb hex color");
 
@@ -77,3 +82,4 @@ export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+export type ExportBookingsRangeInput = z.infer<typeof exportBookingsRangeSchema>;

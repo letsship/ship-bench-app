@@ -6,6 +6,7 @@ import { bookingsToCsv, invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
 import { listBookingRowsForExport } from "@/lib/services/booking-list";
 import { listInvoices } from "@/lib/services/invoices";
 import { listMembers } from "@/lib/services/members";
+import { exportBookingsRangeSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +23,10 @@ export async function GET(request: NextRequest): Promise<Response> {
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
     } else if (type === "bookings") {
-      const from = request.nextUrl.searchParams.get("from") ?? undefined;
-      const to = request.nextUrl.searchParams.get("to") ?? undefined;
+      const { from, to } = exportBookingsRangeSchema.parse({
+        from: request.nextUrl.searchParams.get("from") ?? undefined,
+        to: request.nextUrl.searchParams.get("to") ?? undefined,
+      });
       csv = bookingsToCsv(await listBookingRowsForExport(repos, ctx.studio.id, { from, to }));
     } else {
       return badRequest(`Unknown export type: ${type}`);

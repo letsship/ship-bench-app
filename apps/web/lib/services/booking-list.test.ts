@@ -178,4 +178,27 @@ describe("listBookingRowsForExport", () => {
     expect(onlyTo.some((row) => row.startsAt === "2026-05-31T09:00:00.000Z")).toBe(true);
     expect(onlyTo.some((row) => row.startsAt === "2026-07-01T09:00:00.000Z")).toBe(false);
   });
+
+  it("compares real instants rather than raw strings, so a `+00:00`-offset `to` still matches a `Z`-suffixed session at the same instant", async () => {
+    const { repos, studioId } = buildRepos();
+    // "2026-06-30T23:59:59.000Z" sorts after "2026-06-30T23:59:59+00:00" as a
+    // raw string ("." > "+"), even though they're the exact same instant —
+    // the shape PostgREST can return for a timestamptz column.
+    const rows = await listBookingRowsForExport(repos, studioId, {
+      from: FROM,
+      to: "2026-06-30T23:59:59+00:00",
+    });
+    expect(rows.some((row) => row.startsAt === "2026-06-30T23:59:59.000Z")).toBe(true);
+  });
+
+  it("compares real instants rather than raw strings, so a millisecond-less `from` still includes the exact boundary", async () => {
+    const { repos, studioId } = buildRepos();
+    // "2026-06-01T00:00:00Z" sorts after "2026-06-01T00:00:00.000Z" as a raw
+    // string (no "." before "Z"), but they're the same instant.
+    const rows = await listBookingRowsForExport(repos, studioId, {
+      from: "2026-06-01T00:00:00Z",
+      to: TO,
+    });
+    expect(rows.some((row) => row.startsAt === FROM)).toBe(true);
+  });
 });

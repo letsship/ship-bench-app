@@ -57,9 +57,12 @@ export async function listBookingRowsForExport(
   range: SessionRange = {},
 ): Promise<BookingRow[]> {
   const rows = await listBookingRows(repos, studioId);
+  const from = range.from ? Date.parse(range.from) : undefined;
+  const to = range.to ? Date.parse(range.to) : undefined;
   return rows.filter((row) => {
-    if (range.from && row.startsAt < range.from) return false;
-    if (range.to && row.startsAt > range.to) return false;
+    const startsAt = Date.parse(row.startsAt);
+    if (from !== undefined && startsAt < from) return false;
+    if (to !== undefined && startsAt > to) return false;
     return true;
   });
 }
