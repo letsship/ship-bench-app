@@ -25,7 +25,9 @@ export function NewInvoiceForm({ members }: { members: MemberOption[] }) {
   const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }]);
 
   function updateLine(index: number, patch: Partial<LineDraft>) {
-    setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+    setLines((current) =>
+      current.map((line, i) => (i === index ? { ...line, ...patch } : line)),
+    );
   }
 
   function onSubmit(event: React.FormEvent) {

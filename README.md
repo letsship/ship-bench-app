@@ -92,16 +92,16 @@ a signed dev cookie (Studiobook's own auth is separate from Supabase Auth).
 
 ## Common commands
 
-| Command                                       | What it does                                                         |
-| --------------------------------------------- | -------------------------------------------------------------------- |
-| `pnpm build`                                  | `next build`                                                         |
-| `pnpm test`                                   | Vitest unit + integration (hermetic, ~180 tests)                     |
-| `pnpm lint` / `pnpm typecheck`                | ESLint / `tsc --noEmit`                                              |
-| `pnpm --filter @studiobook/web e2e`           | Playwright smoke (builds, runs `next start` in fake mode)            |
-| `pnpm supabase:start` / `pnpm supabase:reset` | boot local Supabase / apply migrations + seed                        |
-| `pnpm supabase:migrate`                       | apply pending migrations to the running local db                     |
-| `pnpm supabase:types`                         | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
-| `pnpm --filter @studiobook/web db:seed-sql`   | regenerate `supabase/seed.sql`                                       |
+| Command | What it does |
+|---|---|
+| `pnpm build` | `next build` |
+| `pnpm test` | Vitest unit + integration (hermetic, ~180 tests) |
+| `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit` |
+| `pnpm --filter @studiobook/web e2e` | Playwright smoke (builds, runs `next start` in fake mode) |
+| `pnpm supabase:start` / `pnpm supabase:reset` | boot local Supabase / apply migrations + seed |
+| `pnpm supabase:migrate` | apply pending migrations to the running local db |
+| `pnpm supabase:types` | regenerate `apps/web/lib/db/database.types.ts` from the local schema |
+| `pnpm --filter @studiobook/web db:seed-sql` | regenerate `supabase/seed.sql` |
 
 ## Environment
 
