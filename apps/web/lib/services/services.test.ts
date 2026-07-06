@@ -4,7 +4,10 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import {
+  listBookingRows,
+  listBookingRowsForExport,
+} from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -313,6 +316,62 @@ describe("reports + dashboard + booking list", () => {
     const rows = await listBookingRows(repos, studioId);
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
+    expect(rows[0]).toHaveProperty("email");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("listBookingRowsForExport returns everything when no range is given", async () => {
+    const rows = await listBookingRowsForExport(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("listBookingRowsForExport includes a session starting exactly at from", async () => {
+    const rows = await listBookingRows(repos, studioId);
+    const anchor = rows[Math.floor(rows.length / 2)];
+    const filtered = await listBookingRowsForExport(repos, studioId, {
+      from: anchor.startsAt,
+    });
+    expect(filtered.find((r) => r.id === anchor.id)).toBeTruthy();
+  });
+
+  it("listBookingRowsForExport includes a session starting exactly at to", async () => {
+    const rows = await listBookingRows(repos, studioId);
+    const anchor = rows[0];
+    const filtered = await listBookingRowsForExport(repos, studioId, {
+      from: rows[0].startsAt,
+      to: rows[rows.length - 1].startsAt,
+    });
+    expect(filtered.find((r) => r.id === anchor.id)).toBeTruthy();
+  });
+
+  it("listBookingRowsForExport excludes sessions outside the range", async () => {
+    const all = await listBookingRowsForExport(repos, studioId);
+    // Pick a narrow window around the middle session
+    const midIdx = Math.floor(all.length / 2);
+    const from = all[1].startsAt;
+    const to = all[midIdx].startsAt;
+    const filtered = await listBookingRowsForExport(repos, studioId, { from, to });
+    expect(filtered.length).toBeLessThan(all.length);
+    // Every returned row is within [from, to] inclusive
+    for (const row of filtered) {
+      expect(row.startsAt >= from).toBe(true);
+      expect(row.startsAt <= to).toBe(true);
+    }
+  });
+
+  it("listBookingRowsForExport omitted from is unbounded on the low side", async () => {
+    const rows = await listBookingRowsForExport(repos, studioId);
+    const last = rows[rows.length - 1];
+    const filtered = await listBookingRowsForExport(repos, studioId, { to: last.startsAt });
+    expect(filtered.length).toBeGreaterThan(0);
+    expect(filtered.every((r) => r.startsAt <= last.startsAt)).toBe(true);
+  });
+
+  it("listBookingRowsForExport omitted to is unbounded on the high side", async () => {
+    const rows = await listBookingRowsForExport(repos, studioId);
+    const first = rows[0];
+    const filtered = await listBookingRowsForExport(repos, studioId, { from: first.startsAt });
+    expect(filtered.length).toBeGreaterThan(0);
+    expect(filtered.every((r) => r.startsAt >= first.startsAt)).toBe(true);
   });
 });

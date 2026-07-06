@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,25 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+/**
+ * Same join as listBookingRows, but filtered by session start time with
+ * inclusive bounds on BOTH from and to (unlike listBookingRows / the repo's
+ * listByStudio, which use an exclusive to bound).
+ *
+ * This is intentionally separate so the existing bookings-list/page behaviour
+ * is undisturbed — only the export path uses inclusive filtering.
+ */
+export async function listBookingRowsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  return rows.filter((row) => {
+    if (range.from && row.startsAt < range.from) return false;
+    if (range.to && row.startsAt > range.to) return false;
+    return true;
+  });
 }
