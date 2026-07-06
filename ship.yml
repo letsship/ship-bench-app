@@ -15,18 +15,16 @@
 # pinned to claude-code here so the default pipeline never depends on OpenAI
 # quota (planner/builder/qa already default to claude).
 version: 1
-# MANAGED baseBranch by bench-runner
-baseBranch: base/B1
 
 # MANAGED BY bench-runner — config epoch. Do not edit by hand during an experiment.
-# config: fable
+# config: opus
 agents:
   planner:
     harness: claude-code
     model: claude-opus-4-8
   builder:
     harness: claude-code
-    model: claude-fable-5
+    model: claude-opus-4-8
   reviewer:
     harness: claude-code
     model: claude-opus-4-8
