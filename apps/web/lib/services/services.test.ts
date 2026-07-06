@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { dayKey } from "@/lib/domain/dates";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -160,7 +161,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +204,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -307,6 +317,27 @@ describe("reports + dashboard + booking list", () => {
     const data = await getDashboard(repos, await getStudioContext(repos));
     expect(data.stats.activeMembers).toBeGreaterThan(0);
     expect(Array.isArray(data.today)).toBe(true);
+    expect(typeof data.todayIso).toBe("string");
+    const studioToday = dayKey(data.todayIso, "Europe/Amsterdam");
+    expect(
+      data.today.every((session) => dayKey(session.startsAt, "Europe/Amsterdam") === studioToday),
+    ).toBe(true);
+  });
+
+  it("anchors todayIso to the studio timezone, not the host clock's UTC day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-14T23:30:00.000Z"));
+    try {
+      const data = await getDashboard(repos, await getStudioContext(repos));
+      expect(data.todayIso).toBe("2026-03-14T23:30:00.000Z");
+      // The UTC calendar day is still the 14th, but Europe/Amsterdam (UTC+1)
+      // has already rolled over to the 15th — the header must follow the
+      // studio's clock, not the raw UTC date or the host machine's zone.
+      expect(dayKey(data.todayIso, "UTC")).toBe("2026-03-14");
+      expect(dayKey(data.todayIso, "Europe/Amsterdam")).toBe("2026-03-15");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lists booking rows joined to member + class", async () => {

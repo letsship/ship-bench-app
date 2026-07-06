@@ -55,3 +55,31 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
 
   expect(errors).toEqual([]);
 });
+
+test.describe("front-desk laptop set to a US timezone", () => {
+  test.use({ timezoneId: "America/New_York" });
+
+  test("dashboard header still shows the studio's (Europe/Amsterdam) date, with zero console errors", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await signIn(page);
+
+    const studioDate = new Intl.DateTimeFormat("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: "Europe/Amsterdam",
+    }).format(new Date());
+
+    await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
+    await expect(page.getByText(studioDate)).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+});

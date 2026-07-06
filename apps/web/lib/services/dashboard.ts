@@ -11,6 +11,7 @@ export interface DashboardStats {
 }
 
 export interface DashboardData {
+  todayIso: string;
   today: SessionView[];
   stats: DashboardStats;
 }
@@ -35,6 +36,7 @@ export async function getDashboard(
   ]);
 
   return {
+    todayIso: nowIso,
     today,
     stats: {
       activeMembers: members.filter((member) => member.status === "active").length,
