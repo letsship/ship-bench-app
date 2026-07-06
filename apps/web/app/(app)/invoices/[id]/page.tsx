@@ -83,8 +83,7 @@ export default async function InvoiceDetailPage({
             {lineItems.map((line) => (
               <tr key={line.id}>
                 <td>
-                  {/* Line descriptions can carry light formatting entered by staff. */}
-                  <span dangerouslySetInnerHTML={{ __html: line.description }} />
+                  <span data-testid="line-item-description">{line.description}</span>
                   {line.refunded ? (
                     <span className="ml-2">
                       <StatusBadge status="refunded" />
