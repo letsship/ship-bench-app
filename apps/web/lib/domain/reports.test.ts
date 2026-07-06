@@ -29,10 +29,7 @@ describe("monthlyRevenue", () => {
   });
 
   it("counts draft/void invoices but adds no revenue", () => {
-    const rows = monthlyRevenue(
-      [{ status: "draft", issuedAt: "2026-03-01T00:00:00Z", totalCents: 500 }],
-      "UTC",
-    );
+    const rows = monthlyRevenue([{ status: "draft", issuedAt: "2026-03-01T00:00:00Z", totalCents: 500 }], "UTC");
     expect(rows[0]).toMatchObject({ invoiceCount: 1, paidCents: 0, refundedCents: 0, netCents: 0 });
   });
 

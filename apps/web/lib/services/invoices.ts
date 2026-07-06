@@ -111,12 +111,7 @@ export async function createInvoice(
     provider,
     invoiceIssued(
       { memberId: member.id, email: member.email, name: member.name },
-      {
-        number: invoice.number,
-        totalCents: invoice.totalCents,
-        currency: invoice.currency,
-        dueAt: invoice.dueAt,
-      },
+      { number: invoice.number, totalCents: invoice.totalCents, currency: invoice.currency, dueAt: invoice.dueAt },
     ),
   );
   return getInvoiceDetail(repos, invoiceId);
@@ -130,11 +125,7 @@ export async function updateInvoiceStatus(
   const invoice = await repos.invoices.getById(id);
   if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
   if (!canTransitionInvoice(invoice.status as InvoiceStatus, status)) {
-    throw new HttpError(
-      409,
-      "invalid_transition",
-      `Cannot move invoice from ${invoice.status} to ${status}`,
-    );
+    throw new HttpError(409, "invalid_transition", `Cannot move invoice from ${invoice.status} to ${status}`);
   }
   const paidAt = status === "paid" ? new Date().toISOString() : invoice.paidAt;
   return repos.invoices.update(id, { status, paidAt });
