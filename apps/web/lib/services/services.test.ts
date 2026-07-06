@@ -311,9 +311,10 @@ describe("reports + dashboard + booking list", () => {
 
   it("lists booking rows joined to member + class", async () => {
     const rows = await listBookingRows(repos, studioId);
+    const memberEmails = new Set((await repos.members.listByStudio(studioId)).map((member) => member.email));
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
-    expect(rows[0]).toHaveProperty("email");
+    expect(memberEmails.has(rows[0].email)).toBe(true);
     expect(rows[0]).toHaveProperty("className");
   });
 });
