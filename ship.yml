@@ -17,14 +17,20 @@
 version: 1
 
 # MANAGED BY bench-runner — config epoch. Do not edit by hand during an experiment.
-# config: sonnet
+# config: fable
 agents:
+  planner:
+    harness: claude-code
+    model: claude-opus-4-8
   builder:
     harness: claude-code
-    model: claude-sonnet-4-6
+    model: claude-fable-5
   reviewer:
     harness: claude-code
-    model: sonnet
+    model: claude-opus-4-8
+  qa:
+    harness: claude-code
+    model: claude-opus-4-8
 
 deployments:
   # The orchestrator reads the `preview` entry specifically.
