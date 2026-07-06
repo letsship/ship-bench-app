@@ -61,8 +61,9 @@ export async function listBookingRowsForExport(
 ): Promise<BookingRow[]> {
   const rows = await listBookingRows(repos, studioId);
   return rows.filter((row) => {
-    if (range.from && row.startsAt < range.from) return false;
-    if (range.to && row.startsAt > range.to) return false;
+    const startsAtMs = new Date(row.startsAt).getTime();
+    if (range.from && startsAtMs < new Date(range.from).getTime()) return false;
+    if (range.to && startsAtMs > new Date(range.to).getTime()) return false;
     return true;
   });
 }

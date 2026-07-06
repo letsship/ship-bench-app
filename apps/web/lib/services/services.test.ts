@@ -344,6 +344,21 @@ describe("reports + dashboard + booking list", () => {
     expect(filtered.find((r) => r.id === anchor.id)).toBeTruthy();
   });
 
+  it("listBookingRowsForExport handles non-Z offset timezone formats", async () => {
+    const rows = await listBookingRows(repos, studioId);
+    const anchor = rows[Math.floor(rows.length / 2)];
+    // Convert the stored ".000Z" to "+00:00" format, same instant
+    const plus00 = anchor.startsAt.replace(/\.000Z$/, "+00:00");
+    const anchorMs = new Date(anchor.startsAt).getTime();
+    const filtered = await listBookingRowsForExport(repos, studioId, {
+      from: plus00,
+      to: plus00,
+    });
+    expect(filtered.find((r) => r.id === anchor.id)).toBeTruthy();
+    // Every returned row matches the same instant (some sessions share a start time)
+    expect(filtered.every((r) => new Date(r.startsAt).getTime() === anchorMs)).toBe(true);
+  });
+
   it("listBookingRowsForExport excludes sessions outside the range", async () => {
     const all = await listBookingRowsForExport(repos, studioId);
     // Pick a narrow window around the middle session
