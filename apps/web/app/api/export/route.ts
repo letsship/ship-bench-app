@@ -9,6 +9,19 @@ import { listMembers } from "@/lib/services/members";
 
 export const dynamic = "force-dynamic";
 
+// URLSearchParams decodes a literal "+" as a space (the application/x-www-
+// form-urlencoded convention) — but "+00:00" is exactly the UTC-offset form
+// our own CSV's `Starts` column emits, and some proxies in front of this
+// worker already percent-decode "%2B" to "+" once before we see the request,
+// so `searchParams.get()` would silently turn a copy-pasted "+00:00" bound
+// into an invalid " 00:00" timestamp. Parse the raw query string instead:
+// `decodeURIComponent` only resolves %XX escapes and leaves a literal "+"
+// alone, so the offset survives either way.
+function rawSearchParam(search: string, name: string): string | undefined {
+  const match = new RegExp(`[?&]${name}=([^&]*)`).exec(search);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 // GET /api/export?type=members|invoices|bookings — a CSV download.
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
@@ -22,8 +35,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
     } else if (type === "bookings") {
-      const from = request.nextUrl.searchParams.get("from") ?? undefined;
-      const to = request.nextUrl.searchParams.get("to") ?? undefined;
+      const from = rawSearchParam(request.nextUrl.search, "from");
+      const to = rawSearchParam(request.nextUrl.search, "to");
       csv = bookingsToCsv(await listBookingRowsForExport(repos, ctx.studio.id, { from, to }));
     } else {
       return badRequest(`Unknown export type: ${type}`);

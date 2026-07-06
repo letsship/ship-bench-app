@@ -91,8 +91,10 @@ export async function listBookingRowsForExport(
   const members = await repos.members.listByStudio(studioId);
   const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
 
+  const toMs = range.to ? new Date(range.to).getTime() : undefined;
+
   return joinBookingRows(sessions, classTypes, members, bookings)
-    .filter((row) => !range.to || row.startsAt <= range.to)
+    .filter((row) => toMs === undefined || new Date(row.startsAt).getTime() <= toMs)
     .map((row) => ({
       startsAt: row.startsAt,
       className: row.className,

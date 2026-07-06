@@ -378,4 +378,13 @@ describe("listBookingRowsForExport", () => {
     const all = await listBookingRowsForExport(repos, "s1");
     expect(all).toHaveLength(5);
   });
+
+  it("includes the `to` boundary even when it's a differently-formatted equivalent instant", async () => {
+    // Same instant as TO ("...Z"), but written with a "+00:00" offset — the
+    // exact form this endpoint's own `Starts` column emits, so a bookkeeper
+    // copy-pasting it back in must still match.
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingRowsForExport(repos, "s1", { to: "2026-06-30T00:00:00+00:00" });
+    expect(rows.map((row) => row.startsAt)).toContain(TO);
+  });
 });
