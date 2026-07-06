@@ -316,14 +316,26 @@ describe("reports + dashboard + booking list", () => {
     // session should be included in "today".
     const sessionIso = "2026-07-06T22:30:00.000Z"; // 2026-07-07 00:30 CEST
     const ctx = await getStudioContext(repos);
+    const studioId = ctx.studio.id;
     // Seed a session that falls on "2026-07-07" in the studio's timezone.
+    // Use the same studio ID from ctx so listSessions finds the session.
     const seeded = baseSeed({
-      classTypes: [classType("ct1")],
+      studio: { id: studioId, name: "S", slug: "s", timezone: "Europe/Amsterdam", createdAt: ISO },
+      settings: { studioId, currency: "EUR", taxRateBps: 900, cancellationWindowHours: 12, waitlistEnabled: true, notifyBookingConfirmations: true, notifyCancellations: true, notifyWaitlistPromotions: true, notifyInvoices: true },
+      classTypes: [{ id: "ct1", studioId, name: "Yoga", description: null, color: "#111111", defaultCapacity: 10, defaultPriceCents: 1000, createdAt: ISO }],
       sessions: [
-        session("cs1", {
+        {
+          id: "cs1",
+          studioId,
+          classTypeId: "ct1",
+          instructor: "I",
           startsAt: sessionIso,
           endsAt: "2026-07-06T23:30:00.000Z",
-        }),
+          capacity: 10,
+          priceCents: 1000,
+          status: "scheduled",
+          createdAt: ISO,
+        },
       ],
     });
     const repos2 = createInMemoryRepositories(seeded);
