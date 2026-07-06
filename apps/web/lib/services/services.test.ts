@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { dayKey } from "@/lib/domain/dates";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -304,9 +305,21 @@ describe("reports + dashboard + booking list", () => {
   });
 
   it("builds the dashboard", async () => {
-    const data = await getDashboard(repos, await getStudioContext(repos));
-    expect(data.stats.activeMembers).toBeGreaterThan(0);
-    expect(Array.isArray(data.today)).toBe(true);
+    const fixedNow = new Date("2020-06-14T22:30:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+
+    try {
+      const ctx = await getStudioContext(repos);
+      const data = await getDashboard(repos, ctx);
+
+      expect(data.todayIso).toBe(fixedNow.toISOString());
+      expect(dayKey(data.todayIso, ctx.studio.timezone)).toBe("2020-06-15");
+      expect(data.stats.activeMembers).toBeGreaterThan(0);
+      expect(Array.isArray(data.today)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lists booking rows joined to member + class", async () => {
