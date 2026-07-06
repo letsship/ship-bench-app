@@ -5,6 +5,7 @@ import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
+import { listBookingsForExport } from "./bookings-export";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -314,5 +315,80 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("bookings export service", () => {
+  const FROM = "2026-06-01T00:00:00.000Z";
+  const TO = "2026-06-30T23:59:59.999Z";
+
+  function exportSeed(): SeedData {
+    const ct = classType("ct1");
+    return baseSeed({
+      classTypes: [ct],
+      members: [
+        member("m1", { name: "Rossi, Chiara", email: "chiara@example.com" }),
+        member("m2", { name: "Bram" }),
+      ],
+      sessions: [
+        session("cs-before", { startsAt: "2026-05-31T23:59:59.999Z", endsAt: "2026-06-01T00:59:59.999Z" }),
+        session("cs-from", { startsAt: FROM, endsAt: "2026-06-01T01:00:00.000Z" }),
+        session("cs-mid", { startsAt: "2026-06-15T08:00:00.000Z", endsAt: "2026-06-15T09:00:00.000Z" }),
+        session("cs-to", { startsAt: TO, endsAt: "2026-07-01T00:59:59.999Z" }),
+        session("cs-after", { startsAt: "2026-07-01T00:00:00.000Z", endsAt: "2026-07-01T01:00:00.000Z" }),
+      ],
+      bookings: [
+        booking("b-before", "m1", { sessionId: "cs-before" }),
+        booking("b-from", "m1", { sessionId: "cs-from" }),
+        booking("b-mid", "m2", { sessionId: "cs-mid" }),
+        booking("b-to", "m2", { sessionId: "cs-to" }),
+        booking("b-after", "m1", { sessionId: "cs-after" }),
+      ],
+    });
+  }
+
+  it("returns every booking joined to class name, member name, and email when no range is given", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1");
+    expect(rows).toHaveLength(5);
+    expect(rows.map((r) => r.startsAt)).toEqual([...rows.map((r) => r.startsAt)].sort());
+    const chiara = rows.find((r) => r.memberName === "Rossi, Chiara");
+    expect(chiara).toMatchObject({
+      className: "Yoga",
+      email: "chiara@example.com",
+      status: "booked",
+    });
+  });
+
+  it("includes sessions starting exactly at `from` and exactly at `to` (inclusive both ends)", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(rows.map((r) => r.startsAt).sort()).toEqual(
+      [FROM, "2026-06-15T08:00:00.000Z", TO].sort(),
+    );
+    expect(rows.some((r) => r.startsAt === FROM)).toBe(true);
+    expect(rows.some((r) => r.startsAt === TO)).toBe(true);
+  });
+
+  it("excludes sessions outside the range", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(rows.every((r) => r.startsAt >= FROM && r.startsAt <= TO)).toBe(true);
+    expect(rows.some((r) => r.startsAt === "2026-05-31T23:59:59.999Z")).toBe(false);
+    expect(rows.some((r) => r.startsAt === "2026-07-01T00:00:00.000Z")).toBe(false);
+  });
+
+  it("treats an omitted `to` as unbounded on the upper side", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", { from: FROM });
+    expect(rows.every((r) => r.startsAt >= FROM)).toBe(true);
+    expect(rows.some((r) => r.startsAt === "2026-07-01T00:00:00.000Z")).toBe(true);
+  });
+
+  it("treats an omitted `from` as unbounded on the lower side", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", { to: TO });
+    expect(rows.every((r) => r.startsAt <= TO)).toBe(true);
+    expect(rows.some((r) => r.startsAt === "2026-05-31T23:59:59.999Z")).toBe(true);
   });
 });
