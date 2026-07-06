@@ -22,8 +22,14 @@ export async function GET(request: NextRequest): Promise<Response> {
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
     } else if (type === "bookings") {
-      const from = request.nextUrl.searchParams.get("from") ?? undefined;
-      const to = request.nextUrl.searchParams.get("to") ?? undefined;
+      let from: string | undefined = request.nextUrl.searchParams.get("from") ?? undefined;
+      let to: string | undefined = request.nextUrl.searchParams.get("to") ?? undefined;
+      // Edge runtimes (CF Workers) decode "%2B" → "+" in the query string, then
+      // URLSearchParams interprets the literal "+" as a space per the
+      // application/x-www-form-urlencoded spec.  Restore "+" in ISO-8601
+      // timezone offsets so inclusive-boundary comparisons work.
+      from = from?.replace(/ (\d{2}:\d{2})$/, "+$1");
+      to = to?.replace(/ (\d{2}:\d{2})$/, "+$1");
       csv = bookingsToCsv(await listBookingRowsForExport(repos, ctx.studio.id, { from, to }));
     } else {
       return badRequest(`Unknown export type: ${type}`);
