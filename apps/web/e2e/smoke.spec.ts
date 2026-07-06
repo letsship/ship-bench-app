@@ -52,6 +52,7 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
 
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
+  await expect(page.getByText(/^[A-Z][a-z]+ \d{1,2} [A-Z][a-z]+$/)).toBeVisible();
 
   expect(errors).toEqual([]);
 });

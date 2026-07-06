@@ -8,13 +8,14 @@ import { TodayHeading } from "./today-heading";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const now = new Date();
   const { repos, ctx } = await resolveStudio();
   const { today, stats } = await getDashboard(repos, ctx);
   const timeZone = ctx.studio.timezone;
 
   return (
     <>
-      <TodayHeading />
+      <TodayHeading now={now.toISOString()} timeZone={timeZone} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active members" value={stats.activeMembers} />
