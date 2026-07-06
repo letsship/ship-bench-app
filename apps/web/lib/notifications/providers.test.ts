@@ -1,10 +1,7 @@
-import { Resend } from "resend";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createCloudflareProvider } from "./cloudflare-provider";
 import { createFakeProvider } from "./fake-provider";
-import { createResendProvider } from "./resend-provider";
 import type { NotificationMessage } from "./types";
-
-vi.mock("resend", () => ({ Resend: vi.fn() }));
 
 const message: NotificationMessage = {
   kind: "booking_confirmation",
@@ -25,37 +22,80 @@ describe("fake provider", () => {
   });
 });
 
-describe("resend provider", () => {
-  const send = vi.fn();
+describe("cloudflare provider", () => {
+  const fetchMock = vi.fn();
 
   beforeEach(() => {
-    send.mockReset();
-    vi.mocked(Resend).mockImplementation(() => ({ emails: { send } }) as unknown as Resend);
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("maps a message onto the Resend send params", async () => {
-    send.mockResolvedValue({ data: { id: "re_x" }, error: null });
-    const provider = createResendProvider({ apiKey: "k", from: "Studiobook <s@b.co>" });
-    const result = await provider.send(message);
-    expect(result.providerMessageId).toBe("re_x");
-    expect(send).toHaveBeenCalledWith({
+  it("posts the message to the Cloudflare email send API and returns the cf-ray id", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      statusText: "OK",
+      headers: new Headers({ "cf-ray": "abc123-ray" }),
+      json: async () => ({
+        success: true,
+        errors: [],
+        result: { delivered: ["a@b.co"], queued: [], permanent_bounces: [] },
+      }),
+    });
+    const provider = createCloudflareProvider({
+      apiToken: "t",
+      accountId: "acct_1",
       from: "Studiobook <s@b.co>",
-      to: ["a@b.co"],
+    });
+    const result = await provider.send(message);
+    expect(result.providerMessageId).toBe("abc123-ray");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/acct_1/email/sending/send");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: { Authorization: "Bearer t", "Content-Type": "application/json" },
+    });
+    expect(JSON.parse(init.body)).toEqual({
+      from: "Studiobook <s@b.co>",
+      to: "a@b.co",
       subject: "Hi",
       text: "Body text",
-      tags: [{ name: "kind", value: "booking_confirmation" }],
     });
   });
 
-  it("throws when Resend returns an error", async () => {
-    send.mockResolvedValue({ data: null, error: { message: "bad recipient" } });
-    const provider = createResendProvider({ apiKey: "k", from: "s@b.co" });
-    await expect(provider.send(message)).rejects.toThrow(/Resend send failed: bad recipient/);
+  it("throws when Cloudflare returns an error", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      statusText: "Bad Request",
+      headers: new Headers(),
+      json: async () => ({ success: false, errors: [{ message: "bad recipient" }] }),
+    });
+    const provider = createCloudflareProvider({
+      apiToken: "t",
+      accountId: "acct_1",
+      from: "s@b.co",
+    });
+    await expect(provider.send(message)).rejects.toThrow(
+      /Cloudflare email send failed: bad recipient/,
+    );
   });
 
-  it("throws when Resend returns no id", async () => {
-    send.mockResolvedValue({ data: null, error: null });
-    const provider = createResendProvider({ apiKey: "k", from: "s@b.co" });
+  it("throws when Cloudflare returns no cf-ray id", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      statusText: "OK",
+      headers: new Headers(),
+      json: async () => ({
+        success: true,
+        errors: [],
+        result: { delivered: ["a@b.co"], queued: [], permanent_bounces: [] },
+      }),
+    });
+    const provider = createCloudflareProvider({
+      apiToken: "t",
+      accountId: "acct_1",
+      from: "s@b.co",
+    });
     await expect(provider.send(message)).rejects.toThrow(/no message id/);
   });
 });
