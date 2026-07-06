@@ -53,5 +53,17 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
 
+  // No hydration errors — the server-rendered date must match the client.
+  for (const err of errors) {
+    expect(err).not.toMatch(/Hydration/i);
+  }
+
   expect(errors).toEqual([]);
+
+  // The header subtitle must show the expected "Weekday D Month" format.
+  const header = page.getByRole("heading", { name: "Today at the studio" });
+  const subtitle = header.locator("..").locator("p");
+  await expect(subtitle).toBeVisible();
+  const text = await subtitle.textContent();
+  expect(text).toMatch(/^[A-Z][a-z]+ \d{1,2} [A-Z][a-z]+$/);
 });

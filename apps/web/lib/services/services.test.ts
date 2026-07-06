@@ -309,6 +309,39 @@ describe("reports + dashboard + booking list", () => {
     expect(Array.isArray(data.today)).toBe(true);
   });
 
+  it("filters today by an explicit nowIso across a studio-timezone day boundary", async () => {
+    // Set up a session that starts at 2026-07-07 00:30 CEST (+02:00), i.e.
+    // 2026-07-06T22:30:00Z.  If the caller passes a nowIso in late UTC on
+    // 2026-07-06 (which is already 2026-07-07 in Europe/Amsterdam), the
+    // session should be included in "today".
+    const sessionIso = "2026-07-06T22:30:00.000Z"; // 2026-07-07 00:30 CEST
+    const ctx = await getStudioContext(repos);
+    // Seed a session that falls on "2026-07-07" in the studio's timezone.
+    const seeded = baseSeed({
+      classTypes: [classType("ct1")],
+      sessions: [
+        session("cs1", {
+          startsAt: sessionIso,
+          endsAt: "2026-07-06T23:30:00.000Z",
+        }),
+      ],
+    });
+    const repos2 = createInMemoryRepositories(seeded);
+
+    // nowIso that is still 2026-07-06 in UTC but already 2026-07-07 in
+    // Europe/Amsterdam.
+    const nowIso = "2026-07-06T23:00:00.000Z";
+    const data = await getDashboard(repos2, ctx, nowIso);
+
+    expect(data.today).toHaveLength(1);
+    expect(data.today[0].id).toBe("cs1");
+
+    // Same instant, but pass a nowIso that is still 2026-07-06 in Amsterdam.
+    const nowIsoYesterday = "2026-07-06T21:00:00.000Z"; // 23:00 CEST -> still 2026-07-06
+    const data2 = await getDashboard(repos2, ctx, nowIsoYesterday);
+    expect(data2.today).toHaveLength(0);
+  });
+
   it("lists booking rows joined to member + class", async () => {
     const rows = await listBookingRows(repos, studioId);
     expect(rows.length).toBeGreaterThan(0);

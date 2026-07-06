@@ -9,12 +9,13 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const { repos, ctx } = await resolveStudio();
-  const { today, stats } = await getDashboard(repos, ctx);
+  const nowIso = new Date().toISOString();
+  const { today, stats } = await getDashboard(repos, ctx, nowIso);
   const timeZone = ctx.studio.timezone;
 
   return (
     <>
-      <TodayHeading />
+      <TodayHeading nowIso={nowIso} timeZone={timeZone} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active members" value={stats.activeMembers} />

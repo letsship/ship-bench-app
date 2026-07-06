@@ -18,9 +18,10 @@ export interface DashboardData {
 export async function getDashboard(
   repos: Repositories,
   ctx: StudioContext,
+  nowIso?: string,
 ): Promise<DashboardData> {
-  const nowIso = new Date().toISOString();
-  const todayKey = dayKey(nowIso, ctx.studio.timezone);
+  const now = nowIso ?? new Date().toISOString();
+  const todayKey = dayKey(now, ctx.studio.timezone);
 
   const sessions = await listSessions(repos, ctx.studio.id);
   const today = sessions.filter(
@@ -29,7 +30,7 @@ export async function getDashboard(
 
   const [members, upcoming, invoices, pending] = await Promise.all([
     repos.members.listByStudio(ctx.studio.id),
-    repos.classSessions.listByStudio(ctx.studio.id, { from: nowIso }),
+    repos.classSessions.listByStudio(ctx.studio.id, { from: now }),
     repos.invoices.listByStudio(ctx.studio.id),
     repos.outbox.listPending(),
   ]);
