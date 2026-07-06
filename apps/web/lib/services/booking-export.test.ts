@@ -131,6 +131,42 @@ describe("listBookingsForExport", () => {
     expect(starts).toEqual(["2026-06-30T23:59:59.000Z", "2026-07-01T00:00:00.000Z"]);
   });
 
+  it("includes a session whose stored startsAt uses a +00:00 offset when it matches an exact Z-suffixed `from`", async () => {
+    // Supabase serializes timestamptz as e.g. "2026-06-27T08:00:00+00:00" while
+    // query params/CSV output use "Z". A naive string comparison treats
+    // "+00:00" as lexicographically less than "Z", wrongly excluding sessions
+    // that start exactly at `from`. Compare as actual instants instead.
+    const seed = buildSeed();
+    const offsetSessionId = newId();
+    seed.sessions.push({
+      id: offsetSessionId,
+      studioId: seed.studio.id,
+      classTypeId: seed.classTypes[0].id,
+      instructor: "Noor",
+      startsAt: "2026-06-27T08:00:00+00:00",
+      endsAt: "2026-06-27T08:00:00+00:00",
+      capacity: 16,
+      priceCents: 1800,
+      status: "scheduled",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    seed.bookings.push({
+      id: newId(),
+      sessionId: offsetSessionId,
+      memberId: seed.members[0].id,
+      status: "booked",
+      bookedAt: "2026-01-01T00:00:00.000Z",
+      cancelledAt: null,
+    });
+    const repos = createInMemoryRepositories(seed);
+    const rows = await listBookingsForExport(repos, seed.studio.id, {
+      from: "2026-06-27T08:00:00.000Z",
+      to: "2026-06-27T08:00:00.000Z",
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].startsAt).toBe("2026-06-27T08:00:00+00:00");
+  });
+
   it("includes the member's email alongside the existing joined fields", async () => {
     const seed = buildSeed();
     const repos = createInMemoryRepositories(seed);

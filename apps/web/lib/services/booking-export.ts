@@ -1,12 +1,7 @@
+import type { BookingExportRow } from "@/lib/domain/csv";
 import type { Repositories } from "@/lib/db/repos/types";
 
-export interface BookingExportRow {
-  startsAt: string;
-  className: string;
-  memberName: string;
-  memberEmail: string;
-  status: string;
-}
+export type { BookingExportRow };
 
 export interface BookingExportRange {
   from?: string;
@@ -24,10 +19,13 @@ export async function listBookingsForExport(
   studioId: string,
   range: BookingExportRange = {},
 ): Promise<BookingExportRow[]> {
+  const from = range.from ? new Date(range.from).getTime() : undefined;
+  const to = range.to ? new Date(range.to).getTime() : undefined;
   const allSessions = await repos.classSessions.listByStudio(studioId);
   const sessions = allSessions.filter((session) => {
-    if (range.from && session.startsAt < range.from) return false;
-    if (range.to && session.startsAt > range.to) return false;
+    const startsAt = new Date(session.startsAt).getTime();
+    if (from !== undefined && startsAt < from) return false;
+    if (to !== undefined && startsAt > to) return false;
     return true;
   });
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
@@ -50,5 +48,5 @@ export async function listBookingsForExport(
         status: booking.status,
       };
     })
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
