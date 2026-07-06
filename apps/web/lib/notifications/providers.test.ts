@@ -27,11 +27,7 @@ describe("cloudflare email provider", () => {
 
   beforeEach(() => {
     fetchMock.mockReset();
-    vi.stubGlobal("fetch", fetchMock);
-  });
-
-  afterEach(() => {
-    vi.unstubGlobal("fetch");
+    globalThis.fetch = fetchMock;
   });
 
   it("sends a POST to the Cloudflare email send API with the correct shape", async () => {
