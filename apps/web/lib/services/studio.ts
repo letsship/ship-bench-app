@@ -12,19 +12,11 @@ export interface StudioContext {
 export async function getStudioContext(repos: Repositories): Promise<StudioContext> {
   const studio = await repos.studios.getFirst();
   if (!studio) {
-    throw new HttpError(
-      503,
-      "not_provisioned",
-      "No studio has been provisioned. Seed the database.",
-    );
+    throw new HttpError(503, "not_provisioned", "No studio has been provisioned. Seed the database.");
   }
   const settings = await repos.settings.getByStudioId(studio.id);
   if (!settings) {
-    throw new HttpError(
-      503,
-      "not_provisioned",
-      "Studio settings are missing. Reseed the database.",
-    );
+    throw new HttpError(503, "not_provisioned", "Studio settings are missing. Reseed the database.");
   }
   return { studio, settings };
 }
