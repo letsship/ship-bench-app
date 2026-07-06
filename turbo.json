@@ -9,7 +9,7 @@
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "NEXT_PUBLIC_SITE_URL",
     "SUPABASE_SECRET_KEY",
-    "RESEND_API_KEY"
+    "CLOUDFLARE_EMAIL_API_TOKEN"
   ],
   "tasks": {
     "build": {

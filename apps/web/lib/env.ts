@@ -14,7 +14,7 @@ const clientSchema = z.object({
 
 const serverSchema = clientSchema.extend({
   SUPABASE_SECRET_KEY: z.string().min(1),
-  RESEND_API_KEY: z.string().min(1).optional(),
+  CLOUDFLARE_EMAIL_API_TOKEN: z.string().min(1).optional(),
   STUDIOBOOK_FROM_EMAIL: z.string().min(1).optional(),
   // Postgres schema the data lives in. Defaults to "public"; overridden per
   // deployment when a single database hosts several isolated copies of the app
@@ -37,7 +37,7 @@ const getClientVars = () => ({
 const getServerVars = () => ({
   ...getClientVars(),
   SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  CLOUDFLARE_EMAIL_API_TOKEN: process.env.CLOUDFLARE_EMAIL_API_TOKEN,
   STUDIOBOOK_FROM_EMAIL: process.env.STUDIOBOOK_FROM_EMAIL,
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
 });
