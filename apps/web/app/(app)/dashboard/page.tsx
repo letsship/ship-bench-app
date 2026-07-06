@@ -1,5 +1,5 @@
 import { occupancyPercent } from "@/lib/domain/capacity";
-import { formatTime } from "@/lib/format";
+import { formatDayLabel, formatTime } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getDashboard } from "@/lib/services/dashboard";
 import { EmptyState, StatCard, StatusBadge } from "../_components/ui";
@@ -9,12 +9,17 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const { repos, ctx } = await resolveStudio();
-  const { today, stats } = await getDashboard(repos, ctx);
+  // A single shared "now" instant for the whole request: it drives both the
+  // header's day label and the dashboard's "today" filtering, so they can
+  // never disagree right around a studio-local midnight. The label is rendered
+  // in the studio's timezone, not the server's or the visitor's.
+  const nowIso = new Date().toISOString();
   const timeZone = ctx.studio.timezone;
+  const { today, stats } = await getDashboard(repos, ctx, nowIso);
 
   return (
     <>
-      <TodayHeading />
+      <TodayHeading subtitle={formatDayLabel(nowIso, timeZone)} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active members" value={stats.activeMembers} />

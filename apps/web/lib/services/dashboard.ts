@@ -18,8 +18,8 @@ export interface DashboardData {
 export async function getDashboard(
   repos: Repositories,
   ctx: StudioContext,
+  nowIso: string = new Date().toISOString(),
 ): Promise<DashboardData> {
-  const nowIso = new Date().toISOString();
   const todayKey = dayKey(nowIso, ctx.studio.timezone);
 
   const sessions = await listSessions(repos, ctx.studio.id);
