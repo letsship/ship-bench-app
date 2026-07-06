@@ -43,3 +43,46 @@ export async function listBookingRows(
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
+
+export interface BookingExportRow {
+  memberName: string;
+  email: string;
+  className: string;
+  startsAt: string;
+  status: string;
+}
+
+// Same join as listBookingRows, but for the accounting export: the `to`
+// bound is inclusive here (unlike the shared SessionRange semantics used by
+// the live bookings page), so it's applied locally rather than pushed into
+// the repo's range filter.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingExportRow[]> {
+  const sessions = (await repos.classSessions.listByStudio(studioId, { from: range.from })).filter(
+    (session) => !range.to || session.startsAt <= range.to,
+  );
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const members = await repos.members.listByStudio(studioId);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
+
+  return bookings
+    .map((booking) => {
+      const session = sessionById.get(booking.sessionId);
+      const classType = session ? typeById.get(session.classTypeId) : undefined;
+      const member = memberById.get(booking.memberId);
+      return {
+        memberName: member?.name ?? "—",
+        email: member?.email ?? "",
+        className: classType?.name ?? "Class",
+        startsAt: session?.startsAt ?? "",
+        status: booking.status,
+      };
+    })
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
