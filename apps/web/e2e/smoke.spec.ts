@@ -55,3 +55,16 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
 
   expect(errors).toEqual([]);
 });
+
+test("the 'Today at the studio' header date is stable across a reload", async ({ page }) => {
+  await signIn(page);
+  const heading = page.getByRole("heading", { name: "Today at the studio" });
+  await expect(heading).toBeVisible();
+  const subtitle = await heading.locator("xpath=following-sibling::p[1]").textContent();
+
+  await page.reload();
+  await expect(heading).toBeVisible();
+  const reloadedSubtitle = await heading.locator("xpath=following-sibling::p[1]").textContent();
+
+  expect(reloadedSubtitle).toBe(subtitle);
+});
