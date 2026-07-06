@@ -134,4 +134,20 @@ describe("listBookingsForExport", () => {
     const rows = await listBookingsForExport(repos, "s1", { from: FROM });
     expect(rows.some((row) => row.id === "b4")).toBe(true);
   });
+
+  it("includes a session at the exact `to` instant even when the stored offset differs (+00:00 vs Z)", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member("m5")],
+        sessions: [session("cs-offset", { startsAt: "2026-06-30T23:59:59+00:00" })],
+        bookings: [booking("b5", "cs-offset", "m5")],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1", {
+      from: FROM,
+      to: "2026-06-30T23:59:59.000Z",
+    });
+    expect(rows.some((row) => row.id === "b5")).toBe(true);
+  });
 });

@@ -20,5 +20,6 @@ export async function listBookingsForExport(
 ) {
   const rows = await listBookingRows(repos, studioId, { from: range.from });
   if (!range.to) return rows;
-  return rows.filter((row) => row.startsAt <= range.to!);
+  const toMs = new Date(range.to).getTime();
+  return rows.filter((row) => new Date(row.startsAt).getTime() <= toMs);
 }
