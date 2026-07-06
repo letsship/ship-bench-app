@@ -313,6 +313,7 @@ describe("reports + dashboard + booking list", () => {
     const rows = await listBookingRows(repos, studioId);
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
+    expect(rows[0]).toHaveProperty("email");
     expect(rows[0]).toHaveProperty("className");
   });
 });
