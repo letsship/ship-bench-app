@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { formatDayLabel } from "@/lib/format";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -160,7 +161,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +204,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -296,6 +306,10 @@ describe("reports + dashboard + booking list", () => {
     studioId = (await repos.studios.getFirst())?.id ?? "";
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("summarises monthly revenue", async () => {
     const report = await getRevenueReport(repos, await getStudioContext(repos));
     expect(report.rows.length).toBeGreaterThan(0);
@@ -307,6 +321,42 @@ describe("reports + dashboard + booking list", () => {
     const data = await getDashboard(repos, await getStudioContext(repos));
     expect(data.stats.activeMembers).toBeGreaterThan(0);
     expect(Array.isArray(data.today)).toBe(true);
+  });
+
+  it("returns a todayLabel matching formatDayLabel for the studio's timezone", async () => {
+    const ctx = await getStudioContext(repos);
+    const data = await getDashboard(repos, ctx);
+    expect(data.todayLabel).toBe(formatDayLabel(new Date().toISOString(), ctx.studio.timezone));
+  });
+
+  it("agrees on the same studio-timezone calendar day near local midnight (header vs today's list)", async () => {
+    // 2026-06-15T22:15:00Z is still 15 June in UTC, but it's already
+    // 2026-06-16T00:15 in Europe/Amsterdam (CEST, UTC+2) — a day boundary
+    // where a naive UTC-based read would disagree with the studio's clock.
+    const boundaryNow = "2026-06-15T22:15:00.000Z";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(boundaryNow));
+
+    const boundaryRepos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("today-session", {
+            startsAt: "2026-06-16T00:30:00.000Z",
+            endsAt: "2026-06-16T01:30:00.000Z",
+          }),
+          session("yesterday-session", {
+            startsAt: "2026-06-15T20:00:00.000Z",
+            endsAt: "2026-06-15T21:00:00.000Z",
+          }),
+        ],
+      }),
+    );
+    const ctx = await getStudioContext(boundaryRepos);
+    const data = await getDashboard(boundaryRepos, ctx);
+
+    expect(data.todayLabel).toBe("Tuesday 16 June");
+    expect(data.today.map((s) => s.id)).toEqual(["today-session"]);
   });
 
   it("lists booking rows joined to member + class", async () => {
