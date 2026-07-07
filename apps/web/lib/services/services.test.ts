@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows, listBookingsForExport } from "./booking-list";
+import { listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -290,10 +290,8 @@ describe("invoices service", () => {
 
 describe("reports + dashboard + booking list", () => {
   let repos: Repositories;
-  let studioId: string;
   beforeEach(async () => {
     repos = createInMemoryRepositories(buildSeed(NOW));
-    studioId = (await repos.studios.getFirst())?.id ?? "";
   });
 
   it("summarises monthly revenue", async () => {

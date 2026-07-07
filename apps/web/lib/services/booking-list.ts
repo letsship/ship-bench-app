@@ -56,8 +56,9 @@ export async function listBookingsForExport(
   // at the DB level and apply the inclusive 'to' filter in application code so
   // the shared semantics used by /bookings and /classes are not changed.
   const rows = await listBookingRows(repos, studioId, { from: range.from });
-  if (range.to) {
-    return rows.filter((row) => row.startsAt <= range.to);
+  const to = range.to;
+  if (to) {
+    return rows.filter((row) => row.startsAt <= to);
   }
   return rows;
 }
