@@ -1,6 +1,6 @@
 // The provider-agnostic notification contract. The outbox dispatcher and the
 // message builders depend only on this interface; concrete vendors (today:
-// Resend) implement it.
+// Cloudflare Email) implement it.
 
 export type NotificationKind =
   | "booking_confirmation"
