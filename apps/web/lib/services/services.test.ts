@@ -314,5 +314,10 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("email");
+    const seededMembers = await repos.members.listByStudio(studioId);
+    const matchedMember = seededMembers.find((m) => m.name === rows[0].memberName);
+    expect(matchedMember).toBeTruthy();
+    expect(rows[0].email).toBe(matchedMember!.email);
   });
 });

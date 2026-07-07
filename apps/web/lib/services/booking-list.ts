@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
