@@ -60,9 +60,12 @@ export async function listBookingsForExport(
   range: SessionRange = {},
 ): Promise<BookingExportRow[]> {
   const sessions = await repos.classSessions.listByStudio(studioId);
+  const fromMs = range.from !== undefined ? new Date(range.from).getTime() : undefined;
+  const toMs = range.to !== undefined ? new Date(range.to).getTime() : undefined;
   const filteredSessions = sessions.filter((session) => {
-    if (range.from !== undefined && session.startsAt < range.from) return false;
-    if (range.to !== undefined && session.startsAt > range.to) return false;
+    const startsMs = new Date(session.startsAt).getTime();
+    if (fromMs !== undefined && startsMs < fromMs) return false;
+    if (toMs !== undefined && startsMs > toMs) return false;
     return true;
   });
   const sessionById = new Map(filteredSessions.map((session) => [session.id, session]));

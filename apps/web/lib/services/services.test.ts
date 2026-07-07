@@ -344,6 +344,20 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0].startsAt).toBe("2026-06-30T23:59:59.000Z");
   });
 
+  it("includes a session whose start exactly equals the to bound with timezone offset", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { startsAt: "2026-06-27T08:00:00+00:00", endsAt: "2026-06-27T09:00:00+00:00" })],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1", { to: "2026-06-27T08:00:00+00:00" });
+    expect(rows.length).toBe(1);
+    expect(rows[0].startsAt).toBe("2026-06-27T08:00:00+00:00");
+  });
+
   it("returns all bookings unbounded when range is omitted", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
