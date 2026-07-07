@@ -55,3 +55,27 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
 
   expect(errors).toEqual([]);
 });
+
+test.describe("timezone mismatch", () => {
+  test.use({ timezoneId: "America/Los_Angeles" });
+
+  test("the dashboard shows the correct date and zero console errors under a mismatched client timezone", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await signIn(page);
+    await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
+
+    const header = page.locator("div", {
+      has: page.getByRole("heading", { name: "Today at the studio" }),
+    });
+    await expect(header.locator("p")).toHaveText(
+      /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December)$/
+    );
+
+    expect(errors).toEqual([]);
+  });
+});
