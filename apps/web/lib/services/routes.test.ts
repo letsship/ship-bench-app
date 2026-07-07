@@ -108,6 +108,26 @@ describe("GET /api/export?type=bookings (against injected fake repositories)", (
     expect(rows.some((r) => r.startsWith(exact + ","))).toBe(true);
   });
 
+  it("treats a +00:00 offset timestamp the same as a Z timestamp for from/to (inclusive both ends)", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())!.id;
+    const [firstRow] = await listBookingRows(repos, studioId);
+    // The seeded startsAt is a `Z` timestamp; rewrite the same instant using a
+    // `+00:00` offset — the exact format the export's own Starts column emits
+    // in production — and confirm inclusive filtering still matches.
+    const offsetForm = firstRow.startsAt.replace(/Z$/, "+00:00");
+    expect(offsetForm).not.toBe(firstRow.startsAt);
+    const res = await exportGet(
+      new NextRequest(
+        `http://localhost/api/export?type=bookings&from=${encodeURIComponent(offsetForm)}&to=${encodeURIComponent(offsetForm)}`,
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    const rows = body.split("\r\n").slice(1);
+    expect(rows.some((r) => r.startsWith(firstRow.startsAt + ","))).toBe(true);
+  });
+
   it("rejects an unknown export type with 400", async () => {
     const res = await exportGet(
       new NextRequest("http://localhost/api/export?type=unknown"),

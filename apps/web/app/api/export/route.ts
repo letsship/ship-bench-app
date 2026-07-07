@@ -24,11 +24,21 @@ export async function GET(request: NextRequest): Promise<Response> {
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
     } else if (type === "bookings") {
-      // Fetch with `from` only — the repo's SessionRange treats `to` as an
-      // exclusive upper bound, but this export needs both ends inclusive, so
-      // apply `to` here as a plain <= comparison instead of passing it down.
-      const rows = await listBookingRows(repos, ctx.studio.id, { from });
-      const filtered = to ? rows.filter((row) => row.startsAt <= to) : rows;
+      // Parse `from`/`to` as real timestamps (not lexicographic strings) so any
+      // valid ISO-8601 UTC form works — `Z`, `+00:00`, or an offset. The repo's
+      // SessionRange treats `to` as exclusive and compares strings, which would
+      // both drop a session starting exactly at `to` and miscompare differently
+      // formatted-but-equal instants; so fetch with `from` only (normalized to
+      // a canonical `Z` timestamp the DB layer handles consistently) and apply
+      // an inclusive `to` bound here using epoch-millis comparison.
+      const fromMs = from ? Date.parse(from) : NaN;
+      const toMs = to ? Date.parse(to) : NaN;
+      const rows = await listBookingRows(repos, ctx.studio.id, {
+        from: Number.isNaN(fromMs) ? undefined : new Date(fromMs).toISOString(),
+      });
+      const filtered = Number.isNaN(toMs)
+        ? rows
+        : rows.filter((row) => Date.parse(row.startsAt) <= toMs);
       csv = bookingsToCsv(filtered);
     } else {
       return badRequest(`Unknown export type: ${type}`);
