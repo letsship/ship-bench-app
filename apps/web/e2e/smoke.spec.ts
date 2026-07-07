@@ -43,15 +43,32 @@ test("an operator can schedule a new class from the UI", async ({ page }) => {
   await expect(page.getByTestId("schedule").getByText("E2E Tester").first()).toBeVisible();
 });
 
-test("the dashboard renders with zero console errors", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+test.describe("under a non-studio browser timezone", () => {
+  // The studio is configured for Europe/Amsterdam; run the browser under
+  // America/Los_Angeles to exercise the reported cross-timezone hydration
+  // bug where the header previously flashed the visitor's local calendar day.
+  test.use({ timezoneId: "America/Los_Angeles" });
+
+  test("the dashboard renders with zero console errors", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await signIn(page);
+    await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
+
+    // The header date must read the studio-local calendar day, not the
+    // visitor's machine day.
+    const expectedLabel = new Intl.DateTimeFormat("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: "Europe/Amsterdam",
+    }).format(new Date());
+    await expect(page.getByText(expectedLabel)).toBeVisible();
+
+    expect(errors).toEqual([]);
   });
-  page.on("pageerror", (error) => errors.push(error.message));
-
-  await signIn(page);
-  await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
-
-  expect(errors).toEqual([]);
 });

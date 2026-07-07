@@ -307,6 +307,7 @@ describe("reports + dashboard + booking list", () => {
     const data = await getDashboard(repos, await getStudioContext(repos));
     expect(data.stats.activeMembers).toBeGreaterThan(0);
     expect(Array.isArray(data.today)).toBe(true);
+    expect(data.todayLabel).toMatch(/^[A-Z][a-z]+ [0-9]{1,2} [A-Z][a-z]+$/);
   });
 
   it("lists booking rows joined to member + class", async () => {

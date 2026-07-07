@@ -1,5 +1,6 @@
 import type { Repositories } from "@/lib/db/repos/types";
 import { dayKey } from "@/lib/domain/dates";
+import { formatDayLabel } from "@/lib/format";
 import { type SessionView, listSessions } from "./classes";
 import type { StudioContext } from "./studio";
 
@@ -13,6 +14,7 @@ export interface DashboardStats {
 export interface DashboardData {
   today: SessionView[];
   stats: DashboardStats;
+  todayLabel: string;
 }
 
 export async function getDashboard(
@@ -21,6 +23,7 @@ export async function getDashboard(
 ): Promise<DashboardData> {
   const nowIso = new Date().toISOString();
   const todayKey = dayKey(nowIso, ctx.studio.timezone);
+  const todayLabel = formatDayLabel(nowIso, ctx.studio.timezone);
 
   const sessions = await listSessions(repos, ctx.studio.id);
   const today = sessions.filter(
@@ -36,6 +39,7 @@ export async function getDashboard(
 
   return {
     today,
+    todayLabel,
     stats: {
       activeMembers: members.filter((member) => member.status === "active").length,
       upcomingSessions: upcoming.length,
