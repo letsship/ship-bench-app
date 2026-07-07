@@ -3,7 +3,7 @@
   // Deploys apps/web as a Cloudflare Worker via @opennextjs/cloudflare.
   //
   // NEXT_PUBLIC_* vars are public (inlined into the client bundle at build time).
-  // The secrets SUPABASE_SECRET_KEY and RESEND_API_KEY are set out-of-band with
+  // The secrets SUPABASE_SECRET_KEY and CF_EMAIL_API_TOKEN are set out-of-band with
   // `wrangler secret put <NAME>` — never commit them.
   "name": "studiobook",
   "main": ".open-next/worker.js",
