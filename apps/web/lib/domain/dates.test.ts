@@ -126,11 +126,8 @@ describe("studioTodayLabel", () => {
   });
 
   it("defaults to now when no instant is provided", () => {
-    const before = new Date();
     const label = studioTodayLabel("UTC");
-    const after = new Date();
     expect(label).toBeTruthy();
-    // The label should contain the current day — just verify it parses
     expect(label).toMatch(/^\w+ \d{1,2} \w+$/);
   });
 });
