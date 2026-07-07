@@ -63,6 +63,7 @@ export async function listBookingRowsForExport(
   // The underlying repo treats `to` as exclusive; the export needs inclusive.
   // Pass only `from` to the repo and apply the inclusive `to` filter in memory.
   const sessions = await repos.classSessions.listByStudio(studioId, { from: range.from });
-  const filtered = range.to ? sessions.filter((s) => s.startsAt <= range.to) : sessions;
+  const to = range.to;
+  const filtered = to ? sessions.filter((s) => s.startsAt <= to) : sessions;
   return joinBookingRows(repos, studioId, filtered);
 }
