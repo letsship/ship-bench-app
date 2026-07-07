@@ -78,7 +78,13 @@ test("dashboard header shows Europe/Amsterdam date under a US browser timezone",
   // Grab the sibling subtitle <p> and verify it matches an Amsterdam-reckoned
   // date rather than a US-reckoned date.
   const subtitle = heading.locator("..").locator("p");
-  await expect(subtitle).not.toBeEmpty();
+  const expected = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Amsterdam",
+  }).format(new Date());
+  await expect(subtitle).toHaveText(expected);
 
   expect(errors).toEqual([]);
 

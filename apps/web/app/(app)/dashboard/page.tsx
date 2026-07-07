@@ -1,6 +1,5 @@
 import { occupancyPercent } from "@/lib/domain/capacity";
-import { formatTime } from "@/lib/format";
-import { formatDayLabel } from "@/lib/format";
+import { formatDayLabel, formatTime } from "@/lib/format";
 import { getNow } from "@/lib/now";
 import { resolveStudio } from "@/lib/services/context";
 import { getDashboard } from "@/lib/services/dashboard";
