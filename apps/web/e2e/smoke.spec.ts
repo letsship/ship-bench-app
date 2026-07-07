@@ -53,5 +53,12 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
 
+  const subtitle = page
+    .getByRole("heading", { name: "Today at the studio" })
+    .locator("xpath=../p");
+  await expect(subtitle).toHaveText(
+    /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December)$/,
+  );
+
   expect(errors).toEqual([]);
 });

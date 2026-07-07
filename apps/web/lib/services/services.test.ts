@@ -4,6 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { dayKey } from "@/lib/domain/dates";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -304,9 +305,15 @@ describe("reports + dashboard + booking list", () => {
   });
 
   it("builds the dashboard", async () => {
-    const data = await getDashboard(repos, await getStudioContext(repos));
+    const ctx = await getStudioContext(repos);
+    const data = await getDashboard(repos, ctx);
     expect(data.stats.activeMembers).toBeGreaterThan(0);
     expect(Array.isArray(data.today)).toBe(true);
+    expect(data.todayIso).toBeDefined();
+    const expectedDay = dayKey(data.todayIso, ctx.studio.timezone);
+    for (const session of data.today) {
+      expect(dayKey(session.startsAt, ctx.studio.timezone)).toBe(expectedDay);
+    }
   });
 
   it("lists booking rows joined to member + class", async () => {
