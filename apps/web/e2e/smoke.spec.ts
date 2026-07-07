@@ -1,4 +1,10 @@
 import { type Page, expect, test } from "@playwright/test";
+import { formatDayLabel } from "../lib/format";
+
+// The seeded studio (Riverbank Movement) runs on Europe/Amsterdam; the
+// dashboard header must report the calendar day as observed there, regardless
+// of the server's or visitor's machine timezone.
+const STUDIO_TIMEZONE = "Europe/Amsterdam";
 
 async function signIn(page: Page): Promise<void> {
   await page.goto("/login");
@@ -51,7 +57,15 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
   page.on("pageerror", (error) => errors.push(error.message));
 
   await signIn(page);
-  await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
+  const heading = page.getByRole("heading", { name: "Today at the studio" });
+  await expect(heading).toBeVisible();
+
+  // Explicitly assert the header subtitle is the studio-timezone day label for
+  // the current instant, so a regression that reintroduces a client/server
+  // date mismatch (e.g. re-adding a client `new Date()` evaluation) is caught
+  // by a concrete date assertion and not only the generic console-error check.
+  const expectedSubtitle = formatDayLabel(new Date().toISOString(), STUDIO_TIMEZONE);
+  await expect(page.getByText(expectedSubtitle, { exact: true })).toBeVisible();
 
   expect(errors).toEqual([]);
 });

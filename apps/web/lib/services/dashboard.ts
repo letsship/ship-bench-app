@@ -13,6 +13,10 @@ export interface DashboardStats {
 export interface DashboardData {
   today: SessionView[];
   stats: DashboardStats;
+  // The single instant the dashboard was built for, so callers (e.g. the
+  // header date line) don't need to independently call `new Date()` and risk a
+  // client/server disagreement or hydration mismatch.
+  nowIso: string;
 }
 
 export async function getDashboard(
@@ -42,5 +46,6 @@ export async function getDashboard(
       openInvoices: invoices.filter((invoice) => invoice.status === "open").length,
       pendingNotifications: pending.length,
     },
+    nowIso,
   };
 }

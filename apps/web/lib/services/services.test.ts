@@ -3,6 +3,7 @@ import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes"
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { dayKey } from "@/lib/domain/dates";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -307,6 +308,17 @@ describe("reports + dashboard + booking list", () => {
     const data = await getDashboard(repos, await getStudioContext(repos));
     expect(data.stats.activeMembers).toBeGreaterThan(0);
     expect(Array.isArray(data.today)).toBe(true);
+    // nowIso is the single instant the dashboard was built for; it must be a
+    // valid ISO string and agree with the calendar-day bucketing used for the
+    // "today" session list, otherwise the header date and the stats list would
+    // observe different days (the reported header/stats disagreement bug).
+    expect(() => new Date(data.nowIso)).not.toThrow();
+    expect(Number.isNaN(new Date(data.nowIso).getTime())).toBe(false);
+    const ctx = await getStudioContext(repos);
+    const todayKey = dayKey(data.nowIso, ctx.studio.timezone);
+    for (const session of data.today) {
+      expect(dayKey(session.startsAt, ctx.studio.timezone)).toBe(todayKey);
+    }
   });
 
   it("lists booking rows joined to member + class", async () => {
