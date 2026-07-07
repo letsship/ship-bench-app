@@ -55,3 +55,39 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
 
   expect(errors).toEqual([]);
 });
+
+// Regression: a front-desk laptop set to a non-studio timezone (e.g.
+// America/Los_Angeles) used to render the wrong day in the header and trip a
+// React hydration error, because the date was computed client-side with the
+// visitor's own clock/timezone. The header is now server-rendered in the
+// studio's configured Europe/Amsterdam timezone from a single per-request
+// instant, so the browser's timezone must not affect it.
+test("the dashboard header shows the studio-timezone day on a US-timezone client", async ({ browser }) => {
+  const expectedLabel = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Amsterdam",
+  }).format(new Date());
+
+  const context = await browser.newContext({ timezoneId: "America/Los_Angeles" });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
+
+  // The header subtitle is the Amsterdam calendar day, regardless of the
+  // browser's America/Los_Angeles timezone.
+  await expect(page.locator("h1").locator("xpath=following-sibling::p").first()).toHaveText(
+    expectedLabel,
+  );
+
+  expect(errors).toEqual([]);
+
+  await context.close();
+});

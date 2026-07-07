@@ -309,6 +309,39 @@ describe("reports + dashboard + booking list", () => {
     expect(Array.isArray(data.today)).toBe(true);
   });
 
+  it("filters today's sessions by the explicit nowIso's studio-timezone day, not the ambient clock", async () => {
+    // 2026-06-15T22:30:00Z is 2026-06-16T00:30 in Europe/Amsterdam — the
+    // studio has already crossed midnight, so "today" is the 16th even though
+    // a UTC/ambient clock still reads the 15th. Pin two sessions on either
+    // side of that boundary.
+    const boundaryNow = "2026-06-15T22:30:00.000Z";
+    const amsterdamToday = "2026-06-16T10:00:00.000Z"; // 12:00 Amsterdam on the 16th
+    const amsterdamYesterday = "2026-06-15T10:00:00.000Z"; // 12:00 Amsterdam on the 15th
+    const repos2 = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs-today", { startsAt: amsterdamToday, endsAt: "2026-06-16T11:00:00.000Z" }),
+          session("cs-yesterday", {
+            startsAt: amsterdamYesterday,
+            endsAt: "2026-06-15T11:00:00.000Z",
+          }),
+        ],
+        members: [member("m1")],
+      }),
+    );
+    const ctx = await getStudioContext(repos2);
+    expect(ctx.studio.timezone).toBe("Europe/Amsterdam");
+
+    const data = await getDashboard(repos2, ctx, boundaryNow);
+    expect(data.today.map((s) => s.id)).toEqual(["cs-today"]);
+
+    // Sanity check: an explicit instant on the prior Amsterdam day excludes
+    // the 16th session and includes the 15th.
+    const priorDay = await getDashboard(repos2, ctx, "2026-06-15T10:30:00.000Z");
+    expect(priorDay.today.map((s) => s.id)).toEqual(["cs-yesterday"]);
+  });
+
   it("lists booking rows joined to member + class", async () => {
     const rows = await listBookingRows(repos, studioId);
     expect(rows.length).toBeGreaterThan(0);

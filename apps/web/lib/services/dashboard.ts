@@ -1,6 +1,7 @@
 import type { Repositories } from "@/lib/db/repos/types";
 import { dayKey } from "@/lib/domain/dates";
 import { type SessionView, listSessions } from "./classes";
+import { getRequestNowIso } from "./request-time";
 import type { StudioContext } from "./studio";
 
 export interface DashboardStats {
@@ -18,8 +19,8 @@ export interface DashboardData {
 export async function getDashboard(
   repos: Repositories,
   ctx: StudioContext,
+  nowIso: string = getRequestNowIso(),
 ): Promise<DashboardData> {
-  const nowIso = new Date().toISOString();
   const todayKey = dayKey(nowIso, ctx.studio.timezone);
 
   const sessions = await listSessions(repos, ctx.studio.id);

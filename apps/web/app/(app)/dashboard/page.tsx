@@ -1,20 +1,26 @@
 import { occupancyPercent } from "@/lib/domain/capacity";
-import { formatTime } from "@/lib/format";
+import { formatDayLabel, formatTime } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getDashboard } from "@/lib/services/dashboard";
-import { EmptyState, StatCard, StatusBadge } from "../_components/ui";
-import { TodayHeading } from "./today-heading";
+import { getRequestNowIso } from "@/lib/services/request-time";
+import { EmptyState, PageHeader, StatCard, StatusBadge } from "../_components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const { repos, ctx } = await resolveStudio();
-  const { today, stats } = await getDashboard(repos, ctx);
+  // Compute "now" exactly once for the whole request so the header date and
+  // the "today" session list are derived from the same instant — independent
+  // `new Date()` reads can drift across Next.js's internal render passes and
+  // cause a hydration mismatch / date flip near studio-timezone midnight.
+  const nowIso = getRequestNowIso();
+  const { today, stats } = await getDashboard(repos, ctx, nowIso);
   const timeZone = ctx.studio.timezone;
+  const todayLabel = formatDayLabel(nowIso, timeZone);
 
   return (
     <>
-      <TodayHeading />
+      <PageHeader title="Today at the studio" subtitle={todayLabel} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active members" value={stats.activeMembers} />
