@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -307,6 +307,29 @@ describe("reports + dashboard + booking list", () => {
     const data = await getDashboard(repos, await getStudioContext(repos));
     expect(data.stats.activeMembers).toBeGreaterThan(0);
     expect(Array.isArray(data.today)).toBe(true);
+    expect(data.todayLabel).toMatch(/^[A-Z][a-z]+ \d{1,2} [A-Z][a-z]+$/);
+  });
+
+  it("labels today in the studio timezone, not UTC", async () => {
+    // 2026-03-14T23:30:00Z is the next day in Amsterdam, same day in LA.
+    const nearMidnightUtc = "2026-03-14T23:30:00.000Z";
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.setSystemTime(new Date(nearMidnightUtc));
+
+    const amsterdamRepos = createInMemoryRepositories(
+      baseSeed({ studio: { id: "s1", name: "S", slug: "s", timezone: "Europe/Amsterdam", createdAt: ISO } }),
+    );
+    const laRepos = createInMemoryRepositories(
+      baseSeed({ studio: { id: "s1", name: "S", slug: "s", timezone: "America/Los_Angeles", createdAt: ISO } }),
+    );
+
+    const amsterdam = await getDashboard(amsterdamRepos, await getStudioContext(amsterdamRepos));
+    const losAngeles = await getDashboard(laRepos, await getStudioContext(laRepos));
+
+    expect(amsterdam.todayLabel).toBe("Sunday 15 March");
+    expect(losAngeles.todayLabel).toBe("Saturday 14 March");
+
+    vi.useRealTimers();
   });
 
   it("lists booking rows joined to member + class", async () => {
