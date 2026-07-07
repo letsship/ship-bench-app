@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCloudflareEmailProvider } from "./cloudflare-email-provider";
 import type { NotificationMessage } from "./types";
 
-const CLOUDFLARE_EMAIL_SEND_ENDPOINT =
-  "https://api.cloudflare.com/client/v4/accounts/{account_id}/email/routing/send";
-
 const message: NotificationMessage = {
   kind: "booking_confirmation",
   recipient: { memberId: "m1", email: "a@b.co", name: "A" },
@@ -25,11 +22,11 @@ describe("cloudflare email provider", () => {
       new Response(JSON.stringify({ result: { id: "cf_123" } }), { status: 200 }),
     );
 
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok", accountId: "acc_123" });
     await provider.send(message);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      CLOUDFLARE_EMAIL_SEND_ENDPOINT,
+      "https://api.cloudflare.com/client/v4/accounts/acc_123/email/routing/send",
       expect.objectContaining({
         method: "POST",
         headers: {
@@ -47,7 +44,7 @@ describe("cloudflare email provider", () => {
       new Response(JSON.stringify({ result: { id: "cf_abc" } }), { status: 200 }),
     );
 
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok", accountId: "acc_123" });
     const result = await provider.send(message);
     expect(result.providerMessageId).toBe("cf_abc");
   });
@@ -58,7 +55,7 @@ describe("cloudflare email provider", () => {
       new Response(JSON.stringify({ id: "cf_xyz" }), { status: 200 }),
     );
 
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok", accountId: "acc_123" });
     const result = await provider.send(message);
     expect(result.providerMessageId).toBe("cf_xyz");
   });
@@ -69,15 +66,21 @@ describe("cloudflare email provider", () => {
       new Response("Bad Request", { status: 400, statusText: "Bad Request" }),
     );
 
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok", accountId: "acc_123" });
     await expect(provider.send(message)).rejects.toThrow(
       /Cloudflare Email send failed: 400/,
     );
   });
 
   it("throws a clear error when CF_EMAIL_API_TOKEN is missing", () => {
-    expect(() => createCloudflareEmailProvider({ apiToken: "" })).toThrow(
+    expect(() => createCloudflareEmailProvider({ apiToken: "", accountId: "acc_123" })).toThrow(
       /CF_EMAIL_API_TOKEN is not set/,
+    );
+  });
+
+  it("throws a clear error when CF_ACCOUNT_ID is missing", () => {
+    expect(() => createCloudflareEmailProvider({ apiToken: "tok", accountId: "" })).toThrow(
+      /CF_ACCOUNT_ID is not set/,
     );
   });
 });
