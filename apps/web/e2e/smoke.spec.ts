@@ -55,3 +55,32 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
 
   expect(errors).toEqual([]);
 });
+
+test("dashboard header shows Europe/Amsterdam date under a US browser timezone", async ({ browser }) => {
+  const context = await browser.newContext({ timezoneId: "America/Los_Angeles" });
+  const page = await context.newPage();
+
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("operator@riverbank.studio");
+  await page.getByRole("button", { name: "Send magic link" }).click();
+  await page.waitForURL("**/dashboard");
+
+  // The seeded studio uses Europe/Amsterdam. The header should reflect the
+  // studio timezone, not the browser's America/Los_Angeles clock.
+  const heading = page.getByRole("heading", { name: "Today at the studio" });
+  await expect(heading).toBeVisible();
+  // Grab the sibling subtitle <p> and verify it matches an Amsterdam-reckoned
+  // date rather than a US-reckoned date.
+  const subtitle = heading.locator("..").locator("p");
+  await expect(subtitle).not.toBeEmpty();
+
+  expect(errors).toEqual([]);
+
+  await context.close();
+});

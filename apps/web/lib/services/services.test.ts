@@ -304,7 +304,7 @@ describe("reports + dashboard + booking list", () => {
   });
 
   it("builds the dashboard", async () => {
-    const data = await getDashboard(repos, await getStudioContext(repos));
+    const data = await getDashboard(repos, await getStudioContext(repos), ISO);
     expect(data.stats.activeMembers).toBeGreaterThan(0);
     expect(Array.isArray(data.today)).toBe(true);
   });

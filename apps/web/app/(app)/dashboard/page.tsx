@@ -1,5 +1,7 @@
 import { occupancyPercent } from "@/lib/domain/capacity";
 import { formatTime } from "@/lib/format";
+import { formatDayLabel } from "@/lib/format";
+import { getNow } from "@/lib/now";
 import { resolveStudio } from "@/lib/services/context";
 import { getDashboard } from "@/lib/services/dashboard";
 import { EmptyState, StatCard, StatusBadge } from "../_components/ui";
@@ -8,13 +10,14 @@ import { TodayHeading } from "./today-heading";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const nowIso = getNow();
   const { repos, ctx } = await resolveStudio();
-  const { today, stats } = await getDashboard(repos, ctx);
+  const { today, stats } = await getDashboard(repos, ctx, nowIso);
   const timeZone = ctx.studio.timezone;
 
   return (
     <>
-      <TodayHeading />
+      <TodayHeading subtitle={formatDayLabel(nowIso, timeZone)} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active members" value={stats.activeMembers} />
