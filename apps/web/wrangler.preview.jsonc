@@ -4,8 +4,8 @@
   //
   // Preview environments share ONE seeded Supabase project (there is no ephemeral
   // per-PR database). The deploy-preview workflow supplies the NEXT_PUBLIC_*
-  // Supabase vars at build time and sets SUPABASE_SECRET_KEY + RESEND_API_KEY as
-  // Worker secrets after deploy. See the README's deploy section.
+  // Supabase vars at build time and sets SUPABASE_SECRET_KEY + CF_EMAIL_API_TOKEN as
+  // Worker secrets after deploy. CLOUDFLARE_ACCOUNT_ID should be available too.
   "name": "studiobook-preview",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-06-01",
