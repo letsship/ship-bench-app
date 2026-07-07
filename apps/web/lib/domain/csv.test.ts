@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -61,5 +61,52 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits columns in order: Starts,Class,Member,Email,Status", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T09:00:00Z",
+        className: "Vinyasa Flow",
+        memberName: "Chiara Rossi",
+        email: "chiara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [header, row] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+    expect(row).toBe("2026-06-01T09:00:00Z,Vinyasa Flow,Chiara Rossi,chiara@example.com,booked");
+  });
+
+  it("quotes a member name containing a comma as a single field", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T09:00:00Z",
+        className: "Yin & Restore",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "attended",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    // The whole "Rossi, Chiara" stays one column — six fields total.
+    expect(row).toBe('2026-06-01T09:00:00Z,Yin & Restore,"Rossi, Chiara",chiara@example.com,attended');
+  });
+
+  it("passes the ISO-8601 UTC timestamp through unchanged", () => {
+    const iso = "2026-06-30T23:59:59.999Z";
+    const csv = bookingsToCsv([
+      {
+        startsAt: iso,
+        className: "Reformer Pilates",
+        memberName: "Hana Kovač",
+        email: "hana@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row.startsWith(`${iso},`)).toBe(true);
   });
 });

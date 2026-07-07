@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,19 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Bookings export for the accountant. Same join as `listBookingRows`, but the
+// `to` bound is INCLUSIVE of both ends here, whereas the repo-layer
+// `SessionRange` used by `classSessions.listByStudio` treats `to` as exclusive
+// (existing day-boundary callers — the bookings page, dashboard, calendar —
+// rely on that). So only `from` is handed to the repo; the inclusive `to` is
+// applied here on the already-fetched rows.
+export async function listBookingRowsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId, { from: range.from });
+  return range.to ? rows.filter((row) => row.startsAt <= range.to!) : rows;
 }

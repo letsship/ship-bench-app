@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingRowsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -314,5 +314,66 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("listBookingRowsForExport", () => {
+  const FROM = "2026-06-01T00:00:00.000Z";
+  const TO = "2026-06-30T23:59:59.999Z";
+  const BEFORE = "2026-05-31T23:59:59.999Z"; // 1ms before FROM
+  const AFTER = "2026-07-01T00:00:00.000Z"; // 1ms after TO
+
+  function exportSeed(): SeedData {
+    return baseSeed({
+      classTypes: [classType("ct1")],
+      members: [member("m1", { email: "chiara@example.com" })],
+      sessions: [
+        session("cs-from", { startsAt: FROM, endsAt: FROM }),
+        session("cs-to", { startsAt: TO, endsAt: TO }),
+        session("cs-before", { startsAt: BEFORE, endsAt: BEFORE }),
+        session("cs-after", { startsAt: AFTER, endsAt: AFTER }),
+      ],
+      bookings: [
+        booking("b-from", "m1", { sessionId: "cs-from" }),
+        booking("b-to", "m1", { sessionId: "cs-to" }),
+        booking("b-before", "m1", { sessionId: "cs-before" }),
+        booking("b-after", "m1", { sessionId: "cs-after" }),
+      ],
+    });
+  }
+
+  function startsAts(rows: { startsAt: string }[]): string[] {
+    return rows.map((r) => r.startsAt).sort();
+  }
+
+  it("includes bookings whose session starts exactly at `from` or `to` (inclusive both ends)", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingRowsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(startsAts(rows)).toEqual([FROM, TO]);
+  });
+
+  it("excludes bookings 1ms before `from` or 1ms after `to`", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingRowsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(rows.map((r) => r.startsAt)).not.toContain(BEFORE);
+    expect(rows.map((r) => r.startsAt)).not.toContain(AFTER);
+  });
+
+  it("leaves the lower side unbounded when `from` is omitted", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingRowsForExport(repos, "s1", { to: TO });
+    expect(startsAts(rows)).toEqual([BEFORE, FROM, TO]);
+  });
+
+  it("leaves the upper side unbounded when `to` is omitted", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingRowsForExport(repos, "s1", { from: FROM });
+    expect(startsAts(rows)).toEqual([FROM, TO, AFTER]);
+  });
+
+  it("sources the `email` field from the member", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingRowsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(rows.every((r) => r.email === "chiara@example.com")).toBe(true);
   });
 });
