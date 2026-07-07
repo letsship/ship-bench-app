@@ -15,8 +15,22 @@ export async function GET(request: NextRequest): Promise<Response> {
     await requireSession();
     const { repos, ctx } = await resolveStudio();
     const type = request.nextUrl.searchParams.get("type") ?? "members";
-    const from = request.nextUrl.searchParams.get("from") ?? undefined;
-    const to = request.nextUrl.searchParams.get("to") ?? undefined;
+    // Read `from`/`to` straight off the raw query string with
+    // `decodeURIComponent` rather than `request.nextUrl.searchParams`. The
+    // WHATWG `URLSearchParams` used by `nextUrl` follows the
+    // `application/x-www-form-urlencoded` decoding rule on some edge runtimes
+    // (notably Cloudflare Workers via OpenNext), which turns a literal `+` —
+    // or a percent-encoded `%2B` — into a space. ISO-8601 UTC offsets use `+`
+    // (e.g. `2026-06-27T08:00:00+00:00`, the exact format this export emits in
+    // its own `Starts` column), so a `+`-offset timestamp arrived as
+    // `...08:00:00 00:00`, failed `Date.parse`, and was silently dropped —
+    // returning every booking instead of the filtered range. `decodeURIComponent`
+    // never decodes `+` to a space, so any valid ISO-8601 representation (`Z`,
+    // `+00:00`, or a real offset) survives intact.
+    const rawQuery = request.url.split("?", 2)[1] ?? "";
+    const params = parseRawQuery(rawQuery);
+    const from = params.get("from") ?? undefined;
+    const to = params.get("to") ?? undefined;
 
     let csv: string;
     if (type === "members") {
@@ -52,4 +66,21 @@ export async function GET(request: NextRequest): Promise<Response> {
       },
     });
   });
+}
+
+// Parse a raw query string (the bytes after `?`) using `decodeURIComponent`,
+// which — unlike `URLSearchParams` — never decodes `+` to a space. This keeps
+// `+`-bearing ISO-8601 UTC offsets (`+00:00`, `+05:30`) intact regardless of
+// the runtime's query-decoding quirks.
+function parseRawQuery(query: string): URLSearchParams {
+  const params = new URLSearchParams();
+  if (!query) return params;
+  for (const pair of query.split("&")) {
+    if (pair === "") continue;
+    const eq = pair.indexOf("=");
+    const key = decodeURIComponent(eq === -1 ? pair : pair.slice(0, eq));
+    const value = eq === -1 ? "" : decodeURIComponent(pair.slice(eq + 1));
+    params.append(key, value);
+  }
+  return params;
 }

@@ -108,6 +108,54 @@ describe("GET /api/export?type=bookings (against injected fake repositories)", (
     expect(rows.some((r) => r.startsWith(exact + ","))).toBe(true);
   });
 
+  it("with only `from` set (no `to`) is unbounded on the upper side", async () => {
+    // Exercises the repo-level inclusive `from` (gte) code path on its own,
+    // with no upper bound applied. Sessions at/after `from` must all appear,
+    // and the count must match listBookingRows({ from }).
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())!.id;
+    const fromIso = NOW.toISOString();
+    const expected = (
+      await listBookingRows(repos, studioId, { from: fromIso })
+    ).filter((row) => row.startsAt >= fromIso);
+    const res = await exportGet(
+      new NextRequest(
+        `http://localhost/api/export?type=bookings&from=${encodeURIComponent(fromIso)}`,
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    const rows = body.split("\r\n").slice(1);
+    expect(rows.length).toBe(expected.length);
+    // Every returned row is at or after `from`.
+    expect(rows.every((r) => r.slice(0, fromIso.length) >= fromIso)).toBe(true);
+    // And nothing before `from` slipped through.
+    const allRows = await listBookingRows(repos, studioId);
+    expect(rows.length).toBeLessThan(allRows.length);
+  });
+
+  it("with only `to` set (no `from`) is unbounded on the lower side", async () => {
+    // Exercises the in-memory inclusive `to` (epoch <=) code path on its own,
+    // with no lower bound applied. Sessions at/before `to` must all appear,
+    // and the count must match an inclusive filter of all rows.
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())!.id;
+    const toIso = NOW.toISOString();
+    const toMs = Date.parse(toIso);
+    const allRows = await listBookingRows(repos, studioId);
+    const expected = allRows.filter((row) => Date.parse(row.startsAt) <= toMs);
+    const res = await exportGet(
+      new NextRequest(
+        `http://localhost/api/export?type=bookings&to=${encodeURIComponent(toIso)}`,
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    const rows = body.split("\r\n").slice(1);
+    expect(rows.length).toBe(expected.length);
+    expect(rows.length).toBeLessThan(allRows.length);
+  });
+
   it("treats a +00:00 offset timestamp the same as a Z timestamp for from/to (inclusive both ends)", async () => {
     const repos = createInMemoryRepositories(buildSeed(NOW));
     const studioId = (await repos.studios.getFirst())!.id;
@@ -120,6 +168,29 @@ describe("GET /api/export?type=bookings (against injected fake repositories)", (
     const res = await exportGet(
       new NextRequest(
         `http://localhost/api/export?type=bookings&from=${encodeURIComponent(offsetForm)}&to=${encodeURIComponent(offsetForm)}`,
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    const rows = body.split("\r\n").slice(1);
+    expect(rows.some((r) => r.startsWith(firstRow.startsAt + ","))).toBe(true);
+  });
+
+  it("parses a literal `+`-offset timestamp (not percent-encoded) in from/to", async () => {
+    // Reproduces the user-facing scenario: a bookkeeper copies a `+00:00`
+    // timestamp straight out of a previous export's `Starts` column and pastes
+    // it into the URL, so `+` rides along literally (not as `%2B`). On the
+    // edge runtime `URLSearchParams` would decode `+` to a space and silently
+    // drop the filter; `parseRawQuery` uses `decodeURIComponent`, which keeps
+    // `+` intact, so inclusive filtering still matches.
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())!.id;
+    const [firstRow] = await listBookingRows(repos, studioId);
+    const offsetForm = firstRow.startsAt.replace(/Z$/, "+00:00");
+    expect(offsetForm).not.toBe(firstRow.startsAt);
+    const res = await exportGet(
+      new NextRequest(
+        `http://localhost/api/export?type=bookings&from=${offsetForm}&to=${offsetForm}`,
       ),
     );
     expect(res.status).toBe(200);
