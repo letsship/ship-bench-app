@@ -43,3 +43,47 @@ export async function listBookingRows(
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
+
+export interface BookingExportRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+// Date-range CSV export of bookings. Unlike listBookingRows, this filters
+// inclusively on both from and to bounds and carries member email.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingExportRow[]> {
+  const sessions = await repos.classSessions.listByStudio(studioId);
+  const filteredSessions = sessions.filter((session) => {
+    if (range.from !== undefined && session.startsAt < range.from) return false;
+    if (range.to !== undefined && session.startsAt > range.to) return false;
+    return true;
+  });
+  const sessionById = new Map(filteredSessions.map((session) => [session.id, session]));
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const members = await repos.members.listByStudio(studioId);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const bookings = await repos.bookings.listBySessionIds(filteredSessions.map((session) => session.id));
+
+  return bookings
+    .map((booking) => {
+      const session = sessionById.get(booking.sessionId);
+      const classType = session ? typeById.get(session.classTypeId) : undefined;
+      const member = memberById.get(booking.memberId);
+      return {
+        startsAt: session?.startsAt ?? "",
+        className: classType?.name ?? "Class",
+        memberName: member?.name ?? "—",
+        email: member?.email ?? "",
+        status: booking.status,
+      };
+    })
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
