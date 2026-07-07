@@ -336,6 +336,38 @@ describe("reports + dashboard + booking list", () => {
     });
   });
 
+  it("listBookingsForExport compares bounds on epoch time, not raw strings (robust to +00:00 vs .000Z)", async () => {
+    // Mirrors the production mismatch: the DB returns `+00:00`-suffixed startsAt
+    // while a client supplies `.000Z`-suffixed from/to. A lexicographic compare
+    // would treat `+00:00` as sorting before `.000Z` and drop the exact-instant
+    // `from` bound; comparing on epoch ms must include it.
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs-from", { startsAt: "2026-06-27T08:00:00+00:00", endsAt: "2026-06-27T09:00:00+00:00" }),
+          session("cs-mid", { startsAt: "2026-07-15T08:00:00+00:00", endsAt: "2026-07-15T09:00:00+00:00" }),
+        ],
+        members: [member("m1"), member("m2"), member("m3")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs-from" }),
+          booking("b2", "m2", { sessionId: "cs-from" }),
+          booking("b3", "m3", { sessionId: "cs-from" }),
+          booking("b4", "m1", { sessionId: "cs-mid" }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1", {
+      from: "2026-06-27T08:00:00.000Z",
+      to: "2026-07-31T00:00:00.000Z",
+    });
+    // The three attendees of the session starting exactly at `from` must be
+    // included; the later session is also within range.
+    expect(rows.filter((row) => row.startsAt === "2026-06-27T08:00:00+00:00")).toHaveLength(3);
+    expect(rows.filter((row) => row.startsAt === "2026-07-15T08:00:00+00:00")).toHaveLength(1);
+    expect(rows).toHaveLength(4);
+  });
+
   it("listBookingsForExport filters inclusively on [from, to] at both bounds", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
