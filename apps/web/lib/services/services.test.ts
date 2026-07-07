@@ -408,5 +408,32 @@ describe("reports + dashboard + booking list", () => {
       const rows = await listBookingsForExport(r, "s1");
       expect(rows).toHaveLength(2);
     });
+
+    it("handles boundary timestamps without millisecond precision (regression)", async () => {
+      // The stored session uses "2026-06-01T10:00:00.000Z" but the caller
+      // sends "2026-06-01T10:00:00Z" (no milliseconds). A string comparison
+      // would fail at the '.' vs 'Z' character; Date.parse must handle this.
+      const customSeed = baseSeed({
+        classTypes: [classType("ct1", { name: "Yoga" })],
+        sessions: [
+          session("cs1", { startsAt: "2026-06-01T10:00:00.000Z", endsAt: "2026-06-01T11:00:00.000Z" }),
+          session("cs2", { startsAt: "2026-06-01T11:00:00.000Z", endsAt: "2026-06-01T12:00:00.000Z" }),
+        ],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      });
+      const r = createInMemoryRepositories(customSeed);
+
+      // from is "2026-06-01T10:00:00Z" (no .000) — must match the .000Z stored value.
+      const rows = await listBookingsForExport(r, "s1", {
+        from: "2026-06-01T10:00:00Z",
+        to: "2026-06-01T10:00:00Z",
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].startsAt).toBe("2026-06-01T10:00:00.000Z");
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import type { BookingExportRow } from "@/lib/domain/csv";
 
 export interface BookingRow {
   id: string;
@@ -7,14 +8,6 @@ export interface BookingRow {
   classColor: string;
   instructor: string;
   startsAt: string;
-  status: string;
-}
-
-export interface BookingExportRow {
-  startsAt: string;
-  className: string;
-  memberName: string;
-  email: string;
   status: string;
 }
 
@@ -52,6 +45,11 @@ export async function listBookingRows(
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
 
+function parseMs(value: string): number {
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
 // Export-oriented booking list with inclusive date range filtering.
 // Deliberately does NOT reuse `classSessions.listByStudio(studioId, range)`
 // because that repo method uses an exclusive `to` bound (correct for its other
@@ -71,13 +69,17 @@ export async function listBookingsForExport(
   const memberById = new Map(members.map((member) => [member.id, member]));
   const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
 
-  // Apply inclusive range filter in application code.
+  // Apply inclusive range filter in application code using numeric timestamps
+  // so equivalent instants in different ISO representations (e.g.
+  // "2026-06-01T10:00:00Z" vs "2026-06-01T10:00:00.000Z") still compare correctly.
+  const fromMs = range.from !== undefined ? Date.parse(range.from) : undefined;
+  const toMs = range.to !== undefined ? Date.parse(range.to) : undefined;
   let filteredSessions = sessions;
-  if (range.from !== undefined) {
-    filteredSessions = filteredSessions.filter((s) => s.startsAt >= range.from!);
+  if (fromMs !== undefined && !Number.isNaN(fromMs)) {
+    filteredSessions = filteredSessions.filter((s) => parseMs(s.startsAt) >= fromMs);
   }
-  if (range.to !== undefined) {
-    filteredSessions = filteredSessions.filter((s) => s.startsAt <= range.to!);
+  if (toMs !== undefined && !Number.isNaN(toMs)) {
+    filteredSessions = filteredSessions.filter((s) => parseMs(s.startsAt) <= toMs);
   }
   const sessionIds = new Set(filteredSessions.map((s) => s.id));
 
