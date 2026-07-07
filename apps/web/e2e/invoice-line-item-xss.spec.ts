@@ -34,7 +34,7 @@ test.describe("invoice line-item XSS prevention", () => {
 
     await expect(page.locator('img[src="x"]')).toHaveCount(0);
 
-    const xssFired = await page.evaluate(() => (window as any).__xssFired);
+    const xssFired = await page.evaluate(() => (window as Record<string, unknown>).__xssFired);
     expect(xssFired).toBeUndefined();
 
     expect(errors).toEqual([]);
