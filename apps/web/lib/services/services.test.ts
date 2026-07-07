@@ -318,7 +318,6 @@ describe("reports + dashboard + booking list", () => {
 
   it("lists booking rows in an inclusive date range", async () => {
     const all = await listBookingRows(repos, studioId);
-    const earliest = all[0];
     const latest = all[all.length - 1];
     const mid = all[Math.floor(all.length / 2)];
 
