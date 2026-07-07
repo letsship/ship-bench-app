@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -309,10 +309,72 @@ describe("reports + dashboard + booking list", () => {
     expect(Array.isArray(data.today)).toBe(true);
   });
 
-  it("lists booking rows joined to member + class", async () => {
-    const rows = await listBookingRows(repos, studioId);
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows[0]).toHaveProperty("memberName");
-    expect(rows[0]).toHaveProperty("className");
+  it("listBookingsForExport includes both bounds", async () => {
+    const fromTime = "2026-03-15T10:00:00.000Z";
+    const toTime = "2026-03-15T14:00:00.000Z";
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [
+          member("m1", { name: "A", email: "a@e.co" }),
+          member("m2", { name: "B", email: "b@e.co" }),
+          member("m3", { name: "C", email: "c@e.co" }),
+        ],
+        sessions: [
+          session("before", { startsAt: "2026-03-15T09:00:00.000Z", endsAt: "2026-03-15T10:00:00.000Z" }),
+          session("atFrom", { startsAt: fromTime, endsAt: "2026-03-15T11:00:00.000Z" }),
+          session("middle", { startsAt: "2026-03-15T12:00:00.000Z", endsAt: "2026-03-15T13:00:00.000Z" }),
+          session("atTo", { startsAt: toTime, endsAt: "2026-03-15T15:00:00.000Z" }),
+          session("after", { startsAt: "2026-03-15T16:00:00.000Z", endsAt: "2026-03-15T17:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "before" }),
+          booking("b2", "m1", { sessionId: "atFrom" }),
+          booking("b3", "m2", { sessionId: "middle" }),
+          booking("b4", "m3", { sessionId: "atTo" }),
+          booking("b5", "m3", { sessionId: "after" }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1", { from: fromTime, to: toTime });
+    expect(rows.map((r) => r.id)).toEqual(["b2", "b3", "b4"]);
+  });
+
+  it("listBookingsForExport with unbounded from returns everything up to to", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member("m1", { name: "A", email: "a@e.co" })],
+        sessions: [
+          session("before", { startsAt: "2026-03-15T09:00:00.000Z", endsAt: "2026-03-15T10:00:00.000Z" }),
+          session("atTo", { startsAt: "2026-03-15T14:00:00.000Z", endsAt: "2026-03-15T15:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "before" }),
+          booking("b2", "m1", { sessionId: "atTo" }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1", { to: "2026-03-15T14:00:00.000Z" });
+    expect(rows.map((r) => r.id)).toEqual(["b1", "b2"]);
+  });
+
+  it("listBookingsForExport with unbounded to returns everything from from", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member("m1", { name: "A", email: "a@e.co" })],
+        sessions: [
+          session("atFrom", { startsAt: "2026-03-15T14:00:00.000Z", endsAt: "2026-03-15T15:00:00.000Z" }),
+          session("after", { startsAt: "2026-03-15T16:00:00.000Z", endsAt: "2026-03-15T17:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "atFrom" }),
+          booking("b2", "m1", { sessionId: "after" }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1", { from: "2026-03-15T14:00:00.000Z" });
+    expect(rows.map((r) => r.id)).toEqual(["b1", "b2"]);
   });
 });
