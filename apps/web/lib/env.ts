@@ -1,11 +1,5 @@
 import { z } from "zod";
 
-// Zod-validated environment access, split into a client schema (NEXT_PUBLIC_*,
-// safe for the browser bundle) and a server schema (everything). Vars are read
-// by explicit property access so Next inlines NEXT_PUBLIC_* at build time.
-// Parsing is lazy + cached, and only happens when a Supabase/email client is
-// actually constructed — so the fake-backends mode needs none of these set.
-
 const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
@@ -14,8 +8,7 @@ const clientSchema = z.object({
 
 const serverSchema = clientSchema.extend({
   SUPABASE_SECRET_KEY: z.string().min(1),
-  RESEND_API_KEY: z.string().min(1).optional(),
-  STUDIOBOOK_FROM_EMAIL: z.string().min(1).optional(),
+  CF_EMAIL_API_TOKEN: z.string().min(1).optional(),
   // Postgres schema the data lives in. Defaults to "public"; overridden per
   // deployment when a single database hosts several isolated copies of the app
   // (e.g. one schema per preview environment).
@@ -37,8 +30,7 @@ const getClientVars = () => ({
 const getServerVars = () => ({
   ...getClientVars(),
   SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
-  STUDIOBOOK_FROM_EMAIL: process.env.STUDIOBOOK_FROM_EMAIL,
+  CF_EMAIL_API_TOKEN: process.env.CF_EMAIL_API_TOKEN,
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
 });
 

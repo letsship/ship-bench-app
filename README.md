@@ -106,7 +106,7 @@ a signed dev cookie (Studiobook's own auth is separate from Supabase Auth).
 ## Environment
 
 See `apps/web/.env.example`. The Supabase URL + publishable key are public;
-`SUPABASE_SECRET_KEY` and `RESEND_API_KEY` are secrets and must never be
+`SUPABASE_SECRET_KEY` and `CF_EMAIL_API_TOKEN` are secrets and must never be
 committed. Env is validated with Zod in `lib/env.ts` and only read when a
 Supabase/email client is actually constructed (so fake mode needs none of it).
 
@@ -115,12 +115,12 @@ Supabase/email client is actually constructed (so fake mode needs none of it).
 `ship.yml` wires `.github/workflows/deploy-preview.yml` for SHIP's deploy stage.
 On `action=deploy` it builds with OpenNext (Supabase URL + publishable key
 injected at build time) and deploys a `*.workers.dev` Worker, then sets
-`SUPABASE_SECRET_KEY` + `RESEND_API_KEY` as Worker secrets; `action=delete` tears
+`SUPABASE_SECRET_KEY` + `CF_EMAIL_API_TOKEN` as Worker secrets; `action=delete` tears
 the Worker down on PR close.
 
 > Limitation: preview environments share **one seeded Supabase project** — there
 > is no ephemeral per-PR database. Point the workflow's `SUPABASE_*` /
-> `RESEND_API_KEY` GitHub secrets at a dedicated preview project.
+> `CF_EMAIL_API_TOKEN` GitHub secrets at a dedicated preview project.
 
 ## Migrations
 
