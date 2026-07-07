@@ -10,19 +10,48 @@ import { createInMemoryRepositories, type SeedData } from "@/lib/db/repos/fakes"
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 
-(globalThis as any).__testCookieStore = new Map<string, string>();
+interface TestCookieStore {
+  get(name: string): string | undefined;
+  set(name: string, value: string): void;
+  delete(name: string): void;
+  clear(): void;
+}
+
+declare global {
+  var __testCookieStore: TestCookieStore;
+}
+
+function getTestCookieStore(): TestCookieStore {
+  return globalThis.__testCookieStore;
+}
+
+globalThis.__testCookieStore = {
+  store: new Map<string, string>(),
+  get(name: string) {
+    return (this.store as Map<string, string>).get(name);
+  },
+  set(name: string, value: string) {
+    (this.store as Map<string, string>).set(name, value);
+  },
+  delete(name: string) {
+    (this.store as Map<string, string>).delete(name);
+  },
+  clear() {
+    (this.store as Map<string, string>).clear();
+  },
+};
 
 vi.mock("next/headers", () => ({
   cookies: () => ({
     get: (name: string) => {
-      const value = (globalThis as any).__testCookieStore.get(name);
+      const value = getTestCookieStore().get(name);
       return value ? { name, value } : undefined;
     },
     set: (name: string, value: string, _opts?: unknown) => {
-      (globalThis as any).__testCookieStore.set(name, value);
+      getTestCookieStore().set(name, value);
     },
     delete: (name: string) => {
-      (globalThis as any).__testCookieStore.delete(name);
+      getTestCookieStore().delete(name);
     },
   }),
 }));
@@ -142,7 +171,7 @@ describe("GET route handlers (against injected fake repositories)", () => {
 describe("GET /api/export", () => {
   beforeEach(() => {
     __setTestRepositories(createInMemoryRepositories(buildSeed(NOW)));
-    (globalThis as any).__testCookieStore.clear();
+    getTestCookieStore().clear();
   });
 
   afterEach(() => {
