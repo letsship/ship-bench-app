@@ -63,8 +63,9 @@ export async function listBookingsForExport(
   range: BookingExportRange = {},
 ): Promise<BookingExportRow[]> {
   const sessions = await repos.classSessions.listByStudio(studioId, { from: range.from });
-  const filteredSessions = range.to
-    ? sessions.filter((session) => session.startsAt <= range.to)
+  const to = range.to;
+  const filteredSessions = to
+    ? sessions.filter((session) => session.startsAt <= to)
     : sessions;
   const sessionById = new Map(filteredSessions.map((session) => [session.id, session]));
   const classTypes = await repos.classTypes.listByStudio(studioId);
