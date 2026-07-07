@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -61,5 +61,40 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits headers in the right order", () => {
+    const csv = bookingsToCsv([]);
+    expect(csv.split("\r\n")[0]).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("renders a plain row", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T10:00:00.000Z",
+        className: "Yoga",
+        memberName: "Amara",
+        email: "amara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [, row] = csv.split("\r\n");
+    expect(row).toBe("2026-06-15T10:00:00.000Z,Yoga,Amara,amara@example.com,booked");
+  });
+
+  it("quotes a member name containing a comma", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T10:00:00.000Z",
+        className: "Yoga",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [, row] = csv.split("\r\n");
+    expect(row).toBe('2026-06-15T10:00:00.000Z,Yoga,"Rossi, Chiara",chiara@example.com,booked');
   });
 });

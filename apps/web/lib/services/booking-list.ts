@@ -1,8 +1,10 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import type { ClassSession } from "@/lib/db/types";
 
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -10,15 +12,11 @@ export interface BookingRow {
   status: string;
 }
 
-// Flat list of bookings joined (in-memory) to member + session + class type,
-// ordered by session start. The /bookings page buckets these by day. The join
-// happens here in the service so repositories stay single-entity.
-export async function listBookingRows(
+async function joinBookingRows(
   repos: Repositories,
   studioId: string,
-  range: SessionRange = {},
+  sessions: ClassSession[],
 ): Promise<BookingRow[]> {
-  const sessions = await repos.classSessions.listByStudio(studioId, range);
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
   const classTypes = await repos.classTypes.listByStudio(studioId);
   const typeById = new Map(classTypes.map((type) => [type.id, type]));
@@ -34,6 +32,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +41,28 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Flat list of bookings joined (in-memory) to member + session + class type,
+// ordered by session start. The /bookings page buckets these by day. The join
+// happens here in the service so repositories stay single-entity.
+export async function listBookingRows(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const sessions = await repos.classSessions.listByStudio(studioId, range);
+  return joinBookingRows(repos, studioId, sessions);
+}
+
+export async function listBookingRowsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  // The underlying repo treats `to` as exclusive; the export needs inclusive.
+  // Pass only `from` to the repo and apply the inclusive `to` filter in memory.
+  const sessions = await repos.classSessions.listByStudio(studioId, { from: range.from });
+  const filtered = range.to ? sessions.filter((s) => s.startsAt <= range.to) : sessions;
+  return joinBookingRows(repos, studioId, filtered);
 }

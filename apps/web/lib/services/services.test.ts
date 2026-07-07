@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingRowsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -314,5 +314,100 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("email");
+  });
+});
+
+describe("listBookingRowsForExport", () => {
+  it("includes bookings whose session starts exactly at from and exactly at to", async () => {
+    const t1 = "2026-06-01T08:00:00.000Z";
+    const t2 = "2026-06-15T12:00:00.000Z";
+    const t3 = "2026-06-30T17:00:00.000Z";
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1"), member("m2"), member("m3")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs1", { startsAt: t1, endsAt: "2026-06-01T09:00:00.000Z" }),
+          session("cs2", { startsAt: t2, endsAt: "2026-06-15T13:00:00.000Z" }),
+          session("cs3", { startsAt: t3, endsAt: "2026-06-30T18:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m2", { sessionId: "cs2" }),
+          booking("b3", "m3", { sessionId: "cs3" }),
+        ],
+      }),
+    );
+    const rows = await listBookingRowsForExport(repos, "s1", { from: t1, to: t3 });
+    expect(rows.map((r) => r.startsAt)).toEqual([t1, t2, t3]);
+    expect(rows.every((r) => r.email.includes("@"))).toBe(true);
+  });
+
+  it("excludes bookings outside the inclusive bounds", async () => {
+    const t1 = "2026-06-01T08:00:00.000Z";
+    const t2 = "2026-06-02T08:00:00.000Z";
+    const t3 = "2026-06-03T08:00:00.000Z";
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1"), member("m2"), member("m3")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs1", { startsAt: t1, endsAt: "2026-06-01T09:00:00.000Z" }),
+          session("cs2", { startsAt: t2, endsAt: "2026-06-02T09:00:00.000Z" }),
+          session("cs3", { startsAt: t3, endsAt: "2026-06-03T09:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m2", { sessionId: "cs2" }),
+          booking("b3", "m3", { sessionId: "cs3" }),
+        ],
+      }),
+    );
+    const rows = await listBookingRowsForExport(repos, "s1", { from: t2, to: t2 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].startsAt).toBe(t2);
+  });
+
+  it("works with unbounded from", async () => {
+    const t1 = "2026-06-01T08:00:00.000Z";
+    const t2 = "2026-06-02T08:00:00.000Z";
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1"), member("m2")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs1", { startsAt: t1, endsAt: "2026-06-01T09:00:00.000Z" }),
+          session("cs2", { startsAt: t2, endsAt: "2026-06-02T09:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m2", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+    const rows = await listBookingRowsForExport(repos, "s1", { to: t1 });
+    expect(rows.map((r) => r.startsAt)).toEqual([t1]);
+  });
+
+  it("works with unbounded to", async () => {
+    const t1 = "2026-06-01T08:00:00.000Z";
+    const t2 = "2026-06-02T08:00:00.000Z";
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1"), member("m2")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs1", { startsAt: t1, endsAt: "2026-06-01T09:00:00.000Z" }),
+          session("cs2", { startsAt: t2, endsAt: "2026-06-02T09:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m2", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+    const rows = await listBookingRowsForExport(repos, "s1", { from: t2 });
+    expect(rows.map((r) => r.startsAt)).toEqual([t2]);
   });
 });
