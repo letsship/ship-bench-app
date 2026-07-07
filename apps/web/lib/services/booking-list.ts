@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,20 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Booking-list with inclusive `to` semantics. The repo-level SessionRange
+// treats `to` as exclusive (used by /api/bookings and the bookings page).
+// For the accounting export we need inclusive both ends, so we query with
+// only the lower bound and filter the upper bound in memory.
+export async function listBookingRowsInRange(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId, { from: range.from });
+  if (range.to) {
+    return rows.filter((row) => row.startsAt <= range.to);
+  }
+  return rows;
 }

@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingRowsInRange } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -314,5 +314,33 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("lists booking rows in an inclusive date range", async () => {
+    const all = await listBookingRows(repos, studioId);
+    const earliest = all[0];
+    const latest = all[all.length - 1];
+    const mid = all[Math.floor(all.length / 2)];
+
+    const range = { from: mid.startsAt, to: latest.startsAt };
+    const rows = await listBookingRowsInRange(repos, studioId, range);
+    for (const row of rows) {
+      expect(row.startsAt >= range.from).toBe(true);
+      expect(row.startsAt <= range.to).toBe(true);
+    }
+    // Should include latest explicitly because the filter is inclusive.
+    expect(rows.some((r) => r.startsAt === latest.startsAt)).toBe(true);
+  });
+
+  it("includes sessions starting exactly at from and exactly at to", async () => {
+    const all = await listBookingRows(repos, studioId);
+    const first = all[0];
+    const last = all[all.length - 1];
+
+    const rowsFrom = await listBookingRowsInRange(repos, studioId, { from: first.startsAt });
+    expect(rowsFrom.some((r) => r.startsAt === first.startsAt)).toBe(true);
+
+    const rowsTo = await listBookingRowsInRange(repos, studioId, { to: last.startsAt });
+    expect(rowsTo.some((r) => r.startsAt === last.startsAt)).toBe(true);
   });
 });
