@@ -286,6 +286,17 @@ describe("invoices service", () => {
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
+
+  it("stores and returns a line-item description with HTML markup verbatim at the data layer", async () => {
+    const markup = '<img src=x onerror="alert(1)">';
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: markup, quantity: 1, unitAmountCents: 1000 }],
+    });
+    const fetched = await getInvoiceDetail(repos, detail.invoice.id);
+    expect(fetched.lineItems[0].description).toBe(markup);
+  });
 });
 
 describe("reports + dashboard + booking list", () => {
