@@ -28,7 +28,10 @@ test("line-item description with HTML is rendered as escaped text, not executed"
   await form.getByLabel("Unit price").fill("10.00");
   await form.getByRole("button", { name: "Issue invoice" }).click();
 
-  await page.waitForURL("**/invoices/**");
+  await expect(page.getByTestId("invoices-table")).toBeVisible();
+
+  await page.getByTestId("invoices-table").locator("tbody a").first().click();
+  await page.waitForURL("**/invoices/*");
 
   const escapedText = page.getByText(maliciousDesc, { exact: true });
   await expect(escapedText).toBeVisible();
@@ -50,7 +53,10 @@ test("ordinary line-item description renders as readable text", async ({ page })
   await form.getByLabel("Unit price").fill("49.00");
   await form.getByRole("button", { name: "Issue invoice" }).click();
 
-  await page.waitForURL("**/invoices/**");
+  await expect(page.getByTestId("invoices-table")).toBeVisible();
+
+  await page.getByTestId("invoices-table").locator("tbody a").first().click();
+  await page.waitForURL("**/invoices/*");
 
   await expect(page.getByText("Monthly membership", { exact: true })).toBeVisible();
 });
