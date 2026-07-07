@@ -10,6 +10,7 @@ describe("formatDayLabel", () => {
 
   it("does not follow a visitor timezone that is still on the prior day", () => {
     expect(formatDayLabel(earlyAmsterdamMorning, "America/New_York")).toBe("Sunday 14 June");
+    expect(formatDayLabel(earlyAmsterdamMorning, "America/Los_Angeles")).toBe("Sunday 14 June");
   });
 });
 
