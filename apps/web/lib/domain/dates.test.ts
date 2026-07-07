@@ -7,6 +7,7 @@ import {
   isBefore,
   isSameDay,
   monthKey,
+  studioTodayLabel,
   zonedParts,
 } from "./dates";
 
@@ -105,5 +106,31 @@ describe("groupByDay", () => {
     const items = [{ at: "2026-03-14T18:00:00Z" }, { at: "2026-03-14T09:00:00Z" }];
     const groups = groupByDay(items, (item) => item.at, "UTC");
     expect(groups[0].items[0].at).toBe("2026-03-14T18:00:00Z");
+  });
+});
+
+describe("studioTodayLabel", () => {
+  it("returns the correct weekday-day-month format", () => {
+    const label = studioTodayLabel("UTC", new Date("2026-03-14T12:00:00.000Z"));
+    expect(label).toBe("Saturday 14 March");
+  });
+
+  it("rolls forward in Europe/Amsterdam near midnight UTC", () => {
+    const label = studioTodayLabel("Europe/Amsterdam", new Date("2026-03-14T23:30:00.000Z"));
+    expect(label).toBe("Sunday 15 March");
+  });
+
+  it("stays on the prior day in America/New_York near midnight UTC", () => {
+    const label = studioTodayLabel("America/New_York", new Date("2026-03-14T23:30:00.000Z"));
+    expect(label).toBe("Saturday 14 March");
+  });
+
+  it("defaults to now when no instant is provided", () => {
+    const before = new Date();
+    const label = studioTodayLabel("UTC");
+    const after = new Date();
+    expect(label).toBeTruthy();
+    // The label should contain the current day — just verify it parses
+    expect(label).toMatch(/^\w+ \d{1,2} \w+$/);
   });
 });

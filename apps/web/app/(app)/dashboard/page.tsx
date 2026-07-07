@@ -1,4 +1,5 @@
 import { occupancyPercent } from "@/lib/domain/capacity";
+import { studioTodayLabel } from "@/lib/domain/dates";
 import { formatTime } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getDashboard } from "@/lib/services/dashboard";
@@ -11,10 +12,11 @@ export default async function DashboardPage() {
   const { repos, ctx } = await resolveStudio();
   const { today, stats } = await getDashboard(repos, ctx);
   const timeZone = ctx.studio.timezone;
+  const todayLabel = studioTodayLabel(timeZone);
 
   return (
     <>
-      <TodayHeading />
+      <TodayHeading subtitle={todayLabel} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active members" value={stats.activeMembers} />

@@ -43,7 +43,7 @@ test("an operator can schedule a new class from the UI", async ({ page }) => {
   await expect(page.getByTestId("schedule").getByText("E2E Tester").first()).toBeVisible();
 });
 
-test("the dashboard renders with zero console errors", async ({ page }) => {
+test("the dashboard renders with zero console errors and a formatted date header", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
@@ -52,6 +52,11 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
 
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
+
+  // The subtitle should match 'Weekday D Month' pattern (e.g. "Monday 15 June")
+  const subtitle = page.locator("h1 + p");
+  await expect(subtitle).toBeVisible();
+  await expect(subtitle).toHaveText(/^\w+ \d{1,2} \w+$/);
 
   expect(errors).toEqual([]);
 });

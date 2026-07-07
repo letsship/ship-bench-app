@@ -85,6 +85,17 @@ export function isBefore(a: string, b: string): boolean {
   return toDate(a).getTime() < toDate(b).getTime();
 }
 
+// "Weekday D Month" label for the current calendar day in the studio's timezone.
+export function studioTodayLabel(timeZone: string, now?: Date): string {
+  const inst = now ?? new Date();
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone,
+  }).format(inst);
+}
+
 // Group items by their calendar day (in `timeZone`), preserving input order
 // within each day. Returns days sorted ascending.
 export function groupByDay<T>(
