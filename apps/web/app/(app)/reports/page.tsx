@@ -7,11 +7,9 @@ export const dynamic = "force-dynamic";
 function monthLabel(month: string): string {
   const [year, monthNumber] = month.split("-");
   const date = new Date(Date.UTC(Number(year), Number(monthNumber) - 1, 1));
-  return new Intl.DateTimeFormat("en-GB", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    date,
+  );
 }
 
 export default async function ReportsPage() {
