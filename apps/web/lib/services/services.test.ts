@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -59,7 +59,7 @@ const member = (id: string, over: Partial<Member> = {}): Member => ({
   ...over,
 });
 
-const classType = (id: string): ClassType => ({
+const classType = (id: string, over: Partial<ClassType> = {}): ClassType => ({
   id,
   studioId: "s1",
   name: "Yoga",
@@ -68,6 +68,7 @@ const classType = (id: string): ClassType => ({
   defaultCapacity: 10,
   defaultPriceCents: 1000,
   createdAt: ISO,
+  ...over,
 });
 
 const session = (id: string, over: Partial<ClassSession> = {}): ClassSession => ({
@@ -314,5 +315,65 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("listBookingsForExport", () => {
+  // Anchor the fixtures far from "now" so the inclusive/exclusive boundaries
+  // are deterministic regardless of when the suite runs.
+  const FROM = "2026-06-01T00:00:00.000Z";
+  const TO = "2026-06-30T00:00:00.000Z";
+  const BEFORE = "2026-05-31T23:00:00.000Z";
+  const AFTER = "2026-07-01T01:00:00.000Z";
+
+  function exportRepos(startsAts: string[]): Repositories {
+    return createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1", { name: "Yoga" })],
+        members: [
+          member("m1", { name: "Amara", email: "amara@example.com" }),
+          member("m2", { name: "Rossi, Chiara", email: "chiara@example.com" }),
+        ],
+        sessions: startsAts.map((startsAt, i) =>
+          session(`cs${i + 1}`, { startsAt, endsAt: startsAt }),
+        ),
+        bookings: startsAts.map((_, i) =>
+          booking(`b${i + 1}`, `m${(i % 2) + 1}`, { sessionId: `cs${i + 1}` }),
+        ),
+      }),
+    );
+  }
+
+  it("includes a booking whose session starts exactly at `to` (inclusive)", async () => {
+    const repos = exportRepos([FROM, TO, AFTER]);
+    const rows = await listBookingsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(rows.map((r) => r.startsAt)).toEqual([FROM, TO]);
+  });
+
+  it("includes a booking whose session starts exactly at `from` (inclusive)", async () => {
+    const repos = exportRepos([BEFORE, FROM, TO]);
+    const rows = await listBookingsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(rows.map((r) => r.startsAt)).toEqual([FROM, TO]);
+  });
+
+  it("returns all bookings when neither bound is given", async () => {
+    const repos = exportRepos([BEFORE, FROM, TO, AFTER]);
+    const rows = await listBookingsForExport(repos, "s1");
+    expect(rows.map((r) => r.startsAt)).toEqual([BEFORE, FROM, TO, AFTER]);
+  });
+
+  it("is unbounded on the side whose bound is omitted", async () => {
+    const repos = exportRepos([BEFORE, FROM, TO, AFTER]);
+    const onlyFrom = await listBookingsForExport(repos, "s1", { from: FROM });
+    expect(onlyFrom.map((r) => r.startsAt)).toEqual([FROM, TO, AFTER]);
+    const onlyTo = await listBookingsForExport(repos, "s1", { to: TO });
+    expect(onlyTo.map((r) => r.startsAt)).toEqual([BEFORE, FROM, TO]);
+  });
+
+  it("populates each row with the booked member's email", async () => {
+    const repos = exportRepos([FROM, TO]);
+    const rows = await listBookingsForExport(repos, "s1", { from: FROM, to: TO });
+    expect(rows[0].email).toBe("amara@example.com");
+    expect(rows[1].email).toBe("chiara@example.com");
   });
 });

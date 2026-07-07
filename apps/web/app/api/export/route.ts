@@ -2,9 +2,10 @@ import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { badRequest, handle } from "@/lib/http";
 import { resolveStudio } from "@/lib/services/context";
-import { invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
+import { invoicesToCsv, membersToCsv, bookingsToCsv } from "@/lib/domain/csv";
 import { listInvoices } from "@/lib/services/invoices";
 import { listMembers } from "@/lib/services/members";
+import { listBookingsForExport } from "@/lib/services/booking-list";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,19 @@ export async function GET(request: NextRequest): Promise<Response> {
       csv = membersToCsv(await listMembers(repos, ctx.studio.id));
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
+    } else if (type === "bookings") {
+      const from = request.nextUrl.searchParams.get("from") ?? undefined;
+      const to = request.nextUrl.searchParams.get("to") ?? undefined;
+      const rows = await listBookingsForExport(repos, ctx.studio.id, { from, to });
+      csv = bookingsToCsv(
+        rows.map((row) => ({
+          starts: row.startsAt,
+          className: row.className,
+          memberName: row.memberName,
+          email: row.email,
+          status: row.status,
+        })),
+      );
     } else {
       return badRequest(`Unknown export type: ${type}`);
     }

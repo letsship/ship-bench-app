@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,23 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Bookings export: same join as `listBookingRows`, but with the upper bound
+// applied INCLUSIVELY. The repo-level `SessionRange.to` is exclusive (it serves
+// the calendar/dashboard "upcoming sessions" views, where a strict `<` on
+// `starts_at` is correct). The accounting export, by contrast, must include a
+// booking whose session starts exactly at `to` ("everything between 1 June and
+// 30 June" should not drop a 30-June-00:00 session), so only `from` is pushed
+// down to the repo and `to` is applied here with `<=`. Omitted bounds are
+// unbounded on that side.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: { from?: string; to?: string } = {},
+): Promise<BookingRow[]> {
+  const repoRange: SessionRange = range.from ? { from: range.from } : {};
+  const rows = await listBookingRows(repos, studioId, repoRange);
+  if (!range.to) return rows;
+  return rows.filter((row) => row.startsAt <= range.to!);
 }
