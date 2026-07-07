@@ -1,13 +1,12 @@
 import type { NotificationProvider } from "./types";
 
-// Assumed Cloudflare Email send API endpoint. Confirm against docs / account
-// setup; the account-id segment below is a placeholder and may need to become
-// an env var or be replaced with the real value.
-const CLOUDFLARE_EMAIL_SEND_URL =
-  "https://api.cloudflare.com/client/v4/accounts/REPLACE_WITH_ACCOUNT_ID/email/routes/send";
-
 export interface CloudflareEmailConfig {
   apiToken: string;
+  accountId: string;
+}
+
+function buildSendUrl(accountId: string): string {
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/email/routes/send`;
 }
 
 function extractMessageId(body: unknown): string {
@@ -25,13 +24,18 @@ export function createCloudflareEmailProvider(
   return {
     name: "cloudflare-email",
     async send(message) {
+      if (!config.accountId) {
+        throw new Error(
+          "CF_EMAIL_ACCOUNT_ID is not set. Set it for real email delivery, or run with USE_FAKE_BACKENDS=1.",
+        );
+      }
       if (!config.apiToken) {
         throw new Error(
           "CF_EMAIL_API_TOKEN is not set. Set it for real email delivery, or run with USE_FAKE_BACKENDS=1.",
         );
       }
 
-      const response = await fetch(CLOUDFLARE_EMAIL_SEND_URL, {
+      const response = await fetch(buildSendUrl(config.accountId), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${config.apiToken}`,

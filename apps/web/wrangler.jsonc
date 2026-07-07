@@ -17,6 +17,7 @@
     "NEXT_PUBLIC_SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_REPLACE_ME",
     "NEXT_PUBLIC_SITE_URL": "https://studiobook.example",
+    "CF_EMAIL_ACCOUNT_ID": "REPLACE_ME",
   },
   "observability": {
     "enabled": true,

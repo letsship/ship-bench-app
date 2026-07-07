@@ -17,4 +17,7 @@
   "observability": {
     "enabled": true,
   },
+  "vars": {
+    "CF_EMAIL_ACCOUNT_ID": "REPLACE_ME",
+  },
 }

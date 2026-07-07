@@ -19,11 +19,14 @@ describe("cloudflare email provider", () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify({ result: { id: "cf_x" } }), { status: 200 }),
     );
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({
+      apiToken: "tok",
+      accountId: "acc123",
+    });
     const result = await provider.send(message);
     expect(result.providerMessageId).toBe("cf_x");
     expect(fetch).toHaveBeenCalledWith(
-      "https://api.cloudflare.com/client/v4/accounts/REPLACE_WITH_ACCOUNT_ID/email/routes/send",
+      "https://api.cloudflare.com/client/v4/accounts/acc123/email/routes/send",
       {
         method: "POST",
         headers: {
@@ -43,7 +46,10 @@ describe("cloudflare email provider", () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response("bad request", { status: 400 }),
     );
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({
+      apiToken: "tok",
+      accountId: "acc123",
+    });
     await expect(provider.send(message)).rejects.toThrow(
       /Cloudflare Email send failed: 400 bad request/,
     );
@@ -53,16 +59,32 @@ describe("cloudflare email provider", () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify({ result: {} }), { status: 200 }),
     );
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({
+      apiToken: "tok",
+      accountId: "acc123",
+    });
     await expect(provider.send(message)).rejects.toThrow(
       /Cloudflare Email response did not contain a message id/,
     );
   });
 
   it("throws a clear error when the api token is empty", async () => {
-    const provider = createCloudflareEmailProvider({ apiToken: "" });
+    const provider = createCloudflareEmailProvider({
+      apiToken: "",
+      accountId: "acc123",
+    });
     await expect(provider.send(message)).rejects.toThrow(
       /CF_EMAIL_API_TOKEN is not set/,
+    );
+  });
+
+  it("throws a clear error when the account id is empty", async () => {
+    const provider = createCloudflareEmailProvider({
+      apiToken: "tok",
+      accountId: "",
+    });
+    await expect(provider.send(message)).rejects.toThrow(
+      /CF_EMAIL_ACCOUNT_ID is not set/,
     );
   });
 });
