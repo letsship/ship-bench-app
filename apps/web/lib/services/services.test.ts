@@ -314,5 +314,7 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("email");
+    expect(typeof rows[0].email).toBe("string");
   });
 });
