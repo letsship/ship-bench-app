@@ -28,7 +28,7 @@ enabled = true
 port = 54323
 
 # Local email capture — outbound email during dev lands in Inbucket, not a real
-# inbox. Production email goes through Resend (see lib/notifications/).
+# inbox. Production email goes through Cloudflare Email (see lib/notifications/).
 [inbucket]
 enabled = true
 port = 54324
