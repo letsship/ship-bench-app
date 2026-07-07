@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -314,5 +314,99 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  describe("listBookingsForExport", () => {
+    it("includes email in each row", async () => {
+      const rows = await listBookingsForExport(repos, studioId);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows[0]).toHaveProperty("email");
+      expect(rows[0].email).toBeTruthy();
+    });
+
+    it("includes a session starting exactly at the from boundary", async () => {
+      // Build a minimal seed with two sessions whose times we control precisely.
+      const customSeed = baseSeed({
+        classTypes: [classType("ct1", { name: "Yoga" })],
+        sessions: [
+          session("cs1", { startsAt: "2026-06-01T10:00:00.000Z", endsAt: "2026-06-01T11:00:00.000Z" }),
+          session("cs2", { startsAt: "2026-06-15T10:00:00.000Z", endsAt: "2026-06-15T11:00:00.000Z" }),
+        ],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      });
+      const r = createInMemoryRepositories(customSeed);
+      const rows = await listBookingsForExport(r, "s1", {
+        from: "2026-06-01T10:00:00.000Z",
+        to: "2026-06-01T10:00:00.000Z",
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].startsAt).toBe("2026-06-01T10:00:00.000Z");
+    });
+
+    it("includes a session starting exactly at the to boundary (inclusive)", async () => {
+      const customSeed = baseSeed({
+        classTypes: [classType("ct1", { name: "Yoga" })],
+        sessions: [
+          session("cs1", { startsAt: "2026-06-01T10:00:00.000Z", endsAt: "2026-06-01T11:00:00.000Z" }),
+          session("cs2", { startsAt: "2026-06-30T10:00:00.000Z", endsAt: "2026-06-30T11:00:00.000Z" }),
+        ],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      });
+      const r = createInMemoryRepositories(customSeed);
+      const rows = await listBookingsForExport(r, "s1", {
+        from: "2026-06-01T10:00:00.000Z",
+        to: "2026-06-30T10:00:00.000Z",
+      });
+      // Both sessions are at the boundaries — both should be included.
+      expect(rows).toHaveLength(2);
+    });
+
+    it("excludes a session outside the range", async () => {
+      const customSeed = baseSeed({
+        classTypes: [classType("ct1", { name: "Yoga" })],
+        sessions: [
+          session("cs1", { startsAt: "2026-05-01T10:00:00.000Z", endsAt: "2026-05-01T11:00:00.000Z" }),
+          session("cs2", { startsAt: "2026-06-15T10:00:00.000Z", endsAt: "2026-06-15T11:00:00.000Z" }),
+        ],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      });
+      const r = createInMemoryRepositories(customSeed);
+      const rows = await listBookingsForExport(r, "s1", {
+        from: "2026-06-01T00:00:00.000Z",
+        to: "2026-06-30T23:59:59.999Z",
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].startsAt).toBe("2026-06-15T10:00:00.000Z");
+    });
+
+    it("omitting both bounds returns all bookings", async () => {
+      const customSeed = baseSeed({
+        classTypes: [classType("ct1", { name: "Yoga" })],
+        sessions: [
+          session("cs1", { startsAt: "2026-01-01T10:00:00.000Z", endsAt: "2026-01-01T11:00:00.000Z" }),
+          session("cs2", { startsAt: "2026-12-01T10:00:00.000Z", endsAt: "2026-12-01T11:00:00.000Z" }),
+        ],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      });
+      const r = createInMemoryRepositories(customSeed);
+      const rows = await listBookingsForExport(r, "s1");
+      expect(rows).toHaveLength(2);
+    });
   });
 });

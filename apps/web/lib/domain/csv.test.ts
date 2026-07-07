@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -61,5 +61,63 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits the header in order: Starts, Class, Member, Email, Status", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00.000Z",
+        className: "Vinyasa Flow",
+        memberName: "Amara Okafor",
+        email: "amara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [header] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("quotes a member name containing a comma (RFC 4180)", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00.000Z",
+        className: "Vinyasa Flow",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Rossi, Chiara"');
+  });
+
+  it("doubles embedded quotes in a member name", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00.000Z",
+        className: 'Say "Om"',
+        memberName: 'O"Brien',
+        email: "obrien@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"O""Brien"');
+  });
+
+  it("renders all columns in a data row", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T10:00:00.000Z",
+        className: "Reformer Pilates",
+        memberName: "Bram de Vries",
+        email: "bram@example.com",
+        status: "attended",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toBe("2026-06-15T10:00:00.000Z,Reformer Pilates,Bram de Vries,bram@example.com,attended");
   });
 });

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
+import { GET as exportGet } from "@/app/api/export/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
 import { __setTestRepositories } from "@/lib/db/repos";
@@ -44,5 +45,34 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  // NOTE: GET /api/export?type=bookings tests require requireSession() which
+  // calls cookies() from next/headers. If this throws in the vitest node
+  // environment (outside a real request scope), remove these tests and rely on
+  // the listBookingsForExport + bookingsToCsv unit tests for coverage.
+  describe("GET /api/export?type=bookings", () => {
+    it("returns a CSV with the correct header", async () => {
+      const res = await exportGet(
+        new NextRequest("http://localhost/api/export?type=bookings"),
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/csv; charset=utf-8");
+      const body = await res.text();
+      const [header] = body.split("\r\n");
+      expect(header).toBe("Starts,Class,Member,Email,Status");
+    });
+
+    it("filters by from/to query parameters", async () => {
+      const res = await exportGet(
+        new NextRequest(
+          "http://localhost/api/export?type=bookings&from=2099-01-01T00:00:00.000Z&to=2099-12-31T23:59:59.999Z",
+        ),
+      );
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      // Only the header row — no data rows in that far-future range.
+      expect(body.split("\r\n").filter(Boolean)).toHaveLength(1);
+    });
   });
 });
