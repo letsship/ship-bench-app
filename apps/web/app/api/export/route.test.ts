@@ -4,7 +4,6 @@ import { GET } from "@/app/api/export/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { SeedData } from "@/lib/db/repos/fakes";
-import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 
 // `requireSession()` reaches for `next/headers` cookies, which aren't available
