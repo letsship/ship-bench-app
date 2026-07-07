@@ -83,8 +83,10 @@ export default async function InvoiceDetailPage({
             {lineItems.map((line) => (
               <tr key={line.id}>
                 <td>
-                  {/* Line descriptions can carry light formatting entered by staff. */}
-                  <span dangerouslySetInnerHTML={{ __html: line.description }} />
+                  {/* Security invariant: description is user-entered free text and must
+                      never be rendered through a raw-HTML sink. Plain JSX text keeps
+                      the string as literal markup-printed text (React auto-escapes). */}
+                  {line.description}
                   {line.refunded ? (
                     <span className="ml-2">
                       <StatusBadge status="refunded" />
