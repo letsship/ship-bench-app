@@ -56,8 +56,9 @@ export async function listBookingRowsInRange(
   range: SessionRange = {},
 ): Promise<BookingRow[]> {
   const rows = await listBookingRows(repos, studioId, { from: range.from });
-  if (range.to) {
-    return rows.filter((row) => row.startsAt <= range.to);
+  const to = range.to;
+  if (to) {
+    return rows.filter((row) => row.startsAt <= to);
   }
   return rows;
 }
