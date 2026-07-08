@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -158,6 +158,18 @@ describe("classes service", () => {
 });
 
 describe("bookings service", () => {
+  it("stamps bookedAt with the current time", async () => {
+    // Freeze the clock so the stored timestamp is deterministic to assert on.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
+    const repos = createInMemoryRepositories(
+      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" });
+    const stored = await repos.bookings.getById(result.bookingId);
+    expect(stored?.bookedAt).toBe("2020-01-01T00:00:00.000Z");
+  });
+
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
