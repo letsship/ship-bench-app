@@ -12,7 +12,11 @@ concurrency:
 jobs:
   verify:
     name: lint / typecheck / test / build
-    runs-on: ubuntu-latest
+    # Ubicloud dedicated runner (not GitHub's shared queue). The benchmark gates
+    # ci_passed on this check_suite, so a shared-runner queue wait stalled real
+    # trials (STB-60/STB-64 lost ~50min to CI-queue congestion). Mirrors the
+    # ship-platform repo's runner pattern.
+    runs-on: ubicloud-standard-2
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
