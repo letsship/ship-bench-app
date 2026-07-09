@@ -29,7 +29,7 @@ test.describe("unauthenticated", () => {
   test("a signed-out visitor can view the public studio page", async ({ page }) => {
     await page.goto("/s/riverbank");
     await expect(page).toHaveURL(/\/s\/riverbank/);
-    await expect(page.getByText("Riverbank Movement")).toBeVisible();
+    await expect(page.getByText("Riverbank Movement", { exact: true })).toBeVisible();
     await expect(page.getByText("Upcoming classes")).toBeVisible();
   });
 
