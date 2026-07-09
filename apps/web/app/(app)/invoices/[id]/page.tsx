@@ -12,11 +12,7 @@ export const dynamic = "force-dynamic";
 
 const ALL_STATUSES: InvoiceStatus[] = ["draft", "open", "paid", "void", "refunded"];
 
-export default async function InvoiceDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { repos, ctx } = await resolveStudio();
   const { id } = await params;
 
@@ -83,8 +79,7 @@ export default async function InvoiceDetailPage({
             {lineItems.map((line) => (
               <tr key={line.id}>
                 <td>
-                  {/* Line descriptions can carry light formatting entered by staff. */}
-                  <span dangerouslySetInnerHTML={{ __html: line.description }} />
+                  <span>{line.description}</span>
                   {line.refunded ? (
                     <span className="ml-2">
                       <StatusBadge status="refunded" />
