@@ -46,7 +46,9 @@ export default async function PublicStudioPage({ params }: PageProps) {
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // Escape `<` so operator-controlled text (class name, instructor) can't
+        // inject `</script>` and break out of this tag into the surrounding HTML.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <img src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio`} />
       <div style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</div>
