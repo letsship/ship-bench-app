@@ -24,12 +24,10 @@ export function computeInvoiceTotals(
   items: readonly LineItemInput[],
   taxRateBps: number,
 ): InvoiceTotals {
-  let subtotalCents = 0;
-  let refundedCents = 0;
-  for (const item of items) {
-    if (item.refunded) refundedCents += lineAmountCents(item);
-    else subtotalCents += lineAmountCents(item);
-  }
+  const payable = items.filter((item) => !item.refunded).map(lineAmountCents);
+  const refunded = items.filter((item) => item.refunded).map(lineAmountCents);
+  const subtotalCents = payable.reduce((total, cents) => total + cents);
+  const refundedCents = refunded.reduce((total, cents) => total + cents, 0);
   const taxCents = Math.round((subtotalCents * taxRateBps) / 10_000);
   return { subtotalCents, refundedCents, taxCents, totalCents: subtotalCents + taxCents };
 }

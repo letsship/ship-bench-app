@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HttpError } from "@/lib/http";
-import { type InvoiceStatus, canTransitionInvoice } from "@/lib/domain/invoices";
+import { type InvoiceStatus, canTransitionInvoice, computeInvoiceTotals } from "@/lib/domain/invoices";
 import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getInvoiceDetail } from "@/lib/services/invoices";
@@ -30,6 +30,9 @@ export default async function InvoiceDetailPage({
 
   const { invoice, member, lineItems } = detail;
   const currency = invoice.currency;
+  // Derive the money box from the line items so a line-level refund shows up
+  // immediately, not only after the stored totals are rewritten.
+  const totals = computeInvoiceTotals(lineItems, invoice.taxRateBps);
   const allowed = ALL_STATUSES.filter((status) =>
     canTransitionInvoice(invoice.status as InvoiceStatus, status),
   );
@@ -64,7 +67,7 @@ export default async function InvoiceDetailPage({
         <div className="sb-card p-4">
           <div className="text-xs uppercase tracking-wide text-[var(--color-muted)]">Total</div>
           <div className="mt-1 text-xl font-semibold">
-            <Money cents={invoice.totalCents} currency={currency} />
+            <Money cents={totals.totalCents} currency={currency} />
           </div>
         </div>
       </div>
@@ -105,14 +108,14 @@ export default async function InvoiceDetailPage({
 
       <div className="mt-4 flex flex-col items-end gap-1 text-sm">
         <div>
-          Subtotal <Money cents={invoice.subtotalCents} currency={currency} />
+          Subtotal <Money cents={totals.subtotalCents} currency={currency} />
         </div>
         <div className="text-[var(--color-muted)]">
           Tax ({(invoice.taxRateBps / 100).toFixed(1)}%){" "}
-          <Money cents={invoice.taxCents} currency={currency} />
+          <Money cents={totals.taxCents} currency={currency} />
         </div>
         <div className="text-lg font-semibold">
-          Total <Money cents={invoice.totalCents} currency={currency} />
+          Total <Money cents={totals.totalCents} currency={currency} />
         </div>
       </div>
 
