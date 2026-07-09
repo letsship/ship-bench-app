@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveRepositories } from "@/lib/db/repos";
 import { formatDateTime } from "@/lib/format";
-import { publicStudioUrl, resolvePublicStudio } from "@/lib/services/public-studio";
+import { publicBaseUrl, publicStudioUrl, resolvePublicStudio } from "@/lib/services/public-studio";
 
 // Public, no-auth studio page. It lives OUTSIDE the (app) route group so the
 // auth layout never runs — anyone can open it.
@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const url = publicStudioUrl(slug);
 
   return {
+    metadataBase: new URL(publicBaseUrl()),
     title,
     description,
     alternates: { canonical: url },
@@ -79,7 +80,7 @@ export default async function PublicStudioPage({ params }: PageProps) {
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <img src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio`} />
-      <div style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</div>
+      <h1 style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</h1>
       <div style={{ marginTop: 8, color: "#666" }}>Upcoming classes</div>
 
       <div style={{ marginTop: 24 }}>

@@ -30,7 +30,7 @@ test.describe("unauthenticated", () => {
     const response = await page.goto("/s/riverbank");
     expect(response?.status()).toBe(200);
     await expect(page).toHaveURL(/\/s\/riverbank$/);
-    await expect(page.getByText("Riverbank Movement")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Riverbank Movement" })).toBeVisible();
     await expect(page.getByText("Upcoming classes")).toBeVisible();
   });
 
