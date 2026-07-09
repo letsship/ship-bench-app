@@ -74,3 +74,13 @@ export function buildStudioEventJsonLd(
     url,
   }));
 }
+
+// Studio/class/instructor names are free-text fields set by studio operators
+// (lib/validation.ts only checks length/trim, not HTML/script content) and this
+// page is public and unauthenticated, so a name containing "</script>" must not
+// be able to break out of the JSON-LD <script> tag. Escape "<" the way Next/React
+// itself does for embedded JSON so the output stays valid JSON but can't close
+// the surrounding script element.
+export function toSafeJsonLdString(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
+}

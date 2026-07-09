@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Studio } from "@/lib/db/types";
 import type { PublicClass } from "@/lib/services/public-studio";
-import { buildStudioEventJsonLd, buildStudioMetadata, getSiteUrl } from "@/lib/seo";
+import {
+  buildStudioEventJsonLd,
+  buildStudioMetadata,
+  getSiteUrl,
+  toSafeJsonLdString,
+} from "@/lib/seo";
 
 const studio: Studio = {
   id: "s1",
@@ -80,5 +85,23 @@ describe("buildStudioEventJsonLd", () => {
 
   it("returns an empty array when there are no upcoming classes", () => {
     expect(buildStudioEventJsonLd(studio, [])).toEqual([]);
+  });
+});
+
+describe("toSafeJsonLdString", () => {
+  it("escapes '<' so a malicious class/instructor name can't close the script tag", () => {
+    const maliciousClasses: PublicClass[] = [
+      {
+        id: "c1",
+        name: "</script><script>alert(1)</script>",
+        instructor: "Evil Instructor",
+        startsAt: "2026-03-16T07:00:00.000Z",
+        endsAt: "2026-03-16T08:00:00.000Z",
+      },
+    ];
+    const serialized = toSafeJsonLdString(buildStudioEventJsonLd(studio, maliciousClasses));
+    expect(serialized).not.toContain("</script>");
+    expect(serialized).toContain("\\u003c/script>");
+    expect(JSON.parse(serialized.replace(/\\u003c/g, "<"))[0].name).toBe(maliciousClasses[0].name);
   });
 });

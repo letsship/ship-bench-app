@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
-import { buildStudioEventJsonLd, buildStudioMetadata } from "@/lib/seo";
+import { buildStudioEventJsonLd, buildStudioMetadata, toSafeJsonLdString } from "@/lib/seo";
 import { resolvePublicStudio } from "@/lib/services/public-studio";
 
 // Public, no-auth studio page. It lives OUTSIDE the (app) route group so the
@@ -32,7 +32,7 @@ export default async function PublicStudioPage({ params }: PageProps) {
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventsJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: toSafeJsonLdString(eventsJsonLd) }}
       />
       <img src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio cover`} />
       <div style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</div>
