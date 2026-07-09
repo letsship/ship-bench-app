@@ -53,5 +53,16 @@ test("the dashboard renders with zero console errors", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
 
+  // Matches lib/format.ts's formatDayLabel, evaluated for the seeded studio's
+  // configured timezone (see lib/db/seed-data.ts) — proves the header shows
+  // "today" as observed in the studio, not the test runner's local timezone.
+  const expectedLabel = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Amsterdam",
+  }).format(new Date());
+  await expect(page.locator("p", { hasText: expectedLabel })).toBeVisible();
+
   expect(errors).toEqual([]);
 });
