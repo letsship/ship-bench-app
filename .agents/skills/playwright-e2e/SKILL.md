@@ -73,9 +73,7 @@ import { expect, test } from "@playwright/test";
 import { signIn } from "./support/auth";
 
 test.describe("feature", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page);
-  });
+  test.beforeEach(async ({ page }) => { await signIn(page); });
 
   test("does one thing", async ({ page }) => {
     await page.goto("/bookings");
@@ -108,7 +106,7 @@ The forms carry accessible names via `aria-label`: `New booking`, `Add class`,
    `page.getByRole("heading").first()`.
 3. **Prefer structure over brittle copy.** Test functionality (navigation, form
    submission, URL), structural presence (`getByRole`, a testid table has rows), and
-   accessibility — over exact prose. Assert seeded _data_ only where it adds real value.
+   accessibility — over exact prose. Assert seeded *data* only where it adds real value.
 4. **Strict-mode substring traps.** `getByText("Total")` also matches "Subtotal"/"Total
    €X". Use `{ exact: true }` (and `.first()`) when the text is a substring of other text.
 5. **Never skip.** No `test.skip()`, `.skip()`, `test.fixme()`, or commented-out tests to
