@@ -2,5 +2,5 @@
   "name": "@studiobook/db",
   "version": "0.0.0",
   "private": true,
-  "description": "Studiobook database — raw SQL migrations (Postgres/Supabase)."
+  "description": "Studiobook database — D1 (SQLite) schema migrations, applied via wrangler d1 migrations apply and consumed by @studiobook/web's Drizzle schema."
 }

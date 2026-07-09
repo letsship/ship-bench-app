@@ -13,19 +13,17 @@
     "test": "turbo run test",
     "clean": "turbo run clean",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop",
-    "supabase:reset": "supabase db reset",
-    "supabase:migrate": "supabase migration up",
-    "supabase:types": "supabase gen types typescript --local --schema public > apps/web/lib/db/database.types.ts"
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "prettier": "^3.4.2",
-    "supabase": "^2.20.0",
     "turbo": "^2.8.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "supabase", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }
