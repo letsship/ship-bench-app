@@ -18,15 +18,15 @@ PostHog AI
 // Ensure flags are loaded before usage.
 // You only need to call this on the code the first time a user visits.
 // See this doc for more details: /docs/feature-flags/manual#ensuring-flags-are-loaded-before-usage
-posthog.onFeatureFlags(function () {
-  // feature flags should be available at this point
-  if (posthog.getFeatureFlag("experiment-feature-flag-key") == "variant-name") {
-    // do something
-  }
-});
+posthog.onFeatureFlags(function() {
+    // feature flags should be available at this point
+    if (posthog.getFeatureFlag('experiment-feature-flag-key')  == 'variant-name') {
+        // do something
+    }
+})
 // Otherwise, you can just do:
-if (posthog.getFeatureFlag("experiment-feature-flag-key") == "variant-name") {
-  // do something
+if (posthog.getFeatureFlag('experiment-feature-flag-key')  == 'variant-name') {
+    // do something
 }
 // You can also test your code by overriding the feature flag:
 // e.g., posthog.featureFlags.overrideFeatureFlags({ flags: {'experiment-feature-flag-key': 'test'}})
@@ -64,17 +64,17 @@ function App() {
 
 ```jsx
 // With the useFeatureFlag hook
-import { useFeatureFlag } from "posthog-react-native";
+import { useFeatureFlag } from 'posthog-react-native'
 const MyComponent = () => {
-  const variant = useFeatureFlag("experiment-feature-flag-key");
-  if (variant === undefined) {
-    // the response is undefined if the flags are being loaded
-    return null;
-  }
-  if (variant == "variant-name") {
-    // do something
-  }
-};
+    const variant = useFeatureFlag('experiment-feature-flag-key')
+    if (variant === undefined) {
+        // the response is undefined if the flags are being loaded
+        return null
+    }
+    if (variant == 'variant-name') {
+        // do something
+    }
+}
 ```
 
 ### Android
@@ -96,10 +96,10 @@ if (PostHogSDK.shared.getFeatureFlag("experiment-feature-flag-key") as? String =
 ### Node.js
 
 ```javascript
-const flags = await client.evaluateFlags("user_distinct_id");
-const variant = flags.getFlag("experiment-feature-flag-key");
-if (variant === "variant-name") {
-  // Do something
+const flags = await client.evaluateFlags('user_distinct_id')
+const variant = flags.getFlag('experiment-feature-flag-key')
+if (variant === 'variant-name') {
+    // Do something
 }
 ```
 
