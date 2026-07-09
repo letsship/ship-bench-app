@@ -105,3 +105,11 @@ export interface NotificationOutboxRow {
   providerMessageId: string | null;
   error: string | null;
 }
+
+// Idempotency ledger row for inbound Stripe webhooks: id is Stripe's own
+// event id (globally unique), so recording it doubles as the dedupe key.
+export interface StripeEvent {
+  id: string;
+  type: string;
+  receivedAt: string;
+}

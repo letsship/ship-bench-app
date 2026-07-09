@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  StripeEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -79,6 +80,11 @@ export interface NotificationOutboxRepo {
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
+export interface StripeEventsRepo {
+  getById(id: string): Promise<StripeEvent | null>;
+  insert(event: StripeEvent): Promise<StripeEvent>;
+}
+
 export interface Repositories {
   studios: StudioRepo;
   settings: StudioSettingsRepo;
@@ -89,4 +95,5 @@ export interface Repositories {
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
   outbox: NotificationOutboxRepo;
+  stripeEvents: StripeEventsRepo;
 }

@@ -22,11 +22,21 @@ const serverSchema = clientSchema.extend({
   SUPABASE_SCHEMA: z.string().min(1).default("public"),
 });
 
+// Kept as its own schema (not merged into serverSchema) because it is parsed
+// on every webhook request regardless of backend — merging it in would force
+// the Supabase vars to be set for fake-backends mode and for webhook tests,
+// which don't touch Supabase at all.
+const stripeSchema = z.object({
+  STRIPE_WEBHOOK_SECRET: z.string().min(1),
+});
+
 type ClientEnv = z.infer<typeof clientSchema>;
 type ServerEnv = z.infer<typeof serverSchema>;
+type StripeEnv = z.infer<typeof stripeSchema>;
 
 let cachedClientEnv: ClientEnv | undefined;
 let cachedServerEnv: ServerEnv | undefined;
+let cachedStripeEnv: StripeEnv | undefined;
 
 const getClientVars = () => ({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -50,4 +60,13 @@ export const clientEnv = (): ClientEnv => {
 export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
+};
+
+export const stripeEnv = (): StripeEnv => {
+  if (!cachedStripeEnv) {
+    cachedStripeEnv = stripeSchema.parse({
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    });
+  }
+  return cachedStripeEnv;
 };
