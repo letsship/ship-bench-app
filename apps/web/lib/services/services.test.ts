@@ -4,6 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { createFakeClient } from "@/lib/posthog/fake-client";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -160,12 +161,39 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    const posthog = createFakeClient();
+    const result = await createBooking(repos, provider, posthog, {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
     expect(result.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind)).toEqual(["booking_confirmation"]);
+    expect(posthog.captured).toHaveLength(0);
+  });
+
+  it("does not consult the experiment flag when the session is not full", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
+    );
+    const posthog = createFakeClient();
+    posthog.setFlag("waitlist_experiment", "control");
+    const result = await createBooking(repos, createFakeProvider(), posthog, {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+    expect(posthog.captured).toHaveLength(0);
   });
 
   it("waitlists when full (and sends no confirmation)", async () => {
@@ -178,9 +206,54 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    const posthog = createFakeClient();
+    const result = await createBooking(repos, provider, posthog, {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
     expect(result.status).toBe("waitlisted");
     expect(provider.sent).toHaveLength(0);
+  });
+
+  it("waitlists a variant-group member and captures waitlist_joined", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const posthog = createFakeClient();
+    posthog.setFlag("waitlist_experiment", "treatment");
+    const result = await createBooking(repos, createFakeProvider(), posthog, {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(result.status).toBe("waitlisted");
+    expect(posthog.captured).toHaveLength(1);
+    expect(posthog.captured[0]).toEqual({
+      distinctId: "m2",
+      event: "waitlist_joined",
+      properties: { sessionId: "cs1" },
+    });
+  });
+
+  it("turns away a control-group member with the existing 409 when full", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const posthog = createFakeClient();
+    posthog.setFlag("waitlist_experiment", "control");
+    await expect(
+      createBooking(repos, createFakeProvider(), posthog, { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_session_full_no_waitlist" });
+    expect(posthog.captured).toHaveLength(0);
   });
 
   it("rejects a double booking with 409", async () => {
@@ -193,13 +266,21 @@ describe("bookings service", () => {
       }),
     );
     await expect(
-      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+      createBooking(repos, createFakeProvider(), createFakeClient(), {
+        sessionId: "cs1",
+        memberId: "m1",
+      }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
   });
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
