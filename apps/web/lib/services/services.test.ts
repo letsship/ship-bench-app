@@ -200,6 +200,24 @@ describe("bookings service", () => {
     expect(provider.sent).toHaveLength(0);
   });
 
+  it("does not spend a pack credit when the booking is only waitlisted", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+        classPacks: [classPack("p1", "m2", { creditsRemaining: 5 })],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(result.status).toBe("waitlisted");
+    expect((await repos.classPacks.getById("p1"))?.creditsRemaining).toBe(5);
+  });
+
   it("rejects a double booking with 409", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
