@@ -23,10 +23,12 @@ describe("fake tracker", () => {
 
 describe("posthog tracker", () => {
   const capture = vi.fn();
+  const flush = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     capture.mockReset();
-    vi.mocked(PostHog).mockImplementation(() => ({ capture }) as unknown as PostHog);
+    flush.mockClear();
+    vi.mocked(PostHog).mockImplementation(() => ({ capture, flush }) as unknown as PostHog);
   });
 
   it("maps an event onto the PostHog client's capture params", async () => {
@@ -38,5 +40,11 @@ describe("posthog tracker", () => {
       event: "booking_created",
       properties: { session_id: "cs1" },
     });
+  });
+
+  it("flushes the batched event before returning, so short-lived invocations don't lose it", async () => {
+    const tracker = createPostHogTracker({ apiKey: "k" });
+    await tracker.capture(event);
+    expect(flush).toHaveBeenCalledTimes(1);
   });
 });

@@ -13,12 +13,17 @@ export interface PostHogConfig {
 export function createPostHogTracker(config: PostHogConfig): Tracker {
   const client = new PostHog(config.apiKey, { host: config.host });
   return {
-    capture(event) {
+    async capture(event) {
       client.capture({
         distinctId: event.distinctId,
         event: event.event,
         properties: event.properties,
       });
+      // A fresh client is constructed per request (see provider.ts) and is
+      // never reused, so the internal batch queue must be flushed before the
+      // handler returns — otherwise short-lived serverless invocations can be
+      // torn down before the batched event is ever sent.
+      await client.flush();
     },
   };
 }

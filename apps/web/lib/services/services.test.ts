@@ -282,21 +282,38 @@ describe("bookings service", () => {
   });
 
   it("never places email, name, or phone in captured event properties", async () => {
+    const pii = (id: string) => member(id, { name: `Name ${id}`, phone: `+1-555-000-${id}` });
     const repos = createInMemoryRepositories(
       baseSeed({
         classTypes: [classType("ct1")],
-        sessions: [session("cs1")],
-        members: [member("m1")],
+        sessions: [session("cs1", { capacity: 1 }), session("cs2")],
+        members: [pii("m1"), pii("m2"), pii("m3")],
         bookings: [booking("b1", "m1")],
       }),
     );
+    const provider = createFakeProvider();
     const tracker = createFakeTracker();
-    await cancelBooking(repos, createFakeProvider(), tracker, "b1");
-    expect(tracker.captured).toHaveLength(1);
-    for (const captured of tracker.captured) {
-      expect(Object.keys(captured.properties)).toEqual(["session_id"]);
-      const values = Object.values(captured.properties).map(String);
-      expect(values.some((v) => v.includes("@"))).toBe(false);
+
+    // Exercises all three instrumented flows: a confirmed booking, a
+    // waitlisted booking, and a cancellation.
+    await createBooking(repos, provider, tracker, { sessionId: "cs2", memberId: "m3" });
+    await createBooking(repos, provider, tracker, { sessionId: "cs1", memberId: "m2" });
+    await cancelBooking(repos, provider, tracker, "b1");
+
+    expect(tracker.captured.map((e) => e.event)).toEqual([
+      "booking_created",
+      "waitlist_joined",
+      "booking_cancelled",
+    ]);
+    for (const member of [pii("m1"), pii("m2"), pii("m3")]) {
+      for (const captured of tracker.captured) {
+        expect(Object.keys(captured.properties)).toEqual(["session_id"]);
+        const values = Object.values(captured.properties).map(String);
+        expect(values.some((v) => v.includes("@"))).toBe(false);
+        expect(values).not.toContain(member.name);
+        expect(values).not.toContain(member.phone);
+        expect(values).not.toContain(member.email);
+      }
     }
   });
 });
