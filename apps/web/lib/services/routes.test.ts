@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { GET as bookingsGet } from "@/app/api/bookings/route";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
@@ -44,5 +45,24 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/bookings returns bookings joined to member + class", async () => {
+    const res = await bookingsGet(new NextRequest("http://localhost/api/bookings"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown[];
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body[0]).toEqual(
+      expect.objectContaining({
+        id: expect.any(String),
+        memberName: expect.any(String),
+        className: expect.any(String),
+        classColor: expect.any(String),
+        instructor: expect.any(String),
+        startsAt: expect.any(String),
+        status: expect.any(String),
+      }),
+    );
   });
 });
