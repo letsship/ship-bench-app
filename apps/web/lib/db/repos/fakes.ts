@@ -74,6 +74,13 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       async getFirst() {
         return store.studios[0] ? clone(store.studios[0]) : null;
       },
+      async getBySlug(slug) {
+        const found = store.studios.find((row) => row.slug === slug);
+        return found ? clone(found) : null;
+      },
+      async listAll() {
+        return cloneAll(store.studios);
+      },
     },
     settings: {
       async getByStudioId(studioId) {

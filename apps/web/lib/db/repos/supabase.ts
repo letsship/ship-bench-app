@@ -71,6 +71,12 @@ export function createSupabaseRepositories(): Repositories {
     studios: {
       getFirst: () =>
         maybeOne<Studio>(db.from("studios").select("*").limit(1).maybeSingle(), "studios.getFirst"),
+      getBySlug: (slug) =>
+        maybeOne<Studio>(
+          db.from("studios").select("*").eq("slug", slug).maybeSingle(),
+          "studios.getBySlug",
+        ),
+      listAll: () => rows<Studio>(db.from("studios").select("*").order("name"), "studios.listAll"),
     },
     settings: {
       getByStudioId: (studioId) =>
