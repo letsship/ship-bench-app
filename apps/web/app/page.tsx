@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SkipLink } from "./_components/skip-link";
 
 const FEATURES = [
   {
@@ -17,7 +18,8 @@ const FEATURES = [
 
 export default function LandingPage() {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-16">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-5xl px-6 py-16">
+      <SkipLink />
       <nav className="flex items-center justify-between">
         <span className="text-lg font-semibold">Studiobook</span>
         <Link href="/login" className="sb-btn sb-btn-primary">
@@ -27,12 +29,10 @@ export default function LandingPage() {
 
       <section className="mt-20 max-w-2xl">
         <span className="sb-badge sb-badge-clay">For movement studios</span>
-        <h1 className="mt-5 text-5xl leading-tight">
-          Run your studio, not a spreadsheet.
-        </h1>
+        <h1 className="mt-5 text-5xl leading-tight">Run your studio, not a spreadsheet.</h1>
         <p className="mt-5 text-lg text-[var(--color-muted)]">
-          Studiobook keeps your pottery wheels spinning and your yoga mats full — bookings,
-          members, and invoices in one calm workspace.
+          Studiobook keeps your pottery wheels spinning and your yoga mats full — bookings, members,
+          and invoices in one calm workspace.
         </p>
         <div className="mt-8 flex gap-3">
           <Link href="/login" className="sb-btn sb-btn-primary">

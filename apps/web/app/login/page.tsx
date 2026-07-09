@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { startSession } from "@/lib/auth/session";
+import { SkipLink } from "../_components/skip-link";
 
 // Magic-link STUB: there is no email round-trip. Submitting "signs you in" by
 // minting the dev session cookie for the entered email (or a default operator).
@@ -20,7 +21,12 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6"
+    >
+      <SkipLink />
       <Link href="/" className="text-lg font-semibold">
         Studiobook
       </Link>

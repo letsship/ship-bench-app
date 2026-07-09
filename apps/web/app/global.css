@@ -64,7 +64,9 @@ a {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 .sb-btn:hover {
   border-color: var(--color-clay);
@@ -151,6 +153,33 @@ a {
 }
 .sb-table tr:last-child td {
   border-bottom: none;
+}
+
+.sb-skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border-radius: 0.55rem;
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid var(--color-clay);
+}
+.sb-skip-link:focus {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  outline: 2px solid var(--color-clay-soft);
+  outline-offset: 2px;
 }
 
 .sb-nav-link {

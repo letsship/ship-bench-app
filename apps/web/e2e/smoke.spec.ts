@@ -12,9 +12,37 @@ test.describe("unauthenticated", () => {
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
   });
 
+  test("landing page skip link is the first focus stop and jumps to main content", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const skipLink = page.getByRole("link", { name: /skip to (main )?content/i });
+
+    await page.keyboard.press("Tab");
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeVisible();
+
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
+  });
+
   test("visiting a protected page redirects to login", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("login page skip link is the first focus stop and jumps to main content", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    const skipLink = page.getByRole("link", { name: /skip to (main )?content/i });
+
+    await page.keyboard.press("Tab");
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeVisible();
+
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
   });
 
   test("the login stub signs the operator in and lands on the dashboard", async ({ page }) => {
