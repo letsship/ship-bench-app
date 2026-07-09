@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,19 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Same join as `listBookingRows`, but for the accounting CSV export: `range.to`
+// is applied inclusively here (session starting exactly at `to` is included),
+// unlike `ClassSessionsRepo.listByStudio`'s exclusive-`to` contract used
+// elsewhere (the live bookings page, `/api/bookings`). Only `range.from` is
+// passed through to the repo, since that bound is already inclusive there.
+export async function listBookingRowsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId, { from: range.from });
+  if (range.to === undefined) return rows;
+  return rows.filter((row) => row.startsAt <= range.to!);
 }
