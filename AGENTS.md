@@ -46,6 +46,60 @@ does not require Supabase, Resend, Docker, or network access.
   seam, fake provider, Resend adapter, and outbox. Domain code never calls
   Resend directly.
 
+## Coding rules
+
+Functional-first, matching the existing code:
+
+- **Pure, small functions.** Avoid side effects; one thing each; ~5-20 lines, 50
+  max. Compose small functions instead of large classes; prefer `map`/`filter`/
+  `reduce` over imperative loops; `const` + immutable data.
+- **Dependency injection.** Service functions receive their `Repositories` and the
+  notification provider as arguments (`lib/services/`), never module-level
+  singletons — that is what keeps them unit-testable against the fakes.
+- **Separation of concerns.** Pure business rules live in `lib/domain/` (no
+  framework, database, email, or request imports). Services compose domain +
+  repositories + notifications; route handlers and pages orchestrate; components
+  present. Domain data (prices, capacity, tax/rounding, invoice status
+  transitions) belongs in `lib/domain/` — never inlined in a component or route.
+- **KISS + minimal change surface.** Put new logic behind the existing seams, not
+  around them; a feature should touch a few files. Extract a shared util (with a
+  unit test) rather than duplicating logic. Always `console.error` a swallowed
+  error — never a silent catch.
+
+### Cloudflare Workers (MANDATORY)
+
+The app deploys to Cloudflare Workers via OpenNext, which **ends the request
+context once the response is sent** — any un-awaited async work is silently
+dropped. So NEVER fire-and-forget (`void asyncCall()`, `promise.then(...)` without
+`await`) in a route handler, server action, or Server Component. `await` all async
+work before returning; wrap non-critical side effects (e.g. sending a
+notification) in `try/catch` so a failure logs but does not block the primary
+response — as the outbox dispatch does.
+
+### Server actions (MANDATORY)
+
+- Server actions live in `'use server'` modules under `app/**/actions.ts` (see
+  `app/(app)/settings/actions.ts`). Page / Server Component files NEVER contain an
+  inline `'use server'` closure — keep actions in dedicated modules for reliable
+  compilation. Pass them to client components as direct props, or partially apply
+  with `.bind(null, ctx)` (bound args first).
+
+### Input validation — Zod (MANDATORY)
+
+- ALL external data is validated with Zod at the boundary (route handlers, server
+  actions, any untyped external object). NEVER `as`-cast external input — parse it.
+  Request schemas are centralized in `apps/web/lib/validation.ts` (e.g.
+  `createBookingSchema`); `parse` inside `handle()` (which returns the shared JSON
+  error envelope on failure) and `safeParse` where you branch on validity.
+
+### Test integrity (MANDATORY)
+
+- NEVER skip, `.fixme`, or comment out a test to make a suite pass — every test
+  runs and passes (0 failed, 0 skipped). Fix the root cause, not the symptom. The
+  CI gate is `verify` (lint + typecheck + unit/integration + build) AND `e2e`
+  (Playwright journeys); both must be green. Unit/integration tests are hermetic
+  (in-memory repositories + fake email — no Supabase, Resend, Docker, or network).
+
 ## Data and migrations
 
 - Raw SQL migrations live in `packages/db/migrations/`. `supabase/migrations` is
@@ -77,6 +131,7 @@ Use repo skills in `.agents/skills/` when a task matches their description:
 - `studiobook-notifications` for email/outbox work.
 - `studiobook-deploy-preview` for OpenNext, Wrangler, SHIP, and preview deploys.
 - `posthog-nextjs` for PostHog analytics, flags, and experiments.
+- `playwright-e2e` for writing, running, and debugging the E2E user-journey tests.
 - Existing Cloudflare skills cover Workers best practices, Wrangler, and
   Cloudflare Email Service.
 
