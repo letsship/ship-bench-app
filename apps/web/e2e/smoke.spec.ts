@@ -25,6 +25,55 @@ test.describe("unauthenticated", () => {
     await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
     await expect(page.getByText("operator@riverbank.studio")).toBeVisible();
   });
+
+  test("the public studio page renders without a session, is indexable, and carries Event JSON-LD", async ({
+    page,
+  }) => {
+    const response = await page.goto("/s/riverbank");
+    expect(response?.status()).toBe(200);
+    await expect(page.getByText("Riverbank Movement", { exact: true })).toBeVisible();
+    await expect(page.getByText("Upcoming classes")).toBeVisible();
+    await expect(page).toHaveTitle(/Riverbank Movement/);
+
+    const description = await page.locator('meta[name="description"]').getAttribute("content");
+    expect(description).toContain("Riverbank Movement");
+    const robotsTag = await page.locator('meta[name="robots"]').getAttribute("content");
+    expect(robotsTag ?? "").not.toContain("noindex");
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
+    expect(canonical).toContain("/s/riverbank");
+
+    const jsonLd = await page.locator('script[type="application/ld+json"]').first().textContent();
+    const events = JSON.parse(jsonLd ?? "[]");
+    expect(Array.isArray(events)).toBe(true);
+    expect(events[0]).toMatchObject({ "@type": "Event" });
+    expect(events[0].name).toBeTruthy();
+    expect(events[0].startDate).toBeTruthy();
+    expect(events[0].location).toBeTruthy();
+
+    await expect(page.locator("img").first()).toHaveAttribute("alt", /Riverbank Movement/);
+    await expect(page.getByRole("link", { name: /Sign in to book a class/i })).toBeVisible();
+  });
+
+  test("an unknown studio slug 404s", async ({ page }) => {
+    const response = await page.goto("/s/no-such-studio");
+    expect(response?.status()).toBe(404);
+  });
+
+  test("/sitemap.xml lists the public studio page", async ({ request }) => {
+    const response = await request.get("/sitemap.xml");
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("/s/riverbank");
+  });
+
+  test("/robots.txt allows crawling and references the sitemap", async ({ request }) => {
+    const response = await request.get("/robots.txt");
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).toMatch(/Allow: \//);
+    expect(body).toContain("Sitemap:");
+    expect(body).toContain("/sitemap.xml");
+  });
 });
 
 // Authenticated smoke: session comes from the `setup` project's storageState; a

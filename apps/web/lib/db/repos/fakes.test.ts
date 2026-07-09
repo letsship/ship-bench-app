@@ -91,4 +91,18 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("finds a studio by its public slug", async () => {
+    const studio = await repos.studios.getBySlug("riverbank");
+    expect(studio?.name).toBe("Riverbank Movement");
+  });
+
+  it("returns null for a slug that matches no studio", async () => {
+    expect(await repos.studios.getBySlug("no-such-studio")).toBeNull();
+  });
+
+  it("lists all studios", async () => {
+    const all = await repos.studios.listAll();
+    expect(all.map((studio) => studio.slug)).toContain("riverbank");
+  });
 });

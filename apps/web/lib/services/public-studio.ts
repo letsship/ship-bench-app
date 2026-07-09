@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { resolveRepositories } from "@/lib/db/repos";
 import type { Studio } from "@/lib/db/types";
 import { listSessions } from "@/lib/services/classes";
@@ -33,8 +34,10 @@ export function publicStudioUrl(slug: string): string {
 }
 
 // Resolve a studio by its public slug plus its upcoming classes, or null when no
-// studio owns that slug (the page turns null into a 404).
-export async function resolvePublicStudio(slug: string): Promise<PublicStudio | null> {
+// studio owns that slug (the page turns null into a 404). Wrapped in React's
+// cache() so the page's generateMetadata and its default export — which both
+// need this — share one fetch per request instead of hitting the database twice.
+export const resolvePublicStudio = cache(async (slug: string): Promise<PublicStudio | null> => {
   const repos = await resolveRepositories();
   const studio = await repos.studios.getBySlug(slug);
   if (!studio) return null;
@@ -47,7 +50,7 @@ export async function resolvePublicStudio(slug: string): Promise<PublicStudio | 
     endsAt: session.endsAt,
   }));
   return { studio, classes };
-}
+});
 
 // Every studio that has a public page — the set the sitemap enumerates.
 export async function listPublicStudios(): Promise<Studio[]> {
