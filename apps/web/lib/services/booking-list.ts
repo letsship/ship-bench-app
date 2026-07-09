@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,19 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Same join as listBookingRows, but with an inclusive `to` bound for the
+// accounting export ("everything between 1 June and 30 June" must include a
+// booking whose session starts exactly at `to`). The repo-level SessionRange
+// treats `to` as exclusive (calendar month views rely on that), so we only
+// push `from` down to the repo and filter `to` here.
+export async function listBookingExportRows(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId, { from: range.from });
+  if (range.to === undefined) return rows;
+  return rows.filter((row) => row.startsAt <= range.to!);
 }

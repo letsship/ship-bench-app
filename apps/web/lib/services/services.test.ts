@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingExportRows, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,63 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("listBookingExportRows", () => {
+  it("populates email and is inclusive of both the from and to boundary", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("before", { startsAt: "2026-05-31T23:59:59.000Z" }),
+          session("at-from", { startsAt: "2026-06-01T00:00:00.000Z" }),
+          session("middle", { startsAt: "2026-06-15T09:00:00.000Z" }),
+          session("at-to", { startsAt: "2026-06-30T23:59:59.000Z" }),
+          session("after", { startsAt: "2026-07-01T00:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b-before", "m1", { sessionId: "before" }),
+          booking("b-at-from", "m1", { sessionId: "at-from" }),
+          booking("b-middle", "m1", { sessionId: "middle" }),
+          booking("b-at-to", "m1", { sessionId: "at-to" }),
+          booking("b-after", "m1", { sessionId: "after" }),
+        ],
+      }),
+    );
+
+    const rows = await listBookingExportRows(repos, "s1", {
+      from: "2026-06-01T00:00:00.000Z",
+      to: "2026-06-30T23:59:59.000Z",
+    });
+
+    expect(rows.map((row) => row.id).sort()).toEqual(["b-at-from", "b-at-to", "b-middle"].sort());
+    expect(rows[0].email).toBe("m1@e.co");
+  });
+
+  it("leaves a side unbounded when its query param is omitted", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("early", { startsAt: "2020-01-01T00:00:00.000Z" }),
+          session("late", { startsAt: "2099-01-01T00:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b-early", "m1", { sessionId: "early" }),
+          booking("b-late", "m1", { sessionId: "late" }),
+        ],
+      }),
+    );
+
+    const onlyTo = await listBookingExportRows(repos, "s1", { to: "2026-01-01T00:00:00.000Z" });
+    expect(onlyTo.map((row) => row.id)).toEqual(["b-early"]);
+
+    const onlyFrom = await listBookingExportRows(repos, "s1", {
+      from: "2026-01-01T00:00:00.000Z",
+    });
+    expect(onlyFrom.map((row) => row.id)).toEqual(["b-late"]);
   });
 });
