@@ -42,3 +42,42 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  e2e:
+    name: e2e (Playwright user journeys)
+    # Same dedicated Ubicloud runner as `verify`. The benchmark gates ci_passed
+    # on this workflow's check_suite, so `verify` AND `e2e` must both be green
+    # for a PR to advance — a proper production-style quality gate, not just unit
+    # tests. Runs the app via `next start` in fake-backends mode (seeded
+    # in-memory repositories + fake email), so it needs no Supabase/Resend.
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm --filter @studiobook/web exec playwright install --with-deps chromium
+
+      - name: E2E user journeys (fake backends)
+        run: pnpm --filter @studiobook/web e2e
+
+      - name: Upload Playwright report + traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1,11 +1,5 @@
-import { type Page, expect, test } from "@playwright/test";
-
-async function signIn(page: Page): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("operator@riverbank.studio");
-  await page.getByRole("button", { name: "Send magic link" }).click();
-  await page.waitForURL("**/dashboard");
-}
+import { expect, test } from "@playwright/test";
+import { signIn } from "./support/auth";
 
 test("landing page renders the Studiobook marketing hero", async ({ page }) => {
   await page.goto("/");
