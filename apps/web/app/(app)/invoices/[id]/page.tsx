@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HttpError } from "@/lib/http";
-import { type InvoiceStatus, canTransitionInvoice, computeInvoiceTotals } from "@/lib/domain/invoices";
+import {
+  type InvoiceStatus,
+  canTransitionInvoice,
+  computeInvoiceTotals,
+} from "@/lib/domain/invoices";
 import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getInvoiceDetail } from "@/lib/services/invoices";
@@ -12,11 +16,7 @@ export const dynamic = "force-dynamic";
 
 const ALL_STATUSES: InvoiceStatus[] = ["draft", "open", "paid", "void", "refunded"];
 
-export default async function InvoiceDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { repos, ctx } = await resolveStudio();
   const { id } = await params;
 
@@ -83,25 +83,33 @@ export default async function InvoiceDetailPage({
             </tr>
           </thead>
           <tbody>
-            {lineItems.map((line) => (
-              <tr key={line.id}>
-                <td>
-                  {line.description}
-                  {line.refunded ? (
-                    <span className="ml-2">
-                      <StatusBadge status="refunded" />
-                    </span>
-                  ) : null}
-                </td>
-                <td className="text-right">{line.quantity}</td>
-                <td className="text-right">
-                  <Money cents={line.unitAmountCents} currency={currency} />
-                </td>
-                <td className="text-right">
-                  <Money cents={line.amountCents} currency={currency} />
+            {lineItems.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-center text-[var(--color-muted)]">
+                  No line items on this invoice.
                 </td>
               </tr>
-            ))}
+            ) : (
+              lineItems.map((line) => (
+                <tr key={line.id}>
+                  <td>
+                    {line.description}
+                    {line.refunded ? (
+                      <span className="ml-2">
+                        <StatusBadge status="refunded" />
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="text-right">{line.quantity}</td>
+                  <td className="text-right">
+                    <Money cents={line.unitAmountCents} currency={currency} />
+                  </td>
+                  <td className="text-right">
+                    <Money cents={line.amountCents} currency={currency} />
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
