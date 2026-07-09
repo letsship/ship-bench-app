@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { resolveRepositories } from "@/lib/db/repos";
 import { formatDateTime } from "@/lib/format";
 import { publicBaseUrl, publicStudioUrl, resolvePublicStudio } from "@/lib/services/public-studio";
@@ -12,14 +13,22 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+// generateMetadata() and the page body each need the same studio + upcoming
+// classes; react's cache() dedupes that lookup to one repo resolution and one
+// DB round-trip per request instead of two, since this isn't the global
+// fetch() that Next already memoizes.
+const getPublicStudio = cache(async (slug: string) => {
+  const repos = await resolveRepositories();
+  return resolvePublicStudio(repos, slug);
+});
+
 // Studio-specific title/description/canonical/social tags so each studio's
 // page can actually rank and preview well when shared, instead of every
 // studio sharing one generic "Studio" title. A miss just falls through to
 // notFound() in the page body below, so metadata here can stay minimal.
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const repos = await resolveRepositories();
-  const data = await resolvePublicStudio(repos, slug);
+  const data = await getPublicStudio(slug);
   if (!data) return { title: "Studio not found" };
 
   const { studio } = data;
@@ -50,8 +59,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PublicStudioPage({ params }: PageProps) {
   const { slug } = await params;
-  const repos = await resolveRepositories();
-  const data = await resolvePublicStudio(repos, slug);
+  const data = await getPublicStudio(slug);
   if (!data) notFound();
 
   const { studio, classes } = data;

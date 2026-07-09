@@ -32,6 +32,18 @@ test.describe("unauthenticated", () => {
     await expect(page).toHaveURL(/\/s\/riverbank$/);
     await expect(page.getByRole("heading", { name: "Riverbank Movement" })).toBeVisible();
     await expect(page.getByText("Upcoming classes")).toBeVisible();
+
+    const jsonLd = await page.locator("script[type='application/ld+json']").textContent();
+    const events = JSON.parse(jsonLd ?? "[]");
+    expect(Array.isArray(events)).toBe(true);
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) {
+      expect(event["@type"]).toBe("Event");
+      expect(typeof event.name).toBe("string");
+      expect(event.name.length).toBeGreaterThan(0);
+      expect(typeof event.startDate).toBe("string");
+      expect(event.location?.name).toBe("Riverbank Movement");
+    }
   });
 
   test("an unknown studio slug 404s", async ({ page }) => {
