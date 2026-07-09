@@ -95,6 +95,16 @@ export interface InvoiceLineItem {
   bookingId: string | null;
 }
 
+export interface ClassPackage {
+  id: string;
+  memberId: string;
+  creditsTotal: number;
+  creditsRemaining: number;
+  priceCents: number;
+  status: string;
+  purchasedAt: string;
+}
+
 export interface NotificationOutboxRow {
   id: string;
   memberId: string;

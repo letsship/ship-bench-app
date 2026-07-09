@@ -91,4 +91,64 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("classPackages lists by member newest first", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+    await repos.classPackages.insert({
+      id: "pkg_old",
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await repos.classPackages.insert({
+      id: "pkg_new",
+      memberId,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10_000,
+      status: "active",
+      purchasedAt: "2026-02-01T00:00:00.000Z",
+    });
+    const list = await repos.classPackages.listByMember(memberId);
+    expect(list.map((row) => row.id)).toEqual(["pkg_new", "pkg_old"]);
+  });
+
+  it("classPackages inserts then reads back by id", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const pack = {
+      id: "pkg_new2",
+      memberId: members[0].id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+    };
+    await repos.classPackages.insert(pack);
+    expect(await repos.classPackages.getById("pkg_new2")).toEqual(pack);
+  });
+
+  it("classPackages update returns an isolated clone (store not mutated by reference)", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    await repos.classPackages.insert({
+      id: "pkg_new3",
+      memberId: members[0].id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+    });
+    const updated = await repos.classPackages.update("pkg_new3", {
+      creditsRemaining: 0,
+      status: "refunded",
+    });
+    updated.status = "active"; // mutate the returned object
+    const refetched = await repos.classPackages.getById("pkg_new3");
+    expect(refetched?.status).toBe("refunded");
+  });
 });
