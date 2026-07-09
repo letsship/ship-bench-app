@@ -7,3 +7,6 @@ onlyBuiltDependencies:
   - sharp
   - supabase
   - workerd
+
+overrides:
+  semver: ^7.5.2
