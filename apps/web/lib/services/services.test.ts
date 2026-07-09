@@ -2,8 +2,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type {
+  Booking,
+  ClassSession,
+  ClassType,
+  Invoice,
+  InvoiceLineItem,
+  Member,
+} from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { getMemberStatement } from "./account-statements";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -94,6 +102,40 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   ...over,
 });
 
+const invoice = (id: string, memberId: string, over: Partial<Invoice> = {}): Invoice => ({
+  id,
+  studioId: "s1",
+  memberId,
+  number: `INV-${id}`,
+  status: "open",
+  currency: "EUR",
+  taxRateBps: 900,
+  subtotalCents: 0,
+  taxCents: 0,
+  totalCents: 0,
+  issuedAt: ISO,
+  dueAt: null,
+  paidAt: null,
+  createdAt: ISO,
+  ...over,
+});
+
+const lineItem = (
+  id: string,
+  invoiceId: string,
+  over: Partial<InvoiceLineItem> = {},
+): InvoiceLineItem => ({
+  id,
+  invoiceId,
+  description: "Item",
+  quantity: 1,
+  unitAmountCents: 1000,
+  amountCents: 1000,
+  refunded: false,
+  bookingId: null,
+  ...over,
+});
+
 describe("members service", () => {
   let repos: Repositories;
   let studioId: string;
@@ -160,7 +202,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +245,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +336,98 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("account statements service", () => {
+  it("excludes a refunded line from the taxable subtotal, matching computeInvoiceTotals", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [
+          invoice("inv1", "m1", { subtotalCents: 10_000, taxCents: 900, totalCents: 10_900 }),
+        ],
+        lineItems: [
+          lineItem("li1", "inv1", {
+            description: "Billable",
+            quantity: 1,
+            unitAmountCents: 10_000,
+            amountCents: 10_000,
+          }),
+          lineItem("li2", "inv1", {
+            description: "Refunded",
+            quantity: 1,
+            unitAmountCents: 5_000,
+            amountCents: 5_000,
+            refunded: true,
+          }),
+        ],
+      }),
+    );
+    const statement = await getMemberStatement(repos, "s1", "m1");
+    expect(statement.lines).toHaveLength(1);
+    expect(statement.lines[0].totalCents).toBe(10_900);
+    expect(statement.lines[0].totalCents).not.toBe(16_350);
+    const stored = await repos.invoices.getById("inv1");
+    expect(statement.lines[0].totalCents).toBe(stored?.totalCents);
+    expect(statement.balanceCents).toBe(10_900);
+  });
+
+  it("matches the simple subtotal + tax sum when no line is refunded", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [
+          invoice("inv1", "m1", { subtotalCents: 2_000, taxCents: 180, totalCents: 2_180 }),
+        ],
+        lineItems: [
+          lineItem("li1", "inv1", {
+            description: "Pass",
+            quantity: 2,
+            unitAmountCents: 1_000,
+            amountCents: 2_000,
+          }),
+        ],
+      }),
+    );
+    const statement = await getMemberStatement(repos, "s1", "m1");
+    expect(statement.lines[0].totalCents).toBe(2_180);
+  });
+
+  it("aggregates totals across a member's multiple invoices", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [
+          invoice("inv1", "m1", { subtotalCents: 10_000, taxCents: 900, totalCents: 10_900 }),
+          invoice("inv2", "m1", { subtotalCents: 2_000, taxCents: 180, totalCents: 2_180 }),
+        ],
+        lineItems: [
+          lineItem("li1", "inv1", {
+            description: "Billable",
+            quantity: 1,
+            unitAmountCents: 10_000,
+            amountCents: 10_000,
+          }),
+          lineItem("li2", "inv1", {
+            description: "Refunded",
+            quantity: 1,
+            unitAmountCents: 5_000,
+            amountCents: 5_000,
+            refunded: true,
+          }),
+          lineItem("li3", "inv2", {
+            description: "Pass",
+            quantity: 2,
+            unitAmountCents: 1_000,
+            amountCents: 2_000,
+          }),
+        ],
+      }),
+    );
+    const statement = await getMemberStatement(repos, "s1", "m1");
+    expect(statement.lines).toHaveLength(2);
+    expect(statement.balanceCents).toBe(13_080);
   });
 });
 
