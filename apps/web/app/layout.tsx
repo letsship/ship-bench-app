@@ -5,6 +5,10 @@ import "./global.css";
 export const metadata: Metadata = {
   title: "Studiobook — studio class booking",
   description: "Bookings, members, and invoicing for movement studios.",
+  icons: {
+    icon: "/favicon.ico",
+  },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

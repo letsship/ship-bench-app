@@ -17,6 +17,19 @@ test.describe("unauthenticated", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test("public pages link a favicon and web app manifest", async ({ page, request }) => {
+    await page.goto("/");
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.ico");
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.json");
+
+    await page.goto("/login");
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.ico");
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.json");
+
+    expect((await request.get("/favicon.ico")).status()).toBe(200);
+    expect((await request.get("/manifest.json")).status()).toBe(200);
+  });
+
   test("the login stub signs the operator in and lands on the dashboard", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("Email").fill("operator@riverbank.studio");
