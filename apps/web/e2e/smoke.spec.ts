@@ -43,6 +43,28 @@ test("an operator can schedule a new class from the UI", async ({ page }) => {
   await expect(page.getByTestId("schedule").getByText("E2E Tester").first()).toBeVisible();
 });
 
+test("the public studio page renders classes without signing in", async ({ page }) => {
+  await page.goto("/s/riverbank");
+  await expect(page.getByRole("heading", { name: "Riverbank Movement" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Upcoming classes" })).toBeVisible();
+  await expect(page.locator("script[type='application/ld+json']")).toHaveCount(1);
+});
+
+test("an unknown studio slug 404s", async ({ page }) => {
+  const response = await page.goto("/s/does-not-exist");
+  expect(response?.status()).toBe(404);
+});
+
+test("the sitemap and robots endpoints are served", async ({ request }) => {
+  const sitemap = await request.get("/sitemap.xml");
+  expect(sitemap.ok()).toBe(true);
+  expect(await sitemap.text()).toContain("/s/riverbank");
+
+  const robots = await request.get("/robots.txt");
+  expect(robots.ok()).toBe(true);
+  expect(await robots.text()).toContain("Sitemap:");
+});
+
 test("the dashboard renders with zero console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
