@@ -14,8 +14,8 @@ export async function DELETE(
 ): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { repos } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const { id } = await params;
-    return ok(await cancelBooking(repos, createNotificationProvider(), id));
+    return ok(await cancelBooking(repos, createNotificationProvider(), id, ctx.studio.id));
   });
 }
