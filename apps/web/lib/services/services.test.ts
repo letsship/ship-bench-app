@@ -3,6 +3,7 @@ import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes"
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -160,7 +161,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +204,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +295,58 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("reads the detail of an invoice whose only line item is refunded without throwing", async () => {
+    // Reproduces the production report: a fully-refunded invoice (like the
+    // seeded "Pottery intensive" invoice for Femke) must resolve cleanly,
+    // both from the repo and from computeInvoiceTotals() as used by the
+    // detail page, instead of throwing on an empty billable reduce.
+    const refundedInvoice = {
+      id: "inv-refunded-1",
+      studioId,
+      memberId,
+      number: "INV-2026-9001",
+      status: "refunded",
+      currency: "EUR",
+      taxRateBps: 900,
+      subtotalCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+      issuedAt: ISO,
+      dueAt: null,
+      paidAt: null,
+      createdAt: ISO,
+    };
+    await repos.invoices.insert(refundedInvoice);
+    await repos.invoiceLineItems.insertMany([
+      {
+        id: "li-refunded-1",
+        invoiceId: refundedInvoice.id,
+        description: "Pottery intensive",
+        quantity: 1,
+        unitAmountCents: 9000,
+        amountCents: 9000,
+        refunded: true,
+        bookingId: null,
+      },
+    ]);
+
+    const detail = await getInvoiceDetail(repos, refundedInvoice.id);
+    expect(detail.invoice.subtotalCents).toBe(0);
+    expect(detail.invoice.taxCents).toBe(0);
+    expect(detail.invoice.totalCents).toBe(0);
+    expect(detail.lineItems).toEqual([
+      expect.objectContaining({ description: "Pottery intensive", refunded: true }),
+    ]);
+
+    const totals = computeInvoiceTotals(detail.lineItems, detail.invoice.taxRateBps);
+    expect(totals).toEqual({
+      subtotalCents: 0,
+      refundedCents: 9000,
+      taxCents: 0,
+      totalCents: 0,
+    });
   });
 });
 
