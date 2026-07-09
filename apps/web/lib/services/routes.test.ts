@@ -87,6 +87,37 @@ describe("GET route handlers (against injected fake repositories)", () => {
     expect(rows).toEqual(["Starts,Class,Member,Email,Status"]);
   });
 
+  it("GET /api/export?type=bookings includes a session starting exactly at `from`/`to` when both use a `+00:00` offset", async () => {
+    const boundary = encodeURIComponent("2026-03-15T08:00:00+00:00");
+    const res = await exportGet(
+      new NextRequest(`http://localhost/api/export?type=bookings&from=${boundary}&to=${boundary}`),
+    );
+    expect(res.status).toBe(200);
+    const [, ...rows] = (await res.text()).split("\r\n").filter(Boolean);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.startsWith("2026-03-15T08:00:00.000Z")).toBe(true);
+    }
+  });
+
+  it("GET /api/export?type=bookings excludes bookings outside the range when `to` uses a `+00:00` offset in the past", async () => {
+    const res = await exportGet(
+      new NextRequest(
+        `http://localhost/api/export?type=bookings&to=${encodeURIComponent("2020-01-01T00:00:00+00:00")}`,
+      ),
+    );
+    expect(res.status).toBe(200);
+    const rows = (await res.text()).split("\r\n").filter(Boolean);
+    expect(rows).toEqual(["Starts,Class,Member,Email,Status"]);
+  });
+
+  it("GET /api/export?type=bookings rejects an unparseable `to` with 400 instead of returning everything", async () => {
+    const res = await exportGet(
+      new NextRequest("http://localhost/api/export?type=bookings&to=not-a-date"),
+    );
+    expect(res.status).toBe(400);
+  });
+
   it("GET /api/export rejects an unknown type with 400", async () => {
     const res = await exportGet(new NextRequest("http://localhost/api/export?type=bogus"));
     expect(res.status).toBe(400);
