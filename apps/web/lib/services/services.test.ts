@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { newId } from "@/lib/db/ids";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -160,7 +161,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +204,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +295,67 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("reads the seeded fully-refunded invoice without throwing and with zero totals", async () => {
+    const list = await listInvoices(repos, studioId);
+    const refunded = list.find((invoice) => invoice.memberName === "Femke Jansen");
+    expect(refunded).toBeDefined();
+    const detail = await getInvoiceDetail(repos, refunded!.id);
+    expect(detail.invoice.subtotalCents).toBe(0);
+    expect(detail.invoice.taxCents).toBe(0);
+    expect(detail.invoice.totalCents).toBe(0);
+    expect(detail.lineItems.every((line) => line.refunded)).toBe(true);
+  });
+
+  it("keeps excluding a refunded line from subtotal/tax in the detail response for a mixed invoice", async () => {
+    // No service-level "refund a line item" mutation exists yet, so build the
+    // mixed invoice directly through the repo layer the same way a refund
+    // mutation eventually would: one billable line, one already-refunded line.
+    const invoiceId = newId();
+    const invoice = await repos.invoices.insert({
+      id: invoiceId,
+      studioId,
+      memberId,
+      number: "INV-TEST-MIXED",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: 900,
+      subtotalCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+      issuedAt: ISO,
+      dueAt: null,
+      paidAt: null,
+      createdAt: ISO,
+    });
+    await repos.invoiceLineItems.insertMany([
+      {
+        id: newId(),
+        invoiceId: invoice.id,
+        description: "Pass",
+        quantity: 1,
+        unitAmountCents: 1000,
+        amountCents: 1000,
+        refunded: false,
+        bookingId: null,
+      },
+      {
+        id: newId(),
+        invoiceId: invoice.id,
+        description: "Late fee",
+        quantity: 1,
+        unitAmountCents: 500,
+        amountCents: 500,
+        refunded: true,
+        bookingId: null,
+      },
+    ]);
+
+    const detail = await getInvoiceDetail(repos, invoice.id);
+    expect(detail.invoice.subtotalCents).toBe(1000);
+    expect(detail.invoice.taxCents).toBe(90);
+    expect(detail.invoice.totalCents).toBe(1090);
   });
 });
 
