@@ -33,3 +33,11 @@ export async function resolveRepositories(): Promise<Repositories> {
   const { createSupabaseRepositories } = await import("./supabase");
   return createSupabaseRepositories();
 }
+
+// Test-only: re-seed the in-memory store to a clean, known dataset so e2e specs
+// can isolate per test (via the /api/test-reset endpoint). No-op unless fake
+// backends are enabled — the real Supabase path is never touched.
+export function resetFakeBackends(): void {
+  if (!fakeBackendsEnabled()) return;
+  globalForFakes.__studiobookFakeRepos = createInMemoryRepositories(buildSeed());
+}

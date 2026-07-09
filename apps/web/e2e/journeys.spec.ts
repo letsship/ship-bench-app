@@ -1,13 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { AUTHED_PATHS, signIn } from "./support/auth";
+import { AUTHED_PATHS, resetBackend } from "./support/auth";
 
 // Core operator journeys exercised end-to-end against a production `next start`
 // server in fake-backends mode. These are happy-path regression checks over the
 // features the app already ships (booking, invoicing, roster, reporting,
 // navigation) — deterministic against the seeded in-memory dataset, no network.
 test.describe("operator journeys (fake backends)", () => {
-  test.beforeEach(async ({ page }) => {
-    await signIn(page);
+  // Auth comes from the `setup` project's storageState; re-seed per test so the
+  // mutating booking journey stays isolated and retry-safe.
+  test.beforeEach(async ({ request }) => {
+    await resetBackend(request);
   });
 
   test("books a member into a class and sees them on the bookings list", async ({ page }) => {
