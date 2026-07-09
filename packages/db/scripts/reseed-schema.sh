@@ -37,4 +37,20 @@ GRANT USAGE ON SCHEMA $SCHEMA TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA $SCHEMA TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA $SCHEMA TO anon, authenticated, service_role;
 "
+
+# Fail loudly (rather than deploying a schema silently missing a constraint)
+# if any migration-defined index didn't actually land — e.g. the one-active-
+# booking-per-member-session guard the bookings service depends on to reject
+# concurrent double-submits.
+MISSING="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtA -c "
+select string_agg(expected.indexname, ', ')
+from (values ('bookings_one_active_per_member_session')) as expected(indexname)
+left join pg_indexes on pg_indexes.schemaname = '$SCHEMA' and pg_indexes.indexname = expected.indexname
+where pg_indexes.indexname is null;
+")"
+if [ -n "$MISSING" ]; then
+  echo "schema $SCHEMA reseeded but missing expected index(es): $MISSING" >&2
+  exit 1
+fi
+
 echo "schema $SCHEMA reseeded"
