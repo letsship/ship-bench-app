@@ -5,16 +5,23 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 // export. Sessions are fetched unbounded and filtered here with an inclusive
 // [from, to] comparison, since the shared `SessionRange` repo filter used by
 // /api/bookings is exclusive on `to` and would drop a session starting
-// exactly at the requested end of the range.
+// exactly at the requested end of the range. Bounds are compared as parsed
+// timestamps (not raw strings) because `from`/`to` arrive as query params and
+// may use a different ISO-8601 representation (e.g. `+00:00` offset) than the
+// stored `startsAt` (e.g. `.000Z`) — lexicographic string comparison would
+// misorder those even when they denote the same instant.
 export async function listBookingsForExport(
   repos: Repositories,
   studioId: string,
   range: SessionRange = {},
 ): Promise<BookingExportRow[]> {
+  const fromMs = range.from ? new Date(range.from).getTime() : undefined;
+  const toMs = range.to ? new Date(range.to).getTime() : undefined;
   const sessions = await repos.classSessions.listByStudio(studioId);
   const inRange = sessions.filter((session) => {
-    if (range.from && session.startsAt < range.from) return false;
-    if (range.to && session.startsAt > range.to) return false;
+    const startMs = new Date(session.startsAt).getTime();
+    if (fromMs !== undefined && startMs < fromMs) return false;
+    if (toMs !== undefined && startMs > toMs) return false;
     return true;
   });
   const sessionById = new Map(inRange.map((session) => [session.id, session]));

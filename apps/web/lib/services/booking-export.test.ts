@@ -137,6 +137,21 @@ describe("listBookingsForExport", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("includes a session starting exactly at range.to when `to` uses a different ISO-8601 offset notation", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { startsAt: "2026-06-30T23:59:59.000Z" })],
+        members: [member("m1")],
+        bookings: [booking("b1", "cs1", "m1")],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1", {
+      to: "2026-06-30T23:59:59+00:00",
+    });
+    expect(rows).toHaveLength(1);
+  });
+
   it("is unbounded on a side when that bound is omitted", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
