@@ -25,6 +25,30 @@ test.describe("unauthenticated", () => {
     await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
     await expect(page.getByText("operator@riverbank.studio")).toBeVisible();
   });
+
+  for (const path of ["/", "/login"]) {
+    test(`images on ${path} have proper alt text`, async ({ page }) => {
+      await page.goto(path);
+      const images = page.locator("img");
+      const count = await images.count();
+
+      for (let i = 0; i < count; i++) {
+        const image = images.nth(i);
+        const alt = await image.getAttribute("alt");
+        expect(alt, `img[${i}] on ${path} is missing an alt attribute`).not.toBeNull();
+
+        const isDecorative =
+          (await image.getAttribute("aria-hidden")) === "true" ||
+          (await image.getAttribute("role")) === "presentation";
+
+        if (isDecorative) {
+          expect(alt).toBe("");
+        } else {
+          expect(alt).not.toBe("");
+        }
+      }
+    });
+  }
 });
 
 // Authenticated smoke: session comes from the `setup` project's storageState; a
