@@ -23,6 +23,17 @@ export interface SessionRange {
   to?: string;
 }
 
+// Thrown by `BookingsRepo.insert` when the insert would create a second
+// active (booked/waitlisted/attended) booking for the same member+session —
+// the write-time counterpart to the `idx_bookings_one_active_per_member_session`
+// partial unique index, surfaced identically by both repo implementations.
+export class DuplicateActiveBookingError extends Error {
+  constructor(sessionId: string, memberId: string) {
+    super(`Member ${memberId} already has an active booking for session ${sessionId}`);
+    this.name = "DuplicateActiveBookingError";
+  }
+}
+
 export interface StudioRepo {
   getFirst(): Promise<Studio | null>;
 }
