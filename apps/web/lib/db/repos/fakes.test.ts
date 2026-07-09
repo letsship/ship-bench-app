@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -90,5 +92,40 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  it("rejects inserting a second active booking for the same member + session", async () => {
+    const bookingRow = (status: Booking["status"], id: string): Booking => ({
+      id,
+      sessionId: "cs1",
+      memberId: "mem1",
+      status,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    await repos.bookings.insert(bookingRow("booked", "b_first"));
+    await expect(
+      repos.bookings.insert(bookingRow("waitlisted", "b_second")),
+    ).rejects.toBeInstanceOf(DuplicateActiveBookingError);
+
+    const empty = createInMemoryRepositories();
+    await empty.bookings.insert(bookingRow("waitlisted", "b_wait_first"));
+    await expect(
+      empty.bookings.insert(bookingRow("waitlisted", "b_wait_second")),
+    ).rejects.toBeInstanceOf(DuplicateActiveBookingError);
+  });
+
+  it("allows a new booking for a member whose prior booking on that session was cancelled", async () => {
+    const bookingRow = (status: Booking["status"], id: string): Booking => ({
+      id,
+      sessionId: "cs1",
+      memberId: "mem1",
+      status,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: status === "cancelled" ? NOW.toISOString() : null,
+    });
+    await repos.bookings.insert(bookingRow("cancelled", "b_cancelled"));
+    const rebooked = await repos.bookings.insert(bookingRow("booked", "b_rebooked"));
+    expect(rebooked.status).toBe("booked");
   });
 });

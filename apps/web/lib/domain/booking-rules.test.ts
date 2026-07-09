@@ -56,6 +56,13 @@ describe("canBook", () => {
     });
   });
 
+  it("allows rebooking when the member's only prior row for the session is cancelled", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "cancelled" }] }))).toEqual({
+      ok: true,
+      status: "booked",
+    });
+  });
+
   it("rejects when full and the waitlist is closed", () => {
     const occupancy = computeOccupancy(1, [{ status: "booked" }]);
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
