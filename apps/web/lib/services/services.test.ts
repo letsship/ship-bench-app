@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,31 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("issues a bounded number of repository reads regardless of booking count", async () => {
+    const members = Array.from({ length: 50 }, (_, i) => member(`bm${i}`));
+    const sessions = Array.from({ length: 50 }, (_, i) =>
+      session(`bcs${i}`, { startsAt: new Date(NOW.getTime() + (i + 1) * 3_600_000).toISOString() }),
+    );
+    const bookings = Array.from({ length: 200 }, (_, i) =>
+      booking(`bb${i}`, `bm${i % 50}`, { sessionId: `bcs${i % 50}` }),
+    );
+    const bulkRepos = createInMemoryRepositories(
+      baseSeed({ classTypes: [classType("ct1")], sessions, members, bookings }),
+    );
+
+    const membersSpy = vi.spyOn(bulkRepos.members, "listByStudio");
+    const classTypesSpy = vi.spyOn(bulkRepos.classTypes, "listByStudio");
+    const classSessionsSpy = vi.spyOn(bulkRepos.classSessions, "listByStudio");
+    const bookingsSpy = vi.spyOn(bulkRepos.bookings, "listBySessionIds");
+
+    const rows = await listBookingRows(bulkRepos, "s1");
+
+    expect(rows).toHaveLength(200);
+    expect(membersSpy).toHaveBeenCalledTimes(1);
+    expect(classTypesSpy).toHaveBeenCalledTimes(1);
+    expect(classSessionsSpy).toHaveBeenCalledTimes(1);
+    expect(bookingsSpy).toHaveBeenCalledTimes(1);
   });
 });
