@@ -193,6 +193,7 @@ describe("bookings service", () => {
       memberId: "m1",
     });
     expect(result.status).toBe("booked");
+    expect(posthog.flagLookups).toHaveLength(0);
     expect(posthog.captured).toHaveLength(0);
   });
 
