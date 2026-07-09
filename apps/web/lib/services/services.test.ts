@@ -10,6 +10,7 @@ import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
+import { listPublicStudios, resolvePublicStudio } from "./public-studio";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
 
@@ -19,6 +20,8 @@ const NOW = new Date();
 const ISO = NOW.toISOString();
 const FUTURE = new Date(NOW.getTime() + 7 * 86_400_000).toISOString();
 const FUTURE_END = new Date(NOW.getTime() + 7 * 86_400_000 + 3_600_000).toISOString();
+const PAST = new Date(NOW.getTime() - 7 * 86_400_000).toISOString();
+const PAST_END = new Date(NOW.getTime() - 7 * 86_400_000 + 3_600_000).toISOString();
 const SOON = new Date(NOW.getTime() + 2 * 3_600_000).toISOString();
 const SOON_END = new Date(NOW.getTime() + 3 * 3_600_000).toISOString();
 
@@ -160,7 +163,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +206,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +326,36 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("public studio page service", () => {
+  it("resolves a known slug to the studio and only its upcoming classes", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("past", { startsAt: PAST, endsAt: PAST_END }),
+          session("upcoming", { startsAt: FUTURE, endsAt: FUTURE_END, instructor: "Priya" }),
+        ],
+      }),
+    );
+
+    const result = await resolvePublicStudio(repos, "s");
+
+    expect(result?.studio.slug).toBe("s");
+    expect(result?.classes).toHaveLength(1);
+    expect(result?.classes[0]).toMatchObject({ instructor: "Priya", startsAt: FUTURE });
+  });
+
+  it("returns null for a slug that matches no studio", async () => {
+    const repos = createInMemoryRepositories(baseSeed());
+    expect(await resolvePublicStudio(repos, "does-not-exist")).toBeNull();
+  });
+
+  it("lists every studio for the sitemap", async () => {
+    const repos = createInMemoryRepositories(baseSeed());
+    const studios = await listPublicStudios(repos);
+    expect(studios.map((studio) => studio.slug)).toEqual(["s"]);
   });
 });

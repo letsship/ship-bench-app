@@ -25,6 +25,19 @@ test.describe("unauthenticated", () => {
     await expect(page.getByRole("heading", { name: "Today at the studio" })).toBeVisible();
     await expect(page.getByText("operator@riverbank.studio")).toBeVisible();
   });
+
+  test("the public studio page renders without requiring sign-in", async ({ page }) => {
+    const response = await page.goto("/s/riverbank");
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveURL(/\/s\/riverbank$/);
+    await expect(page.getByText("Riverbank Movement")).toBeVisible();
+    await expect(page.getByText("Upcoming classes")).toBeVisible();
+  });
+
+  test("an unknown studio slug 404s", async ({ page }) => {
+    const response = await page.goto("/s/does-not-exist");
+    expect(response?.status()).toBe(404);
+  });
 });
 
 // Authenticated smoke: session comes from the `setup` project's storageState; a

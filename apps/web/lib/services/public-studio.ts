@@ -1,4 +1,4 @@
-import { resolveRepositories } from "@/lib/db/repos";
+import type { Repositories } from "@/lib/db/repos/types";
 import type { Studio } from "@/lib/db/types";
 import { listSessions } from "@/lib/services/classes";
 
@@ -34,8 +34,10 @@ export function publicStudioUrl(slug: string): string {
 
 // Resolve a studio by its public slug plus its upcoming classes, or null when no
 // studio owns that slug (the page turns null into a 404).
-export async function resolvePublicStudio(slug: string): Promise<PublicStudio | null> {
-  const repos = await resolveRepositories();
+export async function resolvePublicStudio(
+  repos: Repositories,
+  slug: string,
+): Promise<PublicStudio | null> {
   const studio = await repos.studios.getBySlug(slug);
   if (!studio) return null;
   const sessions = await listSessions(repos, studio.id, { from: new Date().toISOString() });
@@ -50,7 +52,6 @@ export async function resolvePublicStudio(slug: string): Promise<PublicStudio | 
 }
 
 // Every studio that has a public page — the set the sitemap enumerates.
-export async function listPublicStudios(): Promise<Studio[]> {
-  const repos = await resolveRepositories();
+export async function listPublicStudios(repos: Repositories): Promise<Studio[]> {
   return repos.studios.listAll();
 }
