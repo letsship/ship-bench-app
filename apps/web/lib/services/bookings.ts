@@ -75,13 +75,11 @@ export async function createBooking(
   const sessionBookings = await repos.bookings.listBySession(session.id);
   const occupancy = computeOccupancy(session.capacity, sessionBookings);
 
-  // Only look up the member's experiment group when it can actually change
-  // the outcome — a normal, non-full booking never calls PostHog.
-  const waitlistExperimentGroup =
-    occupancy.isFull && settings.waitlistEnabled
-      ? await resolveWaitlistExperimentGroup(posthog, member.id)
-      : "variant";
-
+  // Evaluate with a placeholder "variant" group first. The experiment group
+  // only changes the outcome once every earlier deny reason (cancelled,
+  // started, inactive member, already booked, no waitlist) has been ruled
+  // out and the decision would otherwise be "waitlisted" — so only in that
+  // case do we pay for a PostHog flag lookup.
   const decision = canBook({
     sessionStatus: session.status,
     sessionStartsAt: session.startsAt,
@@ -89,9 +87,19 @@ export async function createBooking(
     memberBookings: sessionBookings.filter((booking) => booking.memberId === member.id),
     occupancy,
     waitlistEnabled: settings.waitlistEnabled,
-    waitlistExperimentGroup,
+    waitlistExperimentGroup: "variant",
     now: nowIso(),
   });
+  if (decision.ok && decision.status === "waitlisted") {
+    const group = await resolveWaitlistExperimentGroup(posthog, member.id);
+    if (group === "control") {
+      throw new HttpError(
+        409,
+        "booking_session_full_experiment_control",
+        DENY_MESSAGES.session_full_experiment_control,
+      );
+    }
+  }
   if (!decision.ok) {
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
