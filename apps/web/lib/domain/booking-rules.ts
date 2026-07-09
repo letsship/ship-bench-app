@@ -11,12 +11,20 @@ export type BookingDenyReason =
   | "session_started"
   | "member_inactive"
   | "already_booked"
-  | "session_full_no_waitlist";
+  | "session_full_no_waitlist"
+  | "session_full_experiment_control";
 
-export type BookingDecision = { ok: true; status: "booked" | "waitlisted" } | {
-  ok: false;
-  reason: BookingDenyReason;
-};
+export type BookingDecision =
+  | { ok: true; status: "booked" | "waitlisted" }
+  | {
+      ok: false;
+      reason: BookingDenyReason;
+    };
+
+// The booking member's group in the "waitlist_experiment" PostHog experiment
+// (see lib/posthog/experiments.ts). Only consulted when the session is full
+// and the studio's waitlist is enabled.
+export type WaitlistExperimentGroup = "control" | "variant";
 
 export interface BookingContext {
   sessionStatus: string;
@@ -26,6 +34,7 @@ export interface BookingContext {
   memberBookings: readonly { status: string }[];
   occupancy: Occupancy;
   waitlistEnabled: boolean;
+  waitlistExperimentGroup: WaitlistExperimentGroup;
   now: string;
 }
 
@@ -44,6 +53,9 @@ export function canBook(context: BookingContext): BookingDecision {
   }
   if (context.occupancy.isFull) {
     if (!context.waitlistEnabled) return { ok: false, reason: "session_full_no_waitlist" };
+    if (context.waitlistExperimentGroup === "control") {
+      return { ok: false, reason: "session_full_experiment_control" };
+    }
     return { ok: true, status: "waitlisted" };
   }
   return { ok: true, status: "booked" };
@@ -52,8 +64,7 @@ export function canBook(context: BookingContext): BookingDecision {
 export type CancellationDenyReason = "already_cancelled" | "session_passed";
 
 export type CancellationDecision =
-  | { ok: true; refundEligible: boolean }
-  | { ok: false; reason: CancellationDenyReason };
+  { ok: true; refundEligible: boolean } | { ok: false; reason: CancellationDenyReason };
 
 export interface CancellationContext {
   bookingStatus: string;

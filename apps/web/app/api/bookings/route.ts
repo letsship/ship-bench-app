@@ -5,6 +5,7 @@ import { listBookingRows } from "@/lib/services/booking-list";
 import { createBooking } from "@/lib/services/bookings";
 import { resolveStudio } from "@/lib/services/context";
 import { createNotificationProvider } from "@/lib/notifications/provider";
+import { createPostHogClient } from "@/lib/posthog/client";
 import { createBookingSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ export async function POST(request: Request): Promise<Response> {
     await requireSession();
     const { repos } = await resolveStudio();
     const input = createBookingSchema.parse(await request.json());
-    return created(await createBooking(repos, createNotificationProvider(), input));
+    return created(
+      await createBooking(repos, createNotificationProvider(), input, createPostHogClient()),
+    );
   });
 }

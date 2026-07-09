@@ -17,6 +17,8 @@ import {
 } from "@/lib/notifications/messages";
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
+import { captureWaitlistJoined, resolveWaitlistExperimentGroup } from "@/lib/posthog/experiments";
+import type { PostHogClient } from "@/lib/posthog/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
@@ -28,6 +30,7 @@ const DENY_MESSAGES: Record<BookingDenyReason, string> = {
   member_inactive: "This member's account is not active",
   already_booked: "This member already has a booking for this class",
   session_full_no_waitlist: "This class is full and the waitlist is closed",
+  session_full_experiment_control: "This class is full",
 };
 
 function recipientOf(member: Member): { memberId: string; email: string; name: string } {
@@ -64,19 +67,29 @@ export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
   input: CreateBookingInput,
+  posthog: PostHogClient,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
   const session = await loadSession(repos, input.sessionId);
   const member = await loadMember(repos, input.memberId);
   const sessionBookings = await repos.bookings.listBySession(session.id);
+  const occupancy = computeOccupancy(session.capacity, sessionBookings);
+
+  // Only look up the member's experiment group when it can actually change
+  // the outcome — a normal, non-full booking never calls PostHog.
+  const waitlistExperimentGroup =
+    occupancy.isFull && settings.waitlistEnabled
+      ? await resolveWaitlistExperimentGroup(posthog, member.id)
+      : "variant";
 
   const decision = canBook({
     sessionStatus: session.status,
     sessionStartsAt: session.startsAt,
     memberStatus: member.status,
     memberBookings: sessionBookings.filter((booking) => booking.memberId === member.id),
-    occupancy: computeOccupancy(session.capacity, sessionBookings),
+    occupancy,
     waitlistEnabled: settings.waitlistEnabled,
+    waitlistExperimentGroup,
     now: nowIso(),
   });
   if (!decision.ok) {
@@ -99,6 +112,9 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+  }
+  if (decision.status === "waitlisted") {
+    await captureWaitlistJoined(posthog, { memberId: member.id, sessionId: session.id });
   }
   return { bookingId, status: decision.status };
 }
@@ -142,7 +158,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }

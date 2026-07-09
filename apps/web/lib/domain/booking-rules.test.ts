@@ -13,6 +13,7 @@ function baseContext(overrides: Partial<Parameters<typeof canBook>[0]> = {}) {
     memberBookings: [],
     occupancy: computeOccupancy(10, []),
     waitlistEnabled: true,
+    waitlistExperimentGroup: "variant",
     now: NOW,
     ...overrides,
   };
@@ -61,6 +62,38 @@ describe("canBook", () => {
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
       ok: false,
       reason: "session_full_no_waitlist",
+    });
+  });
+
+  it("rejects when full and the waitlist is closed regardless of experiment group", () => {
+    const occupancy = computeOccupancy(1, [{ status: "booked" }]);
+    expect(
+      canBook(
+        baseContext({ occupancy, waitlistEnabled: false, waitlistExperimentGroup: "control" }),
+      ),
+    ).toEqual({ ok: false, reason: "session_full_no_waitlist" });
+  });
+
+  it("rejects a control-group member when full and the waitlist is open", () => {
+    const occupancy = computeOccupancy(1, [{ status: "booked" }]);
+    expect(canBook(baseContext({ occupancy, waitlistExperimentGroup: "control" }))).toEqual({
+      ok: false,
+      reason: "session_full_experiment_control",
+    });
+  });
+
+  it("waitlists a variant-group member when full and the waitlist is open", () => {
+    const occupancy = computeOccupancy(1, [{ status: "booked" }]);
+    expect(canBook(baseContext({ occupancy, waitlistExperimentGroup: "variant" }))).toEqual({
+      ok: true,
+      status: "waitlisted",
+    });
+  });
+
+  it("confirms a booking regardless of experiment group when there is room", () => {
+    expect(canBook(baseContext({ waitlistExperimentGroup: "control" }))).toEqual({
+      ok: true,
+      status: "booked",
     });
   });
 });
