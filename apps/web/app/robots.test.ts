@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const existsSyncMock = vi.fn();
+const existsSyncMock = vi.hoisted(() => vi.fn());
 vi.mock("node:fs", () => ({
   existsSync: (...args: unknown[]) => existsSyncMock(...args),
 }));
