@@ -8,9 +8,14 @@ export async function listMembers(repos: Repositories, studioId: string): Promis
   return repos.members.listByStudio(studioId);
 }
 
-export async function getMember(repos: Repositories, id: string): Promise<Member> {
+export async function getMember(
+  repos: Repositories,
+  id: string,
+  studioId: string,
+): Promise<Member> {
   const member = await repos.members.getById(id);
-  if (!member) throw new HttpError(404, "not_found", "Member not found");
+  if (!member || member.studioId !== studioId)
+    throw new HttpError(404, "not_found", "Member not found");
   return member;
 }
 
@@ -39,7 +44,8 @@ export async function updateMember(
   repos: Repositories,
   id: string,
   input: UpdateMemberInput,
+  studioId: string,
 ): Promise<Member> {
-  await getMember(repos, id);
+  await getMember(repos, id, studioId);
   return repos.members.update(id, input);
 }
