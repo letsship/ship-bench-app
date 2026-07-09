@@ -11,6 +11,13 @@ import type { Repositories } from "./types";
 // Boots a real local D1 binding via wrangler's `getPlatformProxy()` (Miniflare),
 // applies the same migration SQL the production database runs, and exercises
 // every repo method — checking parity with the in-memory fakes' behaviour.
+//
+// `unstable_splitSqlQuery` is a real, typed export present since wrangler
+// 4.67.0 (the floor of this repo's `^4.67.0` range) — it's what wrangler's own
+// `d1 execute`/`d1 migrations apply` commands use internally to feed
+// `D1Database#batch()`. `D1Database#exec()` is not a substitute here: it
+// rejects SQL comments and requires one statement per line, so it fails
+// directly on this repo's (commented, pretty-printed) migration file.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const NOW = new Date("2026-03-15T12:00:00.000Z");
