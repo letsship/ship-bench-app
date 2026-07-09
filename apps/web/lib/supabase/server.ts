@@ -1,6 +1,6 @@
 import type { CookieOptions } from "@supabase/ssr";
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { type UnsafeUnwrappedCookies, cookies } from "next/headers";
 import { clientEnv } from "../env";
 
 interface CookieToSet {
@@ -14,7 +14,7 @@ interface CookieToSet {
 // factory is provided for completeness and for code that wants a request-scoped
 // Supabase client.
 export const createClient = async (cookieStore?: Awaited<ReturnType<typeof cookies>>) => {
-  const store = cookieStore ?? (await cookies());
+  const store = cookieStore ?? (cookies() as unknown as UnsafeUnwrappedCookies);
   const env = clientEnv();
 
   return createServerClient(

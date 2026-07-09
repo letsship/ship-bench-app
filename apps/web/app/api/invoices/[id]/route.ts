@@ -6,13 +6,13 @@ import { updateInvoiceStatusSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: Promise<{ id: string }> };
+type RouteContext = { params: { id: string } };
 
 // GET /api/invoices/:id — invoice with member + line items.
 export async function GET(_request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
     const { repos } = await resolveStudio();
-    const { id } = await params;
+    const { id } = params;
     return ok(await getInvoiceDetail(repos, id));
   });
 }
@@ -22,7 +22,7 @@ export async function PATCH(request: Request, { params }: RouteContext): Promise
   return handle(async () => {
     await requireSession();
     const { repos } = await resolveStudio();
-    const { id } = await params;
+    const { id } = params;
     const { status } = updateInvoiceStatusSchema.parse(await request.json());
     return ok(await updateInvoiceStatus(repos, id, status));
   });

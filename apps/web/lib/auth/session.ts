@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { type UnsafeUnwrappedCookies, cookies } from "next/headers";
 import { HttpError } from "@/lib/http";
 import { SESSION_COOKIE } from "./cookie";
 
@@ -73,7 +73,7 @@ export async function verifySessionToken(token: string): Promise<Session | null>
 }
 
 export async function getSession(): Promise<Session | null> {
-  const store = await cookies();
+  const store = cookies() as unknown as UnsafeUnwrappedCookies;
   const token = store.get(SESSION_COOKIE)?.value;
   return token ? verifySessionToken(token) : null;
 }
@@ -85,7 +85,7 @@ export async function requireSession(): Promise<Session> {
 }
 
 export async function startSession(email: string): Promise<void> {
-  const store = await cookies();
+  const store = cookies() as unknown as UnsafeUnwrappedCookies;
   store.set(SESSION_COOKIE, await createSessionToken(email), {
     httpOnly: true,
     sameSite: "lax",
@@ -95,6 +95,6 @@ export async function startSession(email: string): Promise<void> {
 }
 
 export async function endSession(): Promise<void> {
-  const store = await cookies();
+  const store = cookies() as unknown as UnsafeUnwrappedCookies;
   store.delete(SESSION_COOKIE);
 }

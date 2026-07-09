@@ -15,9 +15,9 @@ async function signIn(formData: FormData): Promise<void> {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: { next?: string };
 }) {
-  const { next } = await searchParams;
+  const { next } = searchParams;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">

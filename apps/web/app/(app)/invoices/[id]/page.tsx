@@ -15,10 +15,10 @@ const ALL_STATUSES: InvoiceStatus[] = ["draft", "open", "paid", "void", "refunde
 export default async function InvoiceDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
   const { repos, ctx } = await resolveStudio();
-  const { id } = await params;
+  const { id } = params;
 
   let detail: Awaited<ReturnType<typeof getInvoiceDetail>>;
   try {
