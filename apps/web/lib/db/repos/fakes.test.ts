@@ -22,6 +22,12 @@ describe("in-memory repositories", () => {
     expect(settings?.currency).toBe("EUR");
   });
 
+  it("finds a studio by slug, and returns null for an unknown slug", async () => {
+    const studio = await repos.studios.getBySlug("riverbank");
+    expect(studio?.name).toBe("Riverbank Movement");
+    expect(await repos.studios.getBySlug("does-not-exist")).toBeNull();
+  });
+
   it("lists members sorted by name", async () => {
     const members = await repos.members.listByStudio(studioId);
     const names = members.map((member) => member.name);
