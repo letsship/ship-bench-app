@@ -161,18 +161,33 @@ describe("bookings service", () => {
   it("stamps bookedAt with the current time", async () => {
     // Freeze the clock so the stored timestamp is deterministic to assert on.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
-    const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
-    );
-    const result = await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" });
-    const stored = await repos.bookings.getById(result.bookingId);
-    expect(stored?.bookedAt).toBe("2020-01-01T00:00:00.000Z");
+    try {
+      vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
+      const repos = createInMemoryRepositories(
+        baseSeed({
+          classTypes: [classType("ct1")],
+          sessions: [session("cs1")],
+          members: [member("m1")],
+        }),
+      );
+      const result = await createBooking(repos, createFakeProvider(), {
+        sessionId: "cs1",
+        memberId: "m1",
+      });
+      const stored = await repos.bookings.getById(result.bookingId);
+      expect(stored?.bookedAt).toBe("2020-01-01T00:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -211,7 +226,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
