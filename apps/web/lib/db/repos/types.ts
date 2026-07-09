@@ -8,6 +8,7 @@ import type {
   NotificationOutboxRow,
   Studio,
   StudioSettings,
+  WebhookEvent,
 } from "../types";
 
 // The repository seam. Route handlers, services, and the outbox depend ONLY on
@@ -79,6 +80,11 @@ export interface NotificationOutboxRepo {
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
+export interface WebhookEventsRepo {
+  getById(id: string): Promise<WebhookEvent | null>;
+  insert(event: WebhookEvent): Promise<WebhookEvent>;
+}
+
 export interface Repositories {
   studios: StudioRepo;
   settings: StudioSettingsRepo;
@@ -89,4 +95,5 @@ export interface Repositories {
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
   outbox: NotificationOutboxRepo;
+  webhookEvents: WebhookEventsRepo;
 }
