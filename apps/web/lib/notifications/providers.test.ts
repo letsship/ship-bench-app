@@ -1,10 +1,8 @@
-import { Resend } from "resend";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createCloudflareEmailProvider } from "./cloudflare-email-provider";
 import { createFakeProvider } from "./fake-provider";
-import { createResendProvider } from "./resend-provider";
+import { createNotificationProvider } from "./provider";
 import type { NotificationMessage } from "./types";
-
-vi.mock("resend", () => ({ Resend: vi.fn() }));
 
 const message: NotificationMessage = {
   kind: "booking_confirmation",
@@ -25,37 +23,56 @@ describe("fake provider", () => {
   });
 });
 
-describe("resend provider", () => {
-  const send = vi.fn();
+describe("cloudflare email provider", () => {
+  const fetchMock = vi.fn();
 
   beforeEach(() => {
-    send.mockReset();
-    vi.mocked(Resend).mockImplementation(() => ({ emails: { send } }) as unknown as Resend);
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("maps a message onto the Resend send params", async () => {
-    send.mockResolvedValue({ data: { id: "re_x" }, error: null });
-    const provider = createResendProvider({ apiKey: "k", from: "Studiobook <s@b.co>" });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts the message to the Cloudflare email send API", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: "cf_x" }), { status: 200 }));
+    const provider = createCloudflareEmailProvider({ apiToken: "k" });
     const result = await provider.send(message);
-    expect(result.providerMessageId).toBe("re_x");
-    expect(send).toHaveBeenCalledWith({
-      from: "Studiobook <s@b.co>",
-      to: ["a@b.co"],
+
+    expect(result.providerMessageId).toBe("cf_x");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/email/send");
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer k");
+    expect(JSON.parse(init.body)).toEqual({
+      to: "a@b.co",
       subject: "Hi",
       text: "Body text",
-      tags: [{ name: "kind", value: "booking_confirmation" }],
     });
   });
 
-  it("throws when Resend returns an error", async () => {
-    send.mockResolvedValue({ data: null, error: { message: "bad recipient" } });
-    const provider = createResendProvider({ apiKey: "k", from: "s@b.co" });
-    await expect(provider.send(message)).rejects.toThrow(/Resend send failed: bad recipient/);
+  it("throws a clear error when CF_EMAIL_API_TOKEN is missing", () => {
+    const original = process.env.CF_EMAIL_API_TOKEN;
+    delete process.env.CF_EMAIL_API_TOKEN;
+    try {
+      expect(() => createNotificationProvider()).toThrow(/CF_EMAIL_API_TOKEN is not set/);
+    } finally {
+      if (original === undefined) delete process.env.CF_EMAIL_API_TOKEN;
+      else process.env.CF_EMAIL_API_TOKEN = original;
+    }
   });
 
-  it("throws when Resend returns no id", async () => {
-    send.mockResolvedValue({ data: null, error: null });
-    const provider = createResendProvider({ apiKey: "k", from: "s@b.co" });
+  it("throws when Cloudflare returns a non-ok response", async () => {
+    fetchMock.mockResolvedValue(new Response("bad recipient", { status: 400 }));
+    const provider = createCloudflareEmailProvider({ apiToken: "k" });
+    await expect(provider.send(message)).rejects.toThrow(/Cloudflare Email send failed/);
+  });
+
+  it("throws when Cloudflare returns no id", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+    const provider = createCloudflareEmailProvider({ apiToken: "k" });
     await expect(provider.send(message)).rejects.toThrow(/no message id/);
   });
 });
