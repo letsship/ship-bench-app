@@ -1,3 +1,4 @@
+import type { ExperimentClient } from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -21,6 +22,11 @@ import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
+
+// The flag key for the waitlist A/B experiment: control-group members are
+// turned away with the existing "class is full" 409 instead of being offered
+// the waitlist.
+const WAITLIST_EXPERIMENT_FLAG = "waitlist_experiment";
 
 const DENY_MESSAGES: Record<BookingDenyReason, string> = {
   session_cancelled: "This class session has been cancelled",
@@ -63,20 +69,31 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  experiments: ExperimentClient,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
   const session = await loadSession(repos, input.sessionId);
   const member = await loadMember(repos, input.memberId);
   const sessionBookings = await repos.bookings.listBySession(session.id);
+  const occupancy = computeOccupancy(session.capacity, sessionBookings);
+
+  // Only members hitting a full, waitlist-enabled session are part of the
+  // experiment — an open session or a studio with the waitlist off is
+  // unaffected either way, so there's nothing to split-test.
+  let waitlistEnabled = settings.waitlistEnabled;
+  if (occupancy.isFull && settings.waitlistEnabled) {
+    const variant = await experiments.getExperimentVariant(member.id, WAITLIST_EXPERIMENT_FLAG);
+    if (variant === "control") waitlistEnabled = false;
+  }
 
   const decision = canBook({
     sessionStatus: session.status,
     sessionStartsAt: session.startsAt,
     memberStatus: member.status,
     memberBookings: sessionBookings.filter((booking) => booking.memberId === member.id),
-    occupancy: computeOccupancy(session.capacity, sessionBookings),
-    waitlistEnabled: settings.waitlistEnabled,
+    occupancy,
+    waitlistEnabled,
     now: nowIso(),
   });
   if (!decision.ok) {
@@ -99,6 +116,12 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+  } else {
+    await experiments.captureEvent({
+      distinctId: member.id,
+      event: "waitlist_joined",
+      properties: { sessionId: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -142,7 +165,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
