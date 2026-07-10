@@ -1,0 +1,37 @@
+import type { NotificationProvider } from "./types";
+
+// The Cloudflare Email adapter behind the provider-agnostic contract. Nothing
+// upstream of this file references Cloudflare Email directly — vendors are
+// swappable behind NotificationProvider.
+
+const CLOUDFLARE_EMAIL_SEND_URL = "https://api.cloudflare.com/client/v4/email/sending/send";
+
+export interface CloudflareEmailConfig {
+  apiToken: string;
+}
+
+export function createCloudflareEmailProvider(config: CloudflareEmailConfig): NotificationProvider {
+  return {
+    name: "cloudflare-email",
+    async send(message) {
+      const response = await fetch(CLOUDFLARE_EMAIL_SEND_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.apiToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: message.recipient.email,
+          subject: message.subject,
+          text: message.body,
+        }),
+      });
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Cloudflare Email send failed: ${errorBody}`);
+      }
+      const result = (await response.json()) as { id: string };
+      return { providerMessageId: result.id };
+    },
+  };
+}
