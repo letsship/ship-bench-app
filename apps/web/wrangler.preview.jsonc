@@ -6,6 +6,11 @@
   // per-PR database — see the D1 binding below). The deploy-preview workflow
   // sets RESEND_API_KEY as a Worker secret after deploy. See the README's
   // deploy section.
+  //
+  // The D1 binding below is intentionally left as a "draft" binding (no
+  // database_id): `wrangler deploy` auto-provisions it on first deploy and
+  // reconnects to the existing database by database_name on every deploy
+  // after that — no manual database_id to keep in sync.
   "name": "studiobook-preview",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-06-01",
@@ -18,7 +23,6 @@
     {
       "binding": "DB",
       "database_name": "studiobook-preview",
-      "database_id": "REPLACE_ME_WITH_D1_DATABASE_ID",
       "migrations_dir": "migrations",
     },
   ],

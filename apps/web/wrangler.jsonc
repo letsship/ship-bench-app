@@ -4,8 +4,10 @@
   //
   // NEXT_PUBLIC_* vars are public (inlined into the client bundle at build time).
   // The secret RESEND_API_KEY is set out-of-band with `wrangler secret put
-  // <NAME>` — never commit it. Persistence is the `DB` D1 binding below —
-  // provision it with `wrangler d1 create studiobook` and fill in its id.
+  // <NAME>` — never commit it. Persistence is the `DB` D1 binding below, left
+  // as a "draft" binding (no database_id): `wrangler deploy` auto-provisions
+  // it by database_name on first deploy and reconnects to it on every deploy
+  // after that.
   "name": "studiobook",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-06-01",
@@ -21,7 +23,6 @@
     {
       "binding": "DB",
       "database_name": "studiobook",
-      "database_id": "REPLACE_ME_WITH_D1_DATABASE_ID",
       "migrations_dir": "migrations",
     },
   ],
