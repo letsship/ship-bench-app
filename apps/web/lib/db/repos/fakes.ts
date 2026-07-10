@@ -1,5 +1,6 @@
 import type {
   Booking,
+  ClassPackage,
   ClassSession,
   ClassType,
   Invoice,
@@ -23,6 +24,7 @@ export interface SeedData {
   classTypes: ClassType[];
   sessions: ClassSession[];
   bookings: Booking[];
+  classPackages: ClassPackage[];
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
@@ -35,6 +37,7 @@ interface Store {
   classTypes: ClassType[];
   classSessions: ClassSession[];
   bookings: Booking[];
+  classPackages: ClassPackage[];
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
@@ -64,6 +67,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     classTypes: seed ? cloneAll(seed.classTypes) : [],
     classSessions: seed ? cloneAll(seed.sessions) : [],
     bookings: seed ? cloneAll(seed.bookings) : [],
+    classPackages: seed ? cloneAll(seed.classPackages) : [],
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
@@ -81,7 +85,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +106,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -162,6 +169,22 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.bookings, (row) => row.id === id, patch, "Booking");
+      },
+    },
+    classPackages: {
+      async listByMember(memberId) {
+        return cloneAll(store.classPackages.filter((row) => row.memberId === memberId));
+      },
+      async getById(id) {
+        const found = store.classPackages.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(classPackage) {
+        store.classPackages.push(clone(classPackage));
+        return clone(classPackage);
+      },
+      async update(id, patch) {
+        return patched(store.classPackages, (row) => row.id === id, patch, "Class package");
       },
     },
     invoices: {
