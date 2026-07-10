@@ -8,6 +8,7 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import type { ExperimentClient } from "@/lib/experiments/types";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -19,6 +20,10 @@ import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
+
+// Any waitlist_experiment flag value other than this literal is treated as a
+// variant group — placed on the waitlist as today.
+const CONTROL_VARIANT = "control";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -63,6 +68,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  experiments: ExperimentClient,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -83,6 +89,17 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  if (decision.status === "waitlisted") {
+    const variant = await experiments.getWaitlistVariant(member.id);
+    if (variant === CONTROL_VARIANT) {
+      throw new HttpError(
+        409,
+        "booking_session_full_no_waitlist",
+        DENY_MESSAGES.session_full_no_waitlist,
+      );
+    }
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -99,6 +116,8 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+  } else {
+    await experiments.captureWaitlistJoined({ memberId: member.id, sessionId: session.id });
   }
   return { bookingId, status: decision.status };
 }
@@ -142,7 +161,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }

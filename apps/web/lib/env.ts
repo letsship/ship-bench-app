@@ -20,6 +20,8 @@ const serverSchema = clientSchema.extend({
   // deployment when a single database hosts several isolated copies of the app
   // (e.g. one schema per preview environment).
   SUPABASE_SCHEMA: z.string().min(1).default("public"),
+  POSTHOG_PROJECT_API_KEY: z.string().min(1).optional(),
+  POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;
@@ -40,6 +42,8 @@ const getServerVars = () => ({
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   STUDIOBOOK_FROM_EMAIL: process.env.STUDIOBOOK_FROM_EMAIL,
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
+  POSTHOG_PROJECT_API_KEY: process.env.POSTHOG_PROJECT_API_KEY,
+  POSTHOG_HOST: process.env.POSTHOG_HOST,
 });
 
 export const clientEnv = (): ClientEnv => {
