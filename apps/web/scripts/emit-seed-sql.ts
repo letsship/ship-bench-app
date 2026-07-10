@@ -4,13 +4,13 @@ import { fileURLToPath } from "node:url";
 import { toSnakeKey } from "@/lib/db/repos/mapping";
 import { buildSeed } from "@/lib/db/seed-data";
 
-// Render the demo dataset as Postgres INSERT statements for supabase/seed.sql
-// (applied by `supabase db reset`). The entity objects are the single source, so
-// the SQL cannot drift from the app's types.
+// Render the demo dataset as SQLite INSERT statements for apps/web/seed.sql
+// (applied via `wrangler d1 execute`). The entity objects are the single
+// source, so the SQL cannot drift from the app's types.
 
 function sqlValue(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
-  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (typeof value === "boolean") return value ? "1" : "0";
   if (typeof value === "number") return String(value);
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -20,7 +20,7 @@ function insertStatements(table: string, records: readonly object[]): string[] {
     const entries = Object.entries(record as Record<string, unknown>);
     const columns = entries.map(([key]) => toSnakeKey(key));
     const values = entries.map(([, value]) => sqlValue(value));
-    return `insert into public.${table} (${columns.join(", ")}) values (${values.join(", ")});`;
+    return `insert into ${table} (${columns.join(", ")}) values (${values.join(", ")});`;
   });
 }
 
@@ -46,6 +46,6 @@ for (const [table, records] of sections) {
   lines.push(...insertStatements(table, records), "");
 }
 
-const outPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../supabase/seed.sql");
+const outPath = resolve(dirname(fileURLToPath(import.meta.url)), "../seed.sql");
 writeFileSync(outPath, `${lines.join("\n")}\n`);
 console.log(`Studiobook: wrote ${outPath} (${lines.length} lines)`);
