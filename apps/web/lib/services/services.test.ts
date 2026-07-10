@@ -8,7 +8,13 @@ import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
-import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
+import {
+  createInvoice,
+  getInvoiceDetail,
+  listInvoices,
+  markInvoicePaidFromWebhook,
+  updateInvoiceStatus,
+} from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
@@ -160,7 +166,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +209,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +300,36 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("markInvoicePaidFromWebhook marks an open invoice paid and sets paidAt", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
+    });
+    const paid = await markInvoicePaidFromWebhook(repos, detail.invoice.id);
+    expect(paid?.status).toBe("paid");
+    expect(paid?.paidAt).not.toBeNull();
+  });
+
+  it("markInvoicePaidFromWebhook is idempotent on replay", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
+    });
+    const first = await markInvoicePaidFromWebhook(repos, detail.invoice.id);
+    const second = await markInvoicePaidFromWebhook(repos, detail.invoice.id);
+    expect(first?.paidAt).toEqual(second?.paidAt);
+    expect(second?.status).toBe("paid");
+    const stored = await repos.invoices.getById(detail.invoice.id);
+    expect(stored?.status).toBe("paid");
+  });
+
+  it("markInvoicePaidFromWebhook returns null and changes nothing for an unknown invoice", async () => {
+    const result = await markInvoicePaidFromWebhook(repos, "unknown-invoice-id");
+    expect(result).toBeNull();
   });
 });
 

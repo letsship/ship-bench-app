@@ -20,6 +20,7 @@ const serverSchema = clientSchema.extend({
   // deployment when a single database hosts several isolated copies of the app
   // (e.g. one schema per preview environment).
   SUPABASE_SCHEMA: z.string().min(1).default("public"),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1),
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;
@@ -40,6 +41,7 @@ const getServerVars = () => ({
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   STUDIOBOOK_FROM_EMAIL: process.env.STUDIOBOOK_FROM_EMAIL,
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
 });
 
 export const clientEnv = (): ClientEnv => {
