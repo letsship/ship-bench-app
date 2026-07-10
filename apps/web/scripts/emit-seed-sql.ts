@@ -1,12 +1,15 @@
 import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { toSnakeKey } from "@/lib/db/repos/mapping";
 import { buildSeed } from "@/lib/db/seed-data";
 
 // Render the demo dataset as Postgres INSERT statements for supabase/seed.sql
 // (applied by `supabase db reset`). The entity objects are the single source, so
 // the SQL cannot drift from the app's types.
+
+function toSnakeKey(key: string): string {
+  return key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+}
 
 function sqlValue(value: unknown): string {
   if (value === null || value === undefined) return "NULL";

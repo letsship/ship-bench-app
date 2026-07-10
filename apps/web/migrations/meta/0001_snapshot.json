@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "cfcb4f6b-e73f-437e-bd0f-195fc64225d1",
+  "id": "256ca6f5-fb0a-4118-baf6-4da6845f6534",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "bookings": {
@@ -51,7 +51,18 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_bookings_session": {
+          "name": "idx_bookings_session",
+          "columns": ["session_id"],
+          "isUnique": false
+        },
+        "idx_bookings_member": {
+          "name": "idx_bookings_member",
+          "columns": ["member_id"],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "bookings_session_id_class_sessions_id_fk": {
           "name": "bookings_session_id_class_sessions_id_fk",
@@ -152,7 +163,18 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_class_sessions_studio": {
+          "name": "idx_class_sessions_studio",
+          "columns": ["studio_id"],
+          "isUnique": false
+        },
+        "idx_class_sessions_starts_at": {
+          "name": "idx_class_sessions_starts_at",
+          "columns": ["starts_at"],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "class_sessions_studio_id_studios_id_fk": {
           "name": "class_sessions_studio_id_studios_id_fk",
@@ -175,7 +197,16 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "capacity_check": {
+          "name": "capacity_check",
+          "value": "\"class_sessions\".\"capacity\" >= 1"
+        },
+        "price_cents_check": {
+          "name": "price_cents_check",
+          "value": "\"class_sessions\".\"price_cents\" >= 0"
+        }
+      }
     },
     "class_types": {
       "name": "class_types",
@@ -254,7 +285,16 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "default_capacity_check": {
+          "name": "default_capacity_check",
+          "value": "\"class_types\".\"default_capacity\" >= 1"
+        },
+        "default_price_cents_check": {
+          "name": "default_price_cents_check",
+          "value": "\"class_types\".\"default_price_cents\" >= 0"
+        }
+      }
     },
     "invoice_line_items": {
       "name": "invoice_line_items",
@@ -320,7 +360,13 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_invoice_line_items_invoice": {
+          "name": "idx_invoice_line_items_invoice",
+          "columns": ["invoice_id"],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "invoice_line_items_invoice_id_invoices_id_fk": {
           "name": "invoice_line_items_invoice_id_invoices_id_fk",
@@ -343,7 +389,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "quantity_check": {
+          "name": "quantity_check",
+          "value": "\"invoice_line_items\".\"quantity\" >= 1"
+        }
+      }
     },
     "invoices": {
       "name": "invoices",
@@ -454,6 +505,11 @@
         }
       },
       "indexes": {
+        "idx_invoices_member": {
+          "name": "idx_invoices_member",
+          "columns": ["member_id"],
+          "isUnique": false
+        },
         "invoices_studio_id_number_unique": {
           "name": "invoices_studio_id_number_unique",
           "columns": ["studio_id", "number"],
@@ -547,6 +603,11 @@
         }
       },
       "indexes": {
+        "idx_members_studio": {
+          "name": "idx_members_studio",
+          "columns": ["studio_id"],
+          "isUnique": false
+        },
         "members_studio_id_email_unique": {
           "name": "members_studio_id_email_unique",
           "columns": ["studio_id", "email"],
@@ -628,7 +689,13 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_notification_outbox_sent": {
+          "name": "idx_notification_outbox_sent",
+          "columns": ["sent_at"],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "notification_outbox_member_id_members_id_fk": {
           "name": "notification_outbox_member_id_members_id_fk",
@@ -733,7 +800,16 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "tax_rate_bps_check": {
+          "name": "tax_rate_bps_check",
+          "value": "\"studio_settings\".\"tax_rate_bps\" >= 0"
+        },
+        "cancellation_window_hours_check": {
+          "name": "cancellation_window_hours_check",
+          "value": "\"studio_settings\".\"cancellation_window_hours\" >= 0"
+        }
+      }
     },
     "studios": {
       "name": "studios",

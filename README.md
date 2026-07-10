@@ -13,9 +13,9 @@ Everything here is hand-authored.
 
 - **Monorepo**: pnpm workspaces + Turborepo. One app, `apps/web`.
 - **Web**: Next.js 16 (App Router, React 19), TypeScript strict, Tailwind v4.
-- **Database**: **Supabase** (Postgres 17 + `@supabase/supabase-js`). All data
+- **Database**: **Cloudflare D1** (SQLite) via **Drizzle ORM**. All data
   access goes through thin **repositories** (`lib/db/repos/`); route handlers and
-  domain logic never touch supabase-js directly.
+  domain logic never touch Drizzle or the D1 binding directly.
 - **Email**: the real **Resend** SDK, behind a provider-agnostic notification
   adapter + an outbox table.
 - **Deploy**: `@opennextjs/cloudflare` to a Cloudflare Worker.
@@ -28,7 +28,7 @@ Everything here is hand-authored.
 The linchpin of the architecture is `lib/db/repos/`:
 
 - `types.ts` — the `Repositories` interface (one typed repo per entity).
-- `supabase.ts` — the production implementation over supabase-js.
+- `d1.ts` — the production implementation over Drizzle ORM + Cloudflare D1.
 - `fakes.ts` — an in-memory implementation for tests + the local fake-backends
   mode.
 - `index.ts` — `resolveRepositories()` picks the implementation.
@@ -41,7 +41,7 @@ changes.
 ## Fake-backends mode
 
 Set `USE_FAKE_BACKENDS=1` to run the whole app against a seeded in-memory store
-and a no-op email provider — no Supabase or Resend account required. Tests use it
+and a no-op email provider — no D1 or Resend account required. Tests use it
 implicitly (via `__setTestRepositories`), Playwright runs `next start` with it,
 and `pnpm --filter @studiobook/web dev:fake` serves local dev with it.
 
@@ -55,16 +55,17 @@ apps/web/
                            invoices, TZ-safe dates, CSV, iCal, reports, money)
     db/
       types.ts             entity types
-      repos/               the repository seam (types, supabase, fakes, mapping)
+      schema.ts            Drizzle sqliteTable schema (D1)
+      repos/               the repository seam (types, d1, fakes)
       seed-data.ts         single-source demo dataset
-    supabase/              @supabase/ssr + service-role client factories
     notifications/         provider seam (Resend adapter + fake) + outbox
     services/              repository-backed services shared by routes + pages
     auth/                  dev session-cookie stub
     env.ts                 Zod-validated environment access
   e2e/                     Playwright smoke specs
-packages/db/migrations/    raw SQL migrations (Postgres)
-supabase/                  Supabase CLI config (migrations symlinks packages/db)
+  migrations/              drizzle-kit-generated D1/SQLite migrations
+packages/db/migrations/    raw SQL migrations (Postgres, legacy reference)
+supabase/                  legacy Supabase CLI config (unused by the app)
 ship.yml                   SHIP preview-deploy manifest
 ```
 
@@ -77,14 +78,11 @@ pnpm install
 pnpm --filter @studiobook/web dev:fake   # http://localhost:3000, seeded in-memory
 ```
 
-Against a real local Supabase:
+Against a real local D1 database (via `wrangler`'s local simulation):
 
 ```bash
 pnpm install
-pnpm supabase:start    # boots the local Supabase stack (Docker)
-pnpm supabase:reset    # applies packages/db/migrations + seeds supabase/seed.sql
-# set NEXT_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY / SUPABASE_SECRET_KEY (see .env.example)
-pnpm --filter @studiobook/web dev
+pnpm --filter @studiobook/web preview:cf   # builds with OpenNext, runs under wrangler + local D1
 ```
 
 Sign in at `/login` with any email — the magic-link flow is a **stub** that sets
@@ -105,10 +103,10 @@ a signed dev cookie (Studiobook's own auth is separate from Supabase Auth).
 
 ## Environment
 
-See `apps/web/.env.example`. The Supabase URL + publishable key are public;
-`SUPABASE_SECRET_KEY` and `RESEND_API_KEY` are secrets and must never be
-committed. Env is validated with Zod in `lib/env.ts` and only read when a
-Supabase/email client is actually constructed (so fake mode needs none of it).
+See `apps/web/.env.example`. `RESEND_API_KEY` is a secret and must never be
+committed. The D1 database is a Worker **binding** (`DB` in `wrangler.jsonc`),
+not an env var. Env is validated with Zod in `lib/env.ts` and only read when
+the email client is actually constructed (so fake mode needs none of it).
 
 ## Deploying a preview (Cloudflare)
 
@@ -124,7 +122,8 @@ the Worker down on PR close.
 
 ## Migrations
 
-Migrations are raw SQL in `packages/db/migrations/`, numbered sequentially
-(`0001_init.sql`). `supabase/migrations` is a symlink to that directory, so
-`supabase db reset` applies them and then seeds from `supabase/seed.sql` (which
-is generated from the app's own seed data — run `db:seed-sql` to refresh it).
+Production migrations are SQLite in `apps/web/migrations/`, generated from the
+Drizzle schema (`apps/web/lib/db/schema.ts`) via `pnpm --filter @studiobook/web
+db:generate`, and applied to the D1 binding with `wrangler d1 migrations apply`.
+`packages/db/migrations/` holds the legacy raw Postgres schema for reference;
+it's no longer used by the app.

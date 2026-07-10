@@ -1,5 +1,5 @@
 // Plain domain row types (camelCase). These are the contract every repository
-// speaks — the Supabase implementation maps them to/from snake_case Postgres
+// speaks — the D1/Drizzle implementation maps them to/from snake_case SQLite
 // columns, and the in-memory fakes store them directly. Domain logic and
 // services depend only on these, never on any database driver.
 
