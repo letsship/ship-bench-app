@@ -20,6 +20,11 @@ describe("fake tracker", () => {
     expect(tracker.captured).toHaveLength(1);
     expect(tracker.captured[0]).toBe(event);
   });
+
+  it("close() is a no-op", async () => {
+    const tracker = createFakeTracker();
+    await expect(tracker.close()).resolves.toBeUndefined();
+  });
 });
 
 describe("posthog tracker", () => {
@@ -32,7 +37,7 @@ describe("posthog tracker", () => {
     vi.mocked(PostHog).mockImplementation(() => ({ capture, shutdown }) as unknown as PostHog);
   });
 
-  it("maps an event onto the PostHog capture params and flushes", async () => {
+  it("maps an event onto the PostHog capture params", async () => {
     const tracker = createPostHogTracker({ apiKey: "k", host: "https://us.i.posthog.com" });
     await tracker.capture(event);
     expect(capture).toHaveBeenCalledWith({
@@ -40,6 +45,16 @@ describe("posthog tracker", () => {
       event: "booking_created",
       properties: { session_id: "cs1" },
     });
+    expect(shutdown).not.toHaveBeenCalled();
+  });
+
+  it("does not shut down the shared client between captures, only on close()", async () => {
+    const tracker = createPostHogTracker({ apiKey: "k", host: "https://us.i.posthog.com" });
+    await tracker.capture({ ...event, event: "booking_cancelled" });
+    await tracker.capture({ ...event, event: "booking_created", distinctId: "m2" });
+    expect(capture).toHaveBeenCalledTimes(2);
+    expect(shutdown).not.toHaveBeenCalled();
+    await tracker.close();
     expect(shutdown).toHaveBeenCalledTimes(1);
   });
 

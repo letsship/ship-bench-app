@@ -15,5 +15,6 @@ export function createFakeTracker(): FakeTracker {
     async capture(event) {
       captured.push(event);
     },
+    async close() {},
   };
 }

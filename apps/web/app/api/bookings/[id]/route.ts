@@ -17,8 +17,11 @@ export async function DELETE(
     await requireSession();
     const { repos } = await resolveStudio();
     const { id } = await params;
-    return ok(
-      await cancelBooking(repos, createNotificationProvider(), createAnalyticsTracker(), id),
-    );
+    const tracker = createAnalyticsTracker();
+    try {
+      return ok(await cancelBooking(repos, createNotificationProvider(), tracker, id));
+    } finally {
+      await tracker.close();
+    }
   });
 }

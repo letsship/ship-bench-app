@@ -27,6 +27,14 @@ export function createPostHogTracker(config: PostHogConfig): AnalyticsTracker {
         event: event.event,
         properties: event.properties,
       });
+    },
+    // Flushes queued events and closes the client. Call once per tracker
+    // lifetime (the composition root does this after all captures for the
+    // request are done) — calling it after every capture() would shut down
+    // the shared client before a later capture in the same flow runs (e.g.
+    // promoteFromWaitlist's booking_created after cancelBooking's own
+    // capture), silently dropping that event.
+    async close() {
       await client.shutdown();
     },
   };

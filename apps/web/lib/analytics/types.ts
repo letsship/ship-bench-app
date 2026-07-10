@@ -16,4 +16,9 @@ export interface AnalyticsEvent {
 export interface AnalyticsTracker {
   readonly name: string;
   capture(event: AnalyticsEvent): Promise<void>;
+  // Flushes and releases the underlying client. Call exactly once, after all
+  // captures for this tracker's lifetime (e.g. once per request at the
+  // composition root) — not per capture, since a single tracker instance is
+  // commonly reused across multiple captures within one flow.
+  close(): Promise<void>;
 }

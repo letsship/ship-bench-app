@@ -26,8 +26,11 @@ export async function POST(request: Request): Promise<Response> {
     await requireSession();
     const { repos } = await resolveStudio();
     const input = createBookingSchema.parse(await request.json());
-    return created(
-      await createBooking(repos, createNotificationProvider(), createAnalyticsTracker(), input),
-    );
+    const tracker = createAnalyticsTracker();
+    try {
+      return created(await createBooking(repos, createNotificationProvider(), tracker, input));
+    } finally {
+      await tracker.close();
+    }
   });
 }
