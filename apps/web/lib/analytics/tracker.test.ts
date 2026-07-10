@@ -23,11 +23,20 @@ describe("createAnalyticsTracker", () => {
     expect((tracker as { captured: unknown[] }).captured).toHaveLength(1);
   });
 
-  it("throws a descriptive error when the real path is selected without a project token", async () => {
+  it("falls back to a no-op tracker and logs when the real path is selected without a project token", async () => {
     delete process.env.USE_FAKE_BACKENDS;
     delete process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { createAnalyticsTracker } = await import("./tracker");
-    expect(() => createAnalyticsTracker()).toThrow(/NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN/);
+    expect(() => createAnalyticsTracker()).not.toThrow();
+    const tracker = createAnalyticsTracker();
+    await expect(
+      tracker.capture({ event: "booking_created", distinctId: "m1", properties: {} }),
+    ).resolves.toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN"),
+    );
+    errorSpy.mockRestore();
   });
 
   it("constructs the real tracker when a project token is set", async () => {

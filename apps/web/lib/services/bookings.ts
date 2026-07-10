@@ -1,4 +1,4 @@
-import type { AnalyticsTracker } from "@/lib/analytics/types";
+import type { AnalyticsCaptureEvent, AnalyticsTracker } from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -56,6 +56,20 @@ async function loadSession(repos: Repositories, sessionId: string): Promise<Clas
   return session;
 }
 
+// Analytics is best-effort observability, not a booking dependency — a
+// capture failure (vendor outage, network blip) must never fail a request
+// whose booking/cancellation has already been committed.
+async function captureSafely(
+  tracker: AnalyticsTracker,
+  event: AnalyticsCaptureEvent,
+): Promise<void> {
+  try {
+    await tracker.capture(event);
+  } catch (error) {
+    console.error("analytics capture failed", { event: event.event, error });
+  }
+}
+
 export interface BookingResult {
   bookingId: string;
   status: "booked" | "waitlisted";
@@ -102,7 +116,7 @@ export async function createBooking(
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   }
-  await tracker.capture({
+  await captureSafely(tracker, {
     event: decision.status === "booked" ? "booking_created" : "waitlist_joined",
     distinctId: member.id,
     properties: { session_id: session.id },
@@ -156,7 +170,7 @@ export async function cancelBooking(
       decision.refundEligible,
     ),
   );
-  await tracker.capture({
+  await captureSafely(tracker, {
     event: "booking_cancelled",
     distinctId: member.id,
     properties: { session_id: session.id },
