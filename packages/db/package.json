@@ -2,5 +2,5 @@
   "name": "@studiobook/db",
   "version": "0.0.0",
   "private": true,
-  "description": "Studiobook database — raw SQL migrations (Postgres/Supabase)."
+  "description": "Studiobook database — raw SQL migrations: legacy Postgres/Supabase in migrations/, plus the current Drizzle/D1 migrations in migrations/d1/."
 }
