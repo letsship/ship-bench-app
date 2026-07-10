@@ -2,6 +2,12 @@ import type { MetadataRoute } from "next";
 import { resolveRepositories } from "@/lib/db/repos";
 import { siteUrl } from "@/lib/env";
 
+// Reads the repo layer, so it can't be statically prerendered at build time
+// (the build step has neither Supabase secrets nor USE_FAKE_BACKENDS set) —
+// same reasoning as the `dynamic = "force-dynamic"` exports on every other
+// route that touches `resolveRepositories()`.
+export const dynamic = "force-dynamic";
+
 // The demo dataset is single-studio (see `getStudioContext`), so `getFirst()`
 // covers every public studio page that exists today. A multi-studio backend
 // would swap this for a `studios.listAll()`-style read.
