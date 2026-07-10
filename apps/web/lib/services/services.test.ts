@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,74 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("issues a bounded number of member/session reads regardless of booking count", async () => {
+    function withCallCounts(base: Repositories) {
+      const calls = {
+        membersListByStudio: 0,
+        membersGetById: 0,
+        sessionsListByStudio: 0,
+        sessionsGetById: 0,
+      };
+      const repos: Repositories = {
+        ...base,
+        members: {
+          ...base.members,
+          listByStudio: (...args) => {
+            calls.membersListByStudio++;
+            return base.members.listByStudio(...args);
+          },
+          getById: (...args) => {
+            calls.membersGetById++;
+            return base.members.getById(...args);
+          },
+        },
+        classSessions: {
+          ...base.classSessions,
+          listByStudio: (...args) => {
+            calls.sessionsListByStudio++;
+            return base.classSessions.listByStudio(...args);
+          },
+          getById: (...args) => {
+            calls.sessionsGetById++;
+            return base.classSessions.getById(...args);
+          },
+        },
+      };
+      return { repos, calls };
+    }
+
+    const smallSeed = buildSeed(NOW);
+    const smallRepos = createInMemoryRepositories(smallSeed);
+    const smallStudioId = (await smallRepos.studios.getFirst())?.id ?? "";
+    const { repos: countedSmall, calls: smallCalls } = withCallCounts(smallRepos);
+    const smallRows = await listBookingRows(countedSmall, smallStudioId);
+
+    const manySessions = Array.from({ length: 2 }, (_, i) =>
+      session(`bulk-cs${i}`, { classTypeId: "ct1" }),
+    );
+    const manyMembers = Array.from({ length: 20 }, (_, i) => member(`bulk-m${i}`));
+    const manyBookings = Array.from({ length: 200 }, (_, i) =>
+      booking(`bulk-b${i}`, `bulk-m${i % 20}`, { sessionId: `bulk-cs${i % 2}` }),
+    );
+    const largeSeed = baseSeed({
+      classTypes: [classType("ct1")],
+      sessions: manySessions,
+      members: manyMembers,
+      bookings: manyBookings,
+    });
+    const largeRepos = createInMemoryRepositories(largeSeed);
+    const largeStudioId = (await largeRepos.studios.getFirst())?.id ?? "";
+    const { repos: countedLarge, calls: largeCalls } = withCallCounts(largeRepos);
+    const largeRows = await listBookingRows(countedLarge, largeStudioId);
+
+    expect(largeRows.length).toBeGreaterThan(smallRows.length);
+    expect(largeCalls.membersListByStudio).toBe(smallCalls.membersListByStudio);
+    expect(largeCalls.sessionsListByStudio).toBe(smallCalls.sessionsListByStudio);
+    expect(smallCalls.membersGetById).toBe(0);
+    expect(smallCalls.sessionsGetById).toBe(0);
+    expect(largeCalls.membersGetById).toBe(0);
+    expect(largeCalls.sessionsGetById).toBe(0);
   });
 });
