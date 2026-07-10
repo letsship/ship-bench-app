@@ -1,3 +1,4 @@
+import { BookingConflictError } from "../errors";
 import type {
   Booking,
   ClassSession,
@@ -10,6 +11,11 @@ import type {
   StudioSettings,
 } from "../types";
 import type { Repositories, SessionRange } from "./types";
+
+// Mirrors the partial unique index from
+// packages/db/migrations/0002_bookings_active_uniqueness.sql — keep both in
+// sync if the set of "active" statuses ever changes.
+const ACTIVE_BOOKING_STATUSES = new Set(["booked", "waitlisted", "attended"]);
 
 // In-memory implementation of the repository seam. Used by the test suite
 // (fully hermetic — no Postgres, no native modules) and by the local
@@ -81,7 +87,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +108,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -157,6 +166,13 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        const hasActiveRow = store.bookings.some(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            ACTIVE_BOOKING_STATUSES.has(row.status),
+        );
+        if (hasActiveRow) throw new BookingConflictError();
         store.bookings.push(clone(booking));
         return clone(booking);
       },

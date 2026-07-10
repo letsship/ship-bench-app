@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -90,5 +91,43 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  describe("bookings uniqueness", () => {
+    const bookingRow = (overrides: Partial<Booking> = {}): Booking => ({
+      id: "b_new",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+      ...overrides,
+    });
+
+    it("rejects a second active row for the same member + session", async () => {
+      const empty = createInMemoryRepositories();
+      await empty.bookings.insert(bookingRow({ id: "b1", status: "waitlisted" }));
+      await expect(
+        empty.bookings.insert(bookingRow({ id: "b2", status: "waitlisted" })),
+      ).rejects.toThrow("conflicting active booking");
+    });
+
+    it("rejects an active row when the existing one is 'booked' or 'attended'", async () => {
+      for (const status of ["booked", "attended"]) {
+        const empty = createInMemoryRepositories();
+        await empty.bookings.insert(bookingRow({ id: "b1", status }));
+        await expect(
+          empty.bookings.insert(bookingRow({ id: "b2", status: "waitlisted" })),
+        ).rejects.toThrow("conflicting active booking");
+      }
+    });
+
+    it("allows a new booking once the prior row for that member + session is cancelled", async () => {
+      const empty = createInMemoryRepositories();
+      await empty.bookings.insert(bookingRow({ id: "b1", status: "cancelled" }));
+      const inserted = await empty.bookings.insert(bookingRow({ id: "b2", status: "waitlisted" }));
+      expect(inserted.id).toBe("b2");
+      expect(await empty.bookings.listBySession("cs1")).toHaveLength(2);
+    });
   });
 });

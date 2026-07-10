@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { BookingConflictError } from "../errors";
 import type {
   Booking,
   ClassSession,
@@ -18,7 +19,9 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+const POSTGRES_UNIQUE_VIOLATION = "23505";
+
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -47,7 +50,12 @@ export function createSupabaseRepositories(): Repositories {
       .insert(toSnakeRow(row as Record<string, unknown>))
       .select()
       .single();
-    if (error) fail(`insert into ${table}`, error);
+    if (error) {
+      if (table === "bookings" && error.code === POSTGRES_UNIQUE_VIOLATION) {
+        throw new BookingConflictError();
+      }
+      fail(`insert into ${table}`, error);
+    }
     return toCamelRow<T>(data as Record<string, unknown>);
   }
 
@@ -88,7 +96,10 @@ export function createSupabaseRepositories(): Repositories {
           "members.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Member>(db.from("members").select("*").eq("id", id).maybeSingle(), "members.getById"),
+        maybeOne<Member>(
+          db.from("members").select("*").eq("id", id).maybeSingle(),
+          "members.getById",
+        ),
       findByEmail: (studioId, email) =>
         maybeOne<Member>(
           db.from("members").select("*").eq("studio_id", studioId).eq("email", email).maybeSingle(),
@@ -138,18 +149,28 @@ export function createSupabaseRepositories(): Repositories {
           "bookings.listBySession",
         ),
       getById: (id) =>
-        maybeOne<Booking>(db.from("bookings").select("*").eq("id", id).maybeSingle(), "bookings.getById"),
+        maybeOne<Booking>(
+          db.from("bookings").select("*").eq("id", id).maybeSingle(),
+          "bookings.getById",
+        ),
       insert: (booking) => insertReturning("bookings", booking),
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {
       listByStudio: (studioId) =>
         rows<Invoice>(
-          db.from("invoices").select("*").eq("studio_id", studioId).order("issued_at", { ascending: false }),
+          db
+            .from("invoices")
+            .select("*")
+            .eq("studio_id", studioId)
+            .order("issued_at", { ascending: false }),
           "invoices.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Invoice>(db.from("invoices").select("*").eq("id", id).maybeSingle(), "invoices.getById"),
+        maybeOne<Invoice>(
+          db.from("invoices").select("*").eq("id", id).maybeSingle(),
+          "invoices.getById",
+        ),
       countByStudio: async (studioId) => {
         const { count, error } = await db
           .from("invoices")
@@ -174,7 +195,9 @@ export function createSupabaseRepositories(): Repositories {
           .insert(items.map((item) => toSnakeRow(item as unknown as Record<string, unknown>)))
           .select();
         if (error) fail("invoiceLineItems.insertMany", error);
-        return (data ?? []).map((row) => toCamelRow<InvoiceLineItem>(row as Record<string, unknown>));
+        return (data ?? []).map((row) =>
+          toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
+        );
       },
     },
     outbox: {
