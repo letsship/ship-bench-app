@@ -43,6 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const url = `${siteUrl()}/s/${studio.slug}`;
   const title = `${studio.name} — classes & bookings`;
   const description = `See the upcoming class schedule at ${studio.name} and book your spot.`;
+  const imageUrl = `${siteUrl()}/studio-placeholder.svg`;
 
   return {
     title,
@@ -53,11 +54,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       type: "website",
       url,
+      images: [{ url: imageUrl, width: 960, height: 480, alt: `${studio.name} studio space` }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description,
+      images: [imageUrl],
     },
   };
 }
