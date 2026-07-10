@@ -1,3 +1,4 @@
+import type { AnalyticsTracker } from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -63,6 +64,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -99,6 +101,17 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    await tracker.capture({
+      event: "booking_created",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
+  } else {
+    await tracker.capture({
+      event: "waitlist_joined",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -111,6 +124,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -135,21 +149,31 @@ export async function cancelBooking(
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
   const promotedMemberId = isSeatTaking(booking.status)
-    ? await promoteFromWaitlist(repos, provider, session)
+    ? await promoteFromWaitlist(repos, provider, tracker, session)
     : null;
 
   const member = await loadMember(repos, booking.memberId);
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
+  await tracker.capture({
+    event: "booking_cancelled",
+    distinctId: member.id,
+    properties: { session_id: session.id },
+  });
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 
 async function promoteFromWaitlist(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   session: ClassSession,
 ): Promise<string | null> {
   const waitlisted = (await repos.bookings.listBySession(session.id)).filter(
@@ -170,5 +194,10 @@ async function promoteFromWaitlist(
     provider,
     waitlistPromotion(recipientOf(member), await summaryOf(repos, session)),
   );
+  await tracker.capture({
+    event: "booking_created",
+    distinctId: member.id,
+    properties: { session_id: session.id },
+  });
   return promoted.memberId;
 }
