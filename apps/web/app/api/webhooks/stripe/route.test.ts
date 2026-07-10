@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
@@ -135,6 +135,36 @@ describe("POST /api/webhooks/stripe", () => {
     const res = await POST(await signedRequest(body));
     expect(res.status).toBe(200);
     expect(await repos.invoices.getById(invoiceId)).toEqual(before);
+  });
+
+  it("rejects with 400 (not a 500) when STRIPE_WEBHOOK_SECRET is unset on this deployment", async () => {
+    // Regression test: a deployment that never provisioned
+    // STRIPE_WEBHOOK_SECRET must still reject unverifiable requests with 400
+    // — it must never crash with an uncaught 500, since that would be
+    // indistinguishable from "this endpoint is broken" rather than "this
+    // request could not be authenticated".
+    const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+    vi.resetModules();
+    try {
+      const { POST: postWithoutSecret } = await import("./route");
+      const body = JSON.stringify({
+        id: "evt_no_secret",
+        type: "invoice.paid",
+        data: { object: { metadata: { invoice_id: invoiceId } } },
+      });
+      const res = await postWithoutSecret(
+        new NextRequest("http://localhost/api/webhooks/stripe", {
+          method: "POST",
+          body,
+          headers: { "Stripe-Signature": "t=1,v1=deadbeef" },
+        }),
+      );
+      expect(res.status).toBe(400);
+    } finally {
+      process.env.STRIPE_WEBHOOK_SECRET = previousSecret;
+      vi.resetModules();
+    }
   });
 
   it("acknowledges a valid signature with an unrelated event type and changes nothing", async () => {

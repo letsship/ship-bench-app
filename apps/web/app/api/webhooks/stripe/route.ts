@@ -14,7 +14,18 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
   const rawBody = await request.text();
   const signature = request.headers.get("Stripe-Signature");
-  const verified = await verifyStripeSignature(rawBody, signature, stripeWebhookSecret());
+
+  // Anything that stops us from proving the request is genuinely from Stripe
+  // — a missing/malformed header, a wrong signature, or even a misconfigured
+  // STRIPE_WEBHOOK_SECRET on this deployment — must reject with 400, not
+  // crash with an uncaught 500. We can never treat an unverifiable request as
+  // authentic, so the failure mode is identical either way.
+  let verified = false;
+  try {
+    verified = await verifyStripeSignature(rawBody, signature, stripeWebhookSecret());
+  } catch {
+    verified = false;
+  }
   if (!verified) {
     return apiError(400, "invalid_signature", "Invalid or missing Stripe-Signature header");
   }

@@ -58,6 +58,16 @@ describe("processStripeWebhookEvent", () => {
     expect(after).toEqual(before);
   });
 
+  it("does not force a voided invoice back to paid", async () => {
+    await repos.invoices.update(invoiceId, { status: "void" });
+
+    await processStripeWebhookEvent(repos, invoicePaidEvent("evt_void", invoiceId));
+
+    const invoice = await repos.invoices.getById(invoiceId);
+    expect(invoice?.status).toBe("void");
+    expect(invoice?.paidAt).toBeNull();
+  });
+
   it("is a no-op for a non-invoice.paid event type", async () => {
     const before = await repos.invoices.getById(invoiceId);
 
