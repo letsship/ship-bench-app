@@ -13,7 +13,7 @@ Checklist:
 
 - No direct `@supabase/supabase-js` outside the repository implementation or
   Supabase client factories.
-- No direct Resend usage outside `apps/web/lib/notifications/resend-provider.ts`.
+- No direct Cloudflare Email usage outside `apps/web/lib/notifications/cloudflare-email-provider.ts`.
 - Route handlers validate input with Zod and use `handle()`.
 - Fake repositories and Supabase repositories stay behaviorally aligned.
 - Tests cover changed domain/service behavior.
