@@ -91,4 +91,38 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("classPackages: inserts, lists newest first, updates, and refunds", async () => {
+    const member = (await repos.members.listByStudio(studioId))[0];
+    const older = {
+      id: "pk_older",
+      studioId,
+      memberId: member.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 1000,
+      status: "active",
+      purchasedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const newer = {
+      ...older,
+      id: "pk_newer",
+      purchasedAt: "2026-02-01T00:00:00.000Z",
+    };
+    await repos.classPackages.insert(older);
+    await repos.classPackages.insert(newer);
+
+    const listed = await repos.classPackages.listByMember(member.id);
+    expect(listed.map((pack) => pack.id)).toEqual(["pk_newer", "pk_older"]);
+
+    const decremented = await repos.classPackages.update("pk_older", { creditsRemaining: 4 });
+    expect(decremented.creditsRemaining).toBe(4);
+
+    const refunded = await repos.classPackages.update("pk_newer", {
+      creditsRemaining: 0,
+      status: "refunded",
+    });
+    expect(refunded).toMatchObject({ creditsRemaining: 0, status: "refunded" });
+    expect(await repos.classPackages.getById("pk_newer")).toMatchObject({ status: "refunded" });
+  });
 });

@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type { Booking, ClassPackage, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
+import { listPackagesForMember, purchasePackage, refundPackage } from "./class-packages";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
@@ -94,6 +95,22 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   ...over,
 });
 
+const classPackage = (
+  id: string,
+  memberId: string,
+  over: Partial<ClassPackage> = {},
+): ClassPackage => ({
+  id,
+  studioId: "s1",
+  memberId,
+  creditsTotal: 5,
+  creditsRemaining: 5,
+  priceCents: 1000,
+  status: "active",
+  purchasedAt: ISO,
+  ...over,
+});
+
 describe("members service", () => {
   let repos: Repositories;
   let studioId: string;
@@ -160,7 +177,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +220,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -239,6 +265,120 @@ describe("bookings service", () => {
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+  });
+
+  it("books unchanged when the member has no class packages", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+  });
+
+  it("spends a credit from the oldest active pack when a member has packages", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        classPackages: [
+          classPackage("pk_newer", "m1", { purchasedAt: "2026-02-01T00:00:00.000Z" }),
+          classPackage("pk_older", "m1", { purchasedAt: "2026-01-01T00:00:00.000Z" }),
+        ],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+    expect((await repos.classPackages.getById("pk_older"))?.creditsRemaining).toBe(4);
+    expect((await repos.classPackages.getById("pk_newer"))?.creditsRemaining).toBe(5);
+  });
+
+  it("rejects with 402 pack_exhausted once every owned pack is spent or refunded", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        classPackages: [
+          classPackage("pk_spent", "m1", { creditsRemaining: 0 }),
+          classPackage("pk_refunded", "m1", { status: "refunded" }),
+        ],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
+  });
+
+  it("still rejects a double booking with 409 and spends no extra credit", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+        classPackages: [classPackage("pk1", "m1")],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    expect((await repos.classPackages.getById("pk1"))?.creditsRemaining).toBe(5);
+  });
+});
+
+describe("class packages service", () => {
+  let repos: Repositories;
+  let studioId: string;
+  let memberId: string;
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(buildSeed(NOW));
+    studioId = (await repos.studios.getFirst())?.id ?? "";
+    memberId = (await repos.members.listByStudio(studioId))[0].id;
+  });
+
+  it("purchases a pack with the credit count and a 1000-cent-per-credit price", async () => {
+    const pack = await purchasePackage(repos, studioId, { memberId, credits: 5 });
+    expect(pack).toMatchObject({
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 1000,
+      status: "active",
+    });
+    expect(pack.id).toBeTruthy();
+    expect(pack.purchasedAt).toBeTruthy();
+  });
+
+  it("lists a member's packs newest first, scoped to that member", async () => {
+    const otherMemberId = (await repos.members.listByStudio(studioId))[1].id;
+    const older = await purchasePackage(repos, studioId, { memberId, credits: 5 });
+    await repos.classPackages.update(older.id, { purchasedAt: "2020-01-01T00:00:00.000Z" });
+    await purchasePackage(repos, studioId, { memberId, credits: 10 });
+    await purchasePackage(repos, studioId, { memberId: otherMemberId, credits: 5 });
+
+    const list = await listPackagesForMember(repos, memberId);
+    expect(list).toHaveLength(2);
+    expect(list[0].creditsTotal).toBe(10);
+    expect(list[1].creditsTotal).toBe(5);
+  });
+
+  it("refund voids the remaining credits and 404s for an unknown id", async () => {
+    const pack = await purchasePackage(repos, studioId, { memberId, credits: 10 });
+    const refunded = await refundPackage(repos, pack.id);
+    expect(refunded).toMatchObject({ creditsRemaining: 0, status: "refunded" });
+
+    await expect(refundPackage(repos, "nope")).rejects.toMatchObject({ status: 404 });
   });
 });
 
