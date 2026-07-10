@@ -335,6 +335,24 @@ describe("bookings service", () => {
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
     expect((await repos.classPackages.getById("p1"))?.creditsRemaining).toBe(10);
   });
+
+  it("spends no credit when the booking only lands on the waitlist", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+        classPackages: [classPackage("p1", "m2")],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(result.status).toBe("waitlisted");
+    expect((await repos.classPackages.getById("p1"))?.creditsRemaining).toBe(10);
+  });
 });
 
 describe("invoices service", () => {
