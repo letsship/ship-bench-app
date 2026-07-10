@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,17 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Bookings CSV export for accounting: the repo-level SessionRange treats `to`
+// as exclusive (relied on by calendar/day-view queries), but this export
+// needs an inclusive upper bound, so it's filtered here in application code
+// instead of passed through to the repo layer.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId, { from: range.from });
+  return range.to === undefined ? rows : rows.filter((row) => row.startsAt <= range.to!);
 }
