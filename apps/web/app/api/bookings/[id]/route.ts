@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/auth/session";
 import { handle, ok } from "@/lib/http";
 import { cancelBooking } from "@/lib/services/bookings";
 import { resolveStudio } from "@/lib/services/context";
+import { createAnalyticsTracker } from "@/lib/analytics/tracker";
 import { createNotificationProvider } from "@/lib/notifications/provider";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export async function DELETE(
     await requireSession();
     const { repos } = await resolveStudio();
     const { id } = await params;
-    return ok(await cancelBooking(repos, createNotificationProvider(), id));
+    return ok(
+      await cancelBooking(repos, createNotificationProvider(), createAnalyticsTracker(), id),
+    );
   });
 }
