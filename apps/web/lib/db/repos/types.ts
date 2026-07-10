@@ -23,6 +23,17 @@ export interface SessionRange {
   to?: string;
 }
 
+// Thrown by a repo's `bookings.insert` when the write would create a second
+// active (booked/waitlisted/attended) booking for the same member + session —
+// the DB unique index in production, or the equivalent in-memory check in the
+// fake. Callers translate this into the standard "already has a booking" 409.
+export class DuplicateBookingError extends Error {
+  constructor(sessionId: string, memberId: string) {
+    super(`Member ${memberId} already has an active booking for session ${sessionId}`);
+    this.name = "DuplicateBookingError";
+  }
+}
+
 export interface StudioRepo {
   getFirst(): Promise<Studio | null>;
 }

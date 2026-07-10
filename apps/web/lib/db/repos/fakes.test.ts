@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
-import type { Repositories } from "./types";
+import { DuplicateBookingError, type Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -90,5 +90,44 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+});
+
+describe("in-memory bookings repo — duplicate active booking guard", () => {
+  const bookingRow = (id: string, status: string) => ({
+    id,
+    sessionId: "cs1",
+    memberId: "m1",
+    status,
+    bookedAt: NOW.toISOString(),
+    cancelledAt: null,
+  });
+
+  it.each(["booked", "waitlisted", "attended"])(
+    "rejects a second active insert when the existing booking is %s",
+    async (status) => {
+      const repos = createInMemoryRepositories();
+      await repos.bookings.insert(bookingRow("b1", status));
+      await expect(repos.bookings.insert(bookingRow("b2", "waitlisted"))).rejects.toBeInstanceOf(
+        DuplicateBookingError,
+      );
+      expect(await repos.bookings.listBySession("cs1")).toHaveLength(1);
+    },
+  );
+
+  it("allows a new insert after the existing booking was cancelled", async () => {
+    const repos = createInMemoryRepositories();
+    await repos.bookings.insert(bookingRow("b1", "cancelled"));
+    const inserted = await repos.bookings.insert(bookingRow("b2", "waitlisted"));
+    expect(inserted.id).toBe("b2");
+    expect(await repos.bookings.listBySession("cs1")).toHaveLength(2);
+  });
+
+  it("allows active bookings for different members or sessions", async () => {
+    const repos = createInMemoryRepositories();
+    await repos.bookings.insert(bookingRow("b1", "booked"));
+    await repos.bookings.insert({ ...bookingRow("b2", "booked"), memberId: "m2" });
+    await repos.bookings.insert({ ...bookingRow("b3", "booked"), sessionId: "cs2" });
+    expect(await repos.bookings.listBySessionIds(["cs1", "cs2"])).toHaveLength(3);
   });
 });
