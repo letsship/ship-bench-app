@@ -12,13 +12,9 @@ export const dynamic = "force-dynamic";
 
 const ALL_STATUSES: InvoiceStatus[] = ["draft", "open", "paid", "void", "refunded"];
 
-export default async function InvoiceDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { repos, ctx } = await resolveStudio();
-  const { id } = params;
+  const { id } = await params;
 
   let detail: Awaited<ReturnType<typeof getInvoiceDetail>>;
   try {
