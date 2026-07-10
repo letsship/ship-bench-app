@@ -92,6 +92,22 @@ jobs:
           pnpm exec wrangler delete -c "$CONFIG" --name "${{ inputs.worker_name }}" || true
 
       # --- DEPLOY: migrate + reseed the shared D1 database, build, deploy, set secrets ---
+      # The config file's database_id is a placeholder (wrangler trusts any non-empty
+      # database_id in a matching config entry instead of resolving it by name), so we
+      # resolve the real UUID via the account-level `d1 list` API — which never reads
+      # local config — and patch it in before any command that reads the config.
+      - name: Resolve the preview D1 database ID
+        if: inputs.action == 'deploy'
+        working-directory: apps/web
+        run: |
+          CONFIG="$(basename "${{ inputs.config_file }}")"
+          DB_ID="$(pnpm exec wrangler d1 list --json | jq -r '.[] | select(.name == "studiobook-preview") | .uuid')"
+          if [ -z "$DB_ID" ]; then
+            echo "Could not find a D1 database named 'studiobook-preview' in this account" >&2
+            exit 1
+          fi
+          sed -i "s/REPLACE_ME_WITH_A_REAL_D1_DATABASE_ID/$DB_ID/" "$CONFIG"
+
       - name: Reseed the shared preview D1 database
         if: inputs.action == 'deploy'
         working-directory: apps/web
