@@ -2,8 +2,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type {
+  Booking,
+  ClassSession,
+  ClassType,
+  Invoice,
+  InvoiceLineItem,
+  Member,
+} from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { getMemberStatement } from "./account-statements";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -94,6 +103,40 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   ...over,
 });
 
+const invoice = (id: string, memberId: string, over: Partial<Invoice> = {}): Invoice => ({
+  id,
+  studioId: "s1",
+  memberId,
+  number: `INV-2026-${id}`,
+  status: "open",
+  currency: "EUR",
+  taxRateBps: 900,
+  subtotalCents: 0,
+  taxCents: 0,
+  totalCents: 0,
+  issuedAt: ISO,
+  dueAt: null,
+  paidAt: null,
+  createdAt: ISO,
+  ...over,
+});
+
+const lineItem = (
+  id: string,
+  invoiceId: string,
+  over: Partial<InvoiceLineItem> = {},
+): InvoiceLineItem => ({
+  id,
+  invoiceId,
+  description: "Line",
+  quantity: 1,
+  unitAmountCents: 0,
+  amountCents: 0,
+  refunded: false,
+  bookingId: null,
+  ...over,
+});
+
 describe("members service", () => {
   let repos: Repositories;
   let studioId: string;
@@ -160,7 +203,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +246,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +337,68 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("stores a subtotal/tax/total for mixed lines that matches computeInvoiceTotals directly", async () => {
+    const provider = createFakeProvider();
+    const lineItems = [
+      { description: "Pass", quantity: 1, unitAmountCents: 10_000 },
+      { description: "Extra", quantity: 1, unitAmountCents: 5_000 },
+    ];
+    const detail = await createInvoice(repos, provider, studioId, { memberId, lineItems });
+    const expected = computeInvoiceTotals(lineItems, 900);
+    expect(detail.invoice.subtotalCents).toBe(expected.subtotalCents);
+    expect(detail.invoice.taxCents).toBe(expected.taxCents);
+    expect(detail.invoice.totalCents).toBe(expected.totalCents);
+  });
+});
+
+describe("account statements service", () => {
+  it("excludes a refunded line from the taxable subtotal, matching the invoice total exactly", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [
+          invoice("inv1", "m1", { subtotalCents: 10_000, taxCents: 900, totalCents: 10_900 }),
+        ],
+        lineItems: [
+          lineItem("li1", "inv1", {
+            description: "Billable",
+            unitAmountCents: 10_000,
+            amountCents: 10_000,
+          }),
+          lineItem("li2", "inv1", {
+            description: "Refunded",
+            unitAmountCents: 5_000,
+            amountCents: 5_000,
+            refunded: true,
+          }),
+        ],
+      }),
+    );
+    const statement = await getMemberStatement(repos, "s1", "m1");
+    expect(statement.lines).toEqual([
+      { invoiceId: "inv1", number: "INV-2026-inv1", totalCents: 10_900 },
+    ]);
+    expect(statement.balanceCents).toBe(10_900);
+    // Never the over-taxed figure from taxing the full 150.00.
+    expect(statement.balanceCents).not.toBe(16_350);
+  });
+
+  it("matches the invoice total unchanged when there are no refunded lines", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [
+          invoice("inv1", "m1", { subtotalCents: 2_000, taxCents: 180, totalCents: 2_180 }),
+        ],
+        lineItems: [
+          lineItem("li1", "inv1", { quantity: 2, unitAmountCents: 1_000, amountCents: 2_000 }),
+        ],
+      }),
+    );
+    const statement = await getMemberStatement(repos, "s1", "m1");
+    expect(statement.balanceCents).toBe(2_180);
   });
 });
 

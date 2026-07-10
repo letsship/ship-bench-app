@@ -36,6 +36,19 @@ describe("computeInvoiceTotals", () => {
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 4).taxCents).toBe(0);
   });
 
+  it("matches the finance-flagged example: a refunded line stays out of tax", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 10_000 },
+        { quantity: 1, unitAmountCents: 5_000, refunded: true },
+      ],
+      900,
+    );
+    expect(totals.subtotalCents).toBe(10_000);
+    expect(totals.taxCents).toBe(900);
+    expect(totals.totalCents).toBe(10_900);
+  });
+
   it("is zero across the board for no line items", () => {
     expect(computeInvoiceTotals([], 2100)).toEqual({
       subtotalCents: 0,
