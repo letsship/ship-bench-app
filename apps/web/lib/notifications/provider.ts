@@ -16,5 +16,11 @@ export function createNotificationProvider(): NotificationProvider {
       "CF_EMAIL_API_TOKEN is not set. Set it for real email delivery, or run with USE_FAKE_BACKENDS=1.",
     );
   }
-  return createCloudflareEmailProvider({ apiToken });
+  const accountId = process.env.CF_ACCOUNT_ID;
+  if (!accountId) {
+    throw new Error(
+      "CF_ACCOUNT_ID is not set. Set it for real email delivery, or run with USE_FAKE_BACKENDS=1.",
+    );
+  }
+  return createCloudflareEmailProvider({ apiToken, accountId });
 }

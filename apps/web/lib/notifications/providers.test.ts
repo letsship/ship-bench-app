@@ -36,14 +36,16 @@ describe("cloudflare email provider", () => {
   });
 
   it("posts the message to the Cloudflare email send API", async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: "cf_x" }), { status: 200 }));
-    const provider = createCloudflareEmailProvider({ apiToken: "k" });
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ result: { message_id: "cf_x" } }), { status: 200 }),
+    );
+    const provider = createCloudflareEmailProvider({ apiToken: "k", accountId: "acct_1" });
     const result = await provider.send(message);
 
     expect(result.providerMessageId).toBe("cf_x");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/email/send");
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/acct_1/email/sending/send");
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer k");
     expect(JSON.parse(init.body)).toEqual({
@@ -64,15 +66,30 @@ describe("cloudflare email provider", () => {
     }
   });
 
+  it("throws a clear error when CF_ACCOUNT_ID is missing", () => {
+    const originalToken = process.env.CF_EMAIL_API_TOKEN;
+    const originalAccount = process.env.CF_ACCOUNT_ID;
+    process.env.CF_EMAIL_API_TOKEN = "k";
+    delete process.env.CF_ACCOUNT_ID;
+    try {
+      expect(() => createNotificationProvider()).toThrow(/CF_ACCOUNT_ID is not set/);
+    } finally {
+      if (originalToken === undefined) delete process.env.CF_EMAIL_API_TOKEN;
+      else process.env.CF_EMAIL_API_TOKEN = originalToken;
+      if (originalAccount === undefined) delete process.env.CF_ACCOUNT_ID;
+      else process.env.CF_ACCOUNT_ID = originalAccount;
+    }
+  });
+
   it("throws when Cloudflare returns a non-ok response", async () => {
     fetchMock.mockResolvedValue(new Response("bad recipient", { status: 400 }));
-    const provider = createCloudflareEmailProvider({ apiToken: "k" });
+    const provider = createCloudflareEmailProvider({ apiToken: "k", accountId: "acct_1" });
     await expect(provider.send(message)).rejects.toThrow(/Cloudflare Email send failed/);
   });
 
-  it("throws when Cloudflare returns no id", async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
-    const provider = createCloudflareEmailProvider({ apiToken: "k" });
+  it("throws when Cloudflare returns no message id", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ result: {} }), { status: 200 }));
+    const provider = createCloudflareEmailProvider({ apiToken: "k", accountId: "acct_1" });
     await expect(provider.send(message)).rejects.toThrow(/no message id/);
   });
 });

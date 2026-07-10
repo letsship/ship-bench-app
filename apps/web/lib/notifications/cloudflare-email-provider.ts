@@ -4,21 +4,26 @@ import type { NotificationProvider } from "./types";
 // upstream of this file references Cloudflare Email directly — vendors are
 // swappable behind NotificationProvider.
 
-const CLOUDFLARE_EMAIL_SEND_URL = "https://api.cloudflare.com/client/v4/accounts/email/send";
+function buildSendUrl(accountId: string): string {
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/email/sending/send`;
+}
 
 export interface CloudflareEmailConfig {
   apiToken: string;
+  accountId: string;
 }
 
 interface CloudflareEmailSendResponse {
-  id: string;
+  result: {
+    message_id: string;
+  };
 }
 
 export function createCloudflareEmailProvider(config: CloudflareEmailConfig): NotificationProvider {
   return {
     name: "cloudflare-email",
     async send(message) {
-      const response = await fetch(CLOUDFLARE_EMAIL_SEND_URL, {
+      const response = await fetch(buildSendUrl(config.accountId), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${config.apiToken}`,
@@ -35,8 +40,9 @@ export function createCloudflareEmailProvider(config: CloudflareEmailConfig): No
         throw new Error(`Cloudflare Email send failed (${response.status}): ${detail}`);
       }
       const data = (await response.json()) as CloudflareEmailSendResponse;
-      if (!data.id) throw new Error("Cloudflare Email returned no message id");
-      return { providerMessageId: data.id };
+      const messageId = data.result?.message_id;
+      if (!messageId) throw new Error("Cloudflare Email returned no message id");
+      return { providerMessageId: messageId };
     },
   };
 }
