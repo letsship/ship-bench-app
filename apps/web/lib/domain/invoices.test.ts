@@ -44,6 +44,28 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("is zero across the board when every line item is refunded", () => {
+    const totals = computeInvoiceTotals(
+      [{ quantity: 1, unitAmountCents: 9000, refunded: true }],
+      2100,
+    );
+    expect(totals).toEqual({
+      subtotalCents: 0,
+      refundedCents: 9000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("does not throw for an empty line-items array", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
 });
 
 describe("formatInvoiceNumber", () => {

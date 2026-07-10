@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HttpError } from "@/lib/http";
-import { type InvoiceStatus, canTransitionInvoice, computeInvoiceTotals } from "@/lib/domain/invoices";
+import {
+  type InvoiceStatus,
+  canTransitionInvoice,
+  computeInvoiceTotals,
+} from "@/lib/domain/invoices";
 import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getInvoiceDetail } from "@/lib/services/invoices";
@@ -12,11 +16,7 @@ export const dynamic = "force-dynamic";
 
 const ALL_STATUSES: InvoiceStatus[] = ["draft", "open", "paid", "void", "refunded"];
 
-export default async function InvoiceDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { repos, ctx } = await resolveStudio();
   const { id } = await params;
 
@@ -107,14 +107,14 @@ export default async function InvoiceDetailPage({
       </div>
 
       <div className="mt-4 flex flex-col items-end gap-1 text-sm">
-        <div>
+        <div data-testid="invoice-subtotal">
           Subtotal <Money cents={totals.subtotalCents} currency={currency} />
         </div>
-        <div className="text-[var(--color-muted)]">
+        <div className="text-[var(--color-muted)]" data-testid="invoice-tax">
           Tax ({(invoice.taxRateBps / 100).toFixed(1)}%){" "}
           <Money cents={totals.taxCents} currency={currency} />
         </div>
-        <div className="text-lg font-semibold">
+        <div className="text-lg font-semibold" data-testid="invoice-total">
           Total <Money cents={totals.totalCents} currency={currency} />
         </div>
       </div>
