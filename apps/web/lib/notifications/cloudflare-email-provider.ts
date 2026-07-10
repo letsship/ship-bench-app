@@ -34,9 +34,18 @@ export function createCloudflareEmailProvider(config: CloudflareEmailConfig): No
         const detail = await response.text().catch(() => response.statusText);
         throw new Error(`Cloudflare Email send failed: ${response.status} ${detail}`);
       }
-      const data = (await response.json()) as { id?: string };
-      if (!data.id) throw new Error("Cloudflare Email returned no message id");
-      return { providerMessageId: data.id };
+      // The REST API's success payload carries delivery status
+      // (delivered/permanent_bounces/queued), not a message id, so we
+      // synthesize one for the outbox to store.
+      const data = (await response.json()) as {
+        success?: boolean;
+        errors?: Array<{ code: number; message: string }>;
+      };
+      if (!data.success) {
+        const detail = data.errors?.map((e) => e.message).join(", ") || "unknown error";
+        throw new Error(`Cloudflare Email send failed: ${detail}`);
+      }
+      return { providerMessageId: `cf_${crypto.randomUUID()}` };
     },
   };
 }
