@@ -91,4 +91,10 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("stripeWebhookEvents.insertIfNew records a new id and rejects a repeat", async () => {
+    const event = { id: "evt_1", type: "invoice.paid", receivedAt: NOW.toISOString() };
+    expect(await repos.stripeWebhookEvents.insertIfNew(event)).toBe(true);
+    expect(await repos.stripeWebhookEvents.insertIfNew(event)).toBe(false);
+  });
 });

@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  StripeWebhookEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -79,6 +80,12 @@ export interface NotificationOutboxRepo {
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
+export interface StripeWebhookEventsRepo {
+  // Atomically records an event id. Returns true if newly recorded, false if
+  // this id was already seen — the idempotency check for webhook replays.
+  insertIfNew(event: StripeWebhookEvent): Promise<boolean>;
+}
+
 export interface Repositories {
   studios: StudioRepo;
   settings: StudioSettingsRepo;
@@ -89,4 +96,5 @@ export interface Repositories {
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
   outbox: NotificationOutboxRepo;
+  stripeWebhookEvents: StripeWebhookEventsRepo;
 }
