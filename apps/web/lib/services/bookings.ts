@@ -142,11 +142,7 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(
-      recipientOf(member),
-      await summaryOf(repos, session),
-      decision.refundEligible,
-    ),
+    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
