@@ -12,13 +12,13 @@ name: deploy-preview
 #   action=deploy : build (OpenNext) + deploy a *.workers.dev Worker.
 #   action=delete : tear down the preview Worker on PR merge/close.
 #
-# Preview environments share ONE Supabase project but are ISOLATED per schema:
-# each PR maps (by number) to one schema from a pre-exposed pool (bench_1..N),
-# reseeded fresh before every deploy, so concurrent previews never share mutable
-# data. The Supabase URL + publishable key are injected at build time (inlined),
-# and SUPABASE_SECRET_KEY + RESEND_API_KEY + SUPABASE_SCHEMA are Worker secrets
-# set after deploy. Requires secret SUPABASE_DB_URL (a direct/pooler psql URL) +
-# a one-time `provision-pool.sh` run to expose the pool.
+# Preview environments read/write ONE Cloudflare D1 database, shared with
+# production (D1 has no lightweight per-branch database, so there's no
+# ephemeral per-PR schema like the old Supabase pool). Each deploy makes sure
+# that database exists and has every migration applied (both idempotent, via
+# `wrangler d1 create` + `wrangler d1 migrations apply`), then RESEND_API_KEY is
+# set as a Worker secret after deploy. Requires CLOUDFLARE_API_TOKEN /
+# CLOUDFLARE_ACCOUNT_ID (below) to carry D1 edit permissions.
 #
 # NOTE: this file must live on the DEFAULT branch for workflow_dispatch to
 # resolve it; ship.yml is read at the PR head SHA.
@@ -94,26 +94,23 @@ jobs:
           CONFIG="$(basename "${{ inputs.config_file }}")"
           pnpm exec wrangler delete -c "$CONFIG" --name "${{ inputs.worker_name }}" || true
 
-      # --- DEPLOY: isolate this PR's data, build, deploy, set secrets ---
-      - name: Reseed this PR's isolated schema
+      # --- DEPLOY: provision/migrate D1, build, deploy, set secrets ---
+      - name: Ensure preview D1 database + apply migrations
         if: inputs.action == 'deploy'
-        id: schema
-        env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        working-directory: apps/web
         run: |
-          POOL=12
-          PR="${{ inputs.pr_number }}"
-          # Deterministic schema per PR from the pre-exposed pool (bench_1..bench_POOL).
-          IDX=$(( ( ${PR:-0} % POOL ) + 1 ))
-          SCHEMA="bench_${IDX}"
-          echo "schema=$SCHEMA" >> "$GITHUB_OUTPUT"
-          bash packages/db/scripts/reseed-schema.sh "$SCHEMA"
+          set -euo pipefail
+          DB_NAME="studiobook"
+          CONFIG="$(basename "${{ inputs.config_file }}")"
+          # Idempotent: fails harmlessly if the database already exists.
+          pnpm exec wrangler d1 create "$DB_NAME" || true
+          DB_ID="$(pnpm exec wrangler d1 info "$DB_NAME" --json | jq -r '.uuid')"
+          sed -i "s/REPLACE_ME_WITH_WRANGLER_D1_CREATE_OUTPUT/$DB_ID/" "$CONFIG"
+          pnpm exec wrangler d1 migrations apply "$DB_NAME" -c "$CONFIG" --remote
 
       - name: Build apps/web for Cloudflare (OpenNext)
         if: inputs.action == 'deploy'
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_SITE_URL: https://${{ inputs.worker_name }}.${{ inputs.account_subdomain }}.workers.dev
         run: pnpm --filter @studiobook/web build:cf
 
@@ -130,14 +127,10 @@ jobs:
         if: inputs.action == 'deploy'
         working-directory: apps/web
         env:
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          SUPABASE_SCHEMA: ${{ steps.schema.outputs.schema }}
         run: |
           CONFIG="$(basename "${{ inputs.config_file }}")"
-          printf '%s' "$SUPABASE_SECRET_KEY" | pnpm exec wrangler secret put SUPABASE_SECRET_KEY -c "$CONFIG" --name "${{ inputs.worker_name }}"
           printf '%s' "$RESEND_API_KEY" | pnpm exec wrangler secret put RESEND_API_KEY -c "$CONFIG" --name "${{ inputs.worker_name }}"
-          printf '%s' "$SUPABASE_SCHEMA" | pnpm exec wrangler secret put SUPABASE_SCHEMA -c "$CONFIG" --name "${{ inputs.worker_name }}"
 
       - name: Signal deployment status to SHIP
         if: inputs.action == 'deploy'

@@ -22,6 +22,7 @@
       "binding": "DB",
       "database_name": "studiobook",
       "database_id": "REPLACE_ME_WITH_WRANGLER_D1_CREATE_OUTPUT",
+      "migrations_dir": "../../packages/db/migrations/d1",
     },
   ],
   "observability": {

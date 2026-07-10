@@ -2,9 +2,12 @@
   // Route-less preview config — deploys to *.workers.dev ONLY. The per-PR worker
   // name is supplied by the SHIP orchestrator via `wrangler deploy --name`.
   //
-  // Preview environments read/write the same D1 binding as production (there is
-  // no ephemeral per-PR database). The deploy-preview workflow sets the
-  // RESEND_API_KEY Worker secret after deploy. See the README's deploy section.
+  // Preview environments read/write the SAME D1 database as production (D1 has
+  // no lightweight per-branch database, so there's no ephemeral per-PR schema
+  // like the old Supabase pool). The deploy-preview workflow creates this
+  // database if it doesn't exist yet, applies any pending migrations, and sets
+  // the RESEND_API_KEY Worker secret after deploy. See the README's deploy
+  // section.
   "name": "studiobook-preview",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-06-01",
@@ -18,6 +21,7 @@
       "binding": "DB",
       "database_name": "studiobook",
       "database_id": "REPLACE_ME_WITH_WRANGLER_D1_CREATE_OUTPUT",
+      "migrations_dir": "../../packages/db/migrations/d1",
     },
   ],
   "observability": {
