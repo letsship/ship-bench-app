@@ -1,3 +1,8 @@
+import type { AnalyticsClient } from "@/lib/analytics/types";
+import {
+  getWaitlistExperimentGroup,
+  recordWaitlistJoined,
+} from "@/lib/analytics/waitlist-experiment";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -63,6 +68,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  analytics: AnalyticsClient,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -83,6 +89,17 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  if (decision.status === "waitlisted") {
+    const group = await getWaitlistExperimentGroup(analytics, member.id);
+    if (group === "control") {
+      throw new HttpError(
+        409,
+        "booking_session_full_no_waitlist",
+        DENY_MESSAGES.session_full_no_waitlist,
+      );
+    }
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -99,6 +116,8 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+  } else {
+    await recordWaitlistJoined(analytics, { memberId: member.id, sessionId: session.id });
   }
   return { bookingId, status: decision.status };
 }
@@ -142,7 +161,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }

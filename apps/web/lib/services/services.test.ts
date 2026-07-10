@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { createFakeProvider as createFakeAnalyticsProvider } from "@/lib/analytics/fake-provider";
+import { WAITLIST_EXPERIMENT_FLAG_KEY } from "@/lib/analytics/waitlist-experiment";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -160,10 +162,17 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    const result = await createBooking(repos, provider, createFakeAnalyticsProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
     expect(result.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind)).toEqual(["booking_confirmation"]);
   });
@@ -178,7 +187,10 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    const result = await createBooking(repos, provider, createFakeAnalyticsProvider(), {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
     expect(result.status).toBe("waitlisted");
     expect(provider.sent).toHaveLength(0);
   });
@@ -193,13 +205,81 @@ describe("bookings service", () => {
       }),
     );
     await expect(
-      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+      createBooking(repos, createFakeProvider(), createFakeAnalyticsProvider(), {
+        sessionId: "cs1",
+        memberId: "m1",
+      }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("turns away a control-group member with the existing 409 when full", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    const analytics = createFakeAnalyticsProvider();
+    analytics.setFlag("m2", WAITLIST_EXPERIMENT_FLAG_KEY, "control");
+    await expect(
+      createBooking(repos, provider, analytics, { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_session_full_no_waitlist" });
+    expect(provider.sent).toHaveLength(0);
+    expect(analytics.captured).toHaveLength(0);
+  });
+
+  it("waitlists a variant-group member when full and records waitlist_joined", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    const analytics = createFakeAnalyticsProvider();
+    analytics.setFlag("m2", WAITLIST_EXPERIMENT_FLAG_KEY, "test");
+    const result = await createBooking(repos, provider, analytics, {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(result.status).toBe("waitlisted");
+    expect(analytics.captured).toEqual([
+      { distinctId: "m2", event: "waitlist_joined", properties: { sessionId: "cs1" } },
+    ]);
+  });
+
+  it("books a non-full session normally regardless of the experiment flag", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    const analytics = createFakeAnalyticsProvider();
+    analytics.setFlag("m1", WAITLIST_EXPERIMENT_FLAG_KEY, "control");
+    const result = await createBooking(repos, provider, analytics, {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+    expect(analytics.captured).toHaveLength(0);
   });
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
