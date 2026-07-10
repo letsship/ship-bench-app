@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  CLOUDFLARE_EMAIL_SEND_URL,
-  createCloudflareEmailProvider,
-} from "./cloudflare-email-provider";
+import { createCloudflareEmailProvider } from "./cloudflare-email-provider";
 import { createFakeProvider } from "./fake-provider";
 import { createNotificationProvider } from "./provider";
 import type { NotificationMessage } from "./types";
@@ -39,12 +36,12 @@ describe("cloudflare email provider", () => {
       ok: true,
       json: async () => ({ id: "cf_x" }),
     });
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok", accountId: "acct_1" });
     const result = await provider.send(message);
     expect(result.providerMessageId).toBe("cf_x");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe(CLOUDFLARE_EMAIL_SEND_URL);
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/acct_1/email/sending/send");
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer tok");
     expect(JSON.parse(init.body)).toEqual({
@@ -61,13 +58,13 @@ describe("cloudflare email provider", () => {
       statusText: "Unauthorized",
       text: async () => "invalid token",
     });
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok", accountId: "acct_1" });
     await expect(provider.send(message)).rejects.toThrow(/Cloudflare Email send failed/);
   });
 
   it("throws when the Cloudflare email API returns no message id", async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
-    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok", accountId: "acct_1" });
     await expect(provider.send(message)).rejects.toThrow(/no message id/);
   });
 });
@@ -75,17 +72,28 @@ describe("cloudflare email provider", () => {
 describe("createNotificationProvider", () => {
   const originalUseFake = process.env.USE_FAKE_BACKENDS;
   const originalToken = process.env.CF_EMAIL_API_TOKEN;
+  const originalAccountId = process.env.CF_ACCOUNT_ID;
 
   afterEach(() => {
     if (originalUseFake === undefined) delete process.env.USE_FAKE_BACKENDS;
     else process.env.USE_FAKE_BACKENDS = originalUseFake;
     if (originalToken === undefined) delete process.env.CF_EMAIL_API_TOKEN;
     else process.env.CF_EMAIL_API_TOKEN = originalToken;
+    if (originalAccountId === undefined) delete process.env.CF_ACCOUNT_ID;
+    else process.env.CF_ACCOUNT_ID = originalAccountId;
   });
 
   it("throws when CF_EMAIL_API_TOKEN is unset", () => {
     delete process.env.USE_FAKE_BACKENDS;
     delete process.env.CF_EMAIL_API_TOKEN;
+    delete process.env.CF_ACCOUNT_ID;
     expect(() => createNotificationProvider()).toThrow(/CF_EMAIL_API_TOKEN is not set/);
+  });
+
+  it("throws when CF_ACCOUNT_ID is unset", () => {
+    delete process.env.USE_FAKE_BACKENDS;
+    process.env.CF_EMAIL_API_TOKEN = "tok";
+    delete process.env.CF_ACCOUNT_ID;
+    expect(() => createNotificationProvider()).toThrow(/CF_ACCOUNT_ID is not set/);
   });
 });

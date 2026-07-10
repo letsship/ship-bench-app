@@ -4,17 +4,21 @@ import type { NotificationProvider } from "./types";
 // upstream of this file references Cloudflare Email directly — vendors are
 // swappable behind NotificationProvider.
 
-export const CLOUDFLARE_EMAIL_SEND_URL = "https://api.cloudflare.com/client/v4/email/send";
+export function cloudflareEmailSendUrl(accountId: string): string {
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/email/sending/send`;
+}
 
 export interface CloudflareEmailConfig {
   apiToken: string;
+  accountId: string;
 }
 
 export function createCloudflareEmailProvider(config: CloudflareEmailConfig): NotificationProvider {
+  const sendUrl = cloudflareEmailSendUrl(config.accountId);
   return {
     name: "cloudflare-email",
     async send(message) {
-      const response = await fetch(CLOUDFLARE_EMAIL_SEND_URL, {
+      const response = await fetch(sendUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${config.apiToken}`,
