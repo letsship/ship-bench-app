@@ -63,10 +63,16 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
       return apiError(error.status, error.code, error.message, error.details);
     }
     console.error("Unhandled API error", error);
-    Sentry.captureException(error);
-    // Cloudflare Workers drops un-awaited async work once the response is
-    // sent, so flush the event before returning rather than fire-and-forget.
-    await Sentry.flush(2000);
+    try {
+      // Cloudflare Workers drops un-awaited async work once the response is
+      // sent, so flush the event before returning rather than fire-and-forget.
+      // A Sentry outage must not itself break the error response, so this is
+      // best-effort — same pattern as the outbox dispatcher's delivery try/catch.
+      Sentry.captureException(error);
+      await Sentry.flush(2000);
+    } catch (sentryError) {
+      console.error("Failed to report error to Sentry", sentryError);
+    }
     return apiError(500, "internal_error", "Something went wrong");
   }
 }

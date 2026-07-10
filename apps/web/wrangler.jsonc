@@ -7,7 +7,10 @@
   // `wrangler secret put <NAME>` — never commit them.
   "name": "studiobook",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2025-06-01",
+  // 2025-08-16+ is required so the runtime exposes node:http/node:https,
+  // which @sentry/nextjs needs to actually send captured events — see
+  // https://docs.sentry.io/platforms/javascript/guides/cloudflare/frameworks/nextjs/
+  "compatibility_date": "2025-08-16",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
