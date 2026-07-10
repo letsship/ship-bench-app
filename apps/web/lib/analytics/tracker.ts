@@ -3,19 +3,30 @@ import { createFakeTracker } from "./fake-tracker";
 import { createPostHogTracker } from "./posthog-tracker";
 import type { AnalyticsTracker } from "./types";
 
-// The app's analytics tracker. Production uses PostHog (a real API key is
-// required — a missing key is surfaced as an error, never silently degraded).
-// The local fake-backends mode uses the in-memory recorder so the app runs with
-// no vendor account.
+// The app's analytics tracker. Production uses PostHog when configured. Unlike
+// the notification provider, a missing/broken PostHog config degrades to a
+// no-op tracker (logged, not thrown): losing product-analytics visibility must
+// never take down booking/cancellation for a member. The local fake-backends
+// mode always uses the in-memory recorder so the app runs with no vendor
+// account.
 export function createAnalyticsTracker(): AnalyticsTracker {
   if (process.env.USE_FAKE_BACKENDS === "1") {
     return createFakeTracker();
   }
   const { POSTHOG_PROJECT_API_KEY: apiKey, POSTHOG_HOST: host } = serverEnv();
   if (!apiKey || !host) {
-    throw new Error(
-      "POSTHOG_PROJECT_API_KEY / POSTHOG_HOST are not set. Set them for real analytics capture, or run with USE_FAKE_BACKENDS=1.",
+    console.error(
+      "POSTHOG_PROJECT_API_KEY / POSTHOG_HOST are not set. Analytics capture is disabled for this request.",
     );
+    return createFakeTracker();
   }
-  return createPostHogTracker({ apiKey, host });
+  try {
+    return createPostHogTracker({ apiKey, host });
+  } catch (err) {
+    console.error(
+      "Failed to construct the PostHog client. Analytics capture is disabled for this request.",
+      err,
+    );
+    return createFakeTracker();
+  }
 }
