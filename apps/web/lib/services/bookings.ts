@@ -84,9 +84,12 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
-  const packages = await repos.classPackages.listByMember(member.id);
+  // A pack credit is only ever at stake for a confirmed seat — joining the
+  // waitlist guarantees nothing, so it neither spends a credit nor requires one.
+  const packages =
+    decision.status === "booked" ? await repos.classPackages.listByMember(member.id) : [];
   const draw = decideCreditDraw(packages);
-  if (draw.applicable && !draw.ok) {
+  if (decision.status === "booked" && draw.applicable && !draw.ok) {
     throw new HttpError(
       402,
       "pack_exhausted",
@@ -104,7 +107,7 @@ export async function createBooking(
     cancelledAt: null,
   });
 
-  if (draw.applicable && draw.ok) {
+  if (decision.status === "booked" && draw.applicable && draw.ok) {
     const drawnPackage = packages.find((pack) => pack.id === draw.packageId);
     if (drawnPackage) {
       await repos.classPackages.update(draw.packageId, {

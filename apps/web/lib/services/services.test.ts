@@ -303,6 +303,41 @@ describe("bookings service", () => {
     expect((await repos.classPackages.getById("pk_newer"))?.creditsRemaining).toBe(5);
   });
 
+  it("does not spend a credit when the booking only lands on the waitlist", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+        classPackages: [classPackage("pk1", "m2")],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(result.status).toBe("waitlisted");
+    expect((await repos.classPackages.getById("pk1"))?.creditsRemaining).toBe(5);
+  });
+
+  it("lets an exhausted-pack member join the waitlist instead of 402ing", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+        classPackages: [classPackage("pk1", "m2", { creditsRemaining: 0 })],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(result.status).toBe("waitlisted");
+  });
+
   it("rejects with 402 pack_exhausted once every owned pack is spent or refunded", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
@@ -367,7 +402,7 @@ describe("class packages service", () => {
     await purchasePackage(repos, studioId, { memberId, credits: 10 });
     await purchasePackage(repos, studioId, { memberId: otherMemberId, credits: 5 });
 
-    const list = await listPackagesForMember(repos, memberId);
+    const list = await listPackagesForMember(repos, studioId, memberId);
     expect(list).toHaveLength(2);
     expect(list[0].creditsTotal).toBe(10);
     expect(list[1].creditsTotal).toBe(5);

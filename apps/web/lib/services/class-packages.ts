@@ -50,8 +50,13 @@ export async function purchasePackage(
 
 export async function listPackagesForMember(
   repos: Repositories,
+  studioId: string,
   memberId: string,
 ): Promise<ClassPackageListItem[]> {
+  const member = await repos.members.getById(memberId);
+  if (!member || member.studioId !== studioId) {
+    throw new HttpError(400, "bad_request", "Unknown member for this studio");
+  }
   const packages = await repos.classPackages.listByMember(memberId);
   return packages.map(toListItem);
 }
