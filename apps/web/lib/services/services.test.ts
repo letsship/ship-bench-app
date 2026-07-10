@@ -168,7 +168,7 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, createFakeExperimentClient(), {
+    const result = await createBooking(repos, provider, () => createFakeExperimentClient(), {
       sessionId: "cs1",
       memberId: "m1",
     });
@@ -186,7 +186,7 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, createFakeExperimentClient(), {
+    const result = await createBooking(repos, provider, () => createFakeExperimentClient(), {
       sessionId: "cs1",
       memberId: "m2",
     });
@@ -206,7 +206,7 @@ describe("bookings service", () => {
     const experiments = createFakeExperimentClient();
     experiments.setVariant("m2", "control");
     await expect(
-      createBooking(repos, createFakeProvider(), experiments, {
+      createBooking(repos, createFakeProvider(), () => experiments, {
         sessionId: "cs1",
         memberId: "m2",
       }),
@@ -226,7 +226,7 @@ describe("bookings service", () => {
     );
     const experiments = createFakeExperimentClient();
     experiments.setVariant("m2", "test");
-    const result = await createBooking(repos, createFakeProvider(), experiments, {
+    const result = await createBooking(repos, createFakeProvider(), () => experiments, {
       sessionId: "cs1",
       memberId: "m2",
     });
@@ -234,7 +234,7 @@ describe("bookings service", () => {
     expect(experiments.captured).toEqual([{ memberId: "m2", sessionId: "cs1" }]);
   });
 
-  it("books a non-full session normally regardless of experiment variant", async () => {
+  it("books a non-full session normally without ever consulting the experiment client", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
         classTypes: [classType("ct1")],
@@ -244,11 +244,18 @@ describe("bookings service", () => {
     );
     const experiments = createFakeExperimentClient();
     experiments.setVariant("m1", "control");
-    const result = await createBooking(repos, createFakeProvider(), experiments, {
-      sessionId: "cs1",
-      memberId: "m1",
-    });
+    let getExperimentsCalls = 0;
+    const result = await createBooking(
+      repos,
+      createFakeProvider(),
+      () => {
+        getExperimentsCalls += 1;
+        return experiments;
+      },
+      { sessionId: "cs1", memberId: "m1" },
+    );
     expect(result.status).toBe("booked");
+    expect(getExperimentsCalls).toBe(0);
     expect(experiments.captured).toHaveLength(0);
   });
 
@@ -262,7 +269,7 @@ describe("bookings service", () => {
       }),
     );
     await expect(
-      createBooking(repos, createFakeProvider(), createFakeExperimentClient(), {
+      createBooking(repos, createFakeProvider(), () => createFakeExperimentClient(), {
         sessionId: "cs1",
         memberId: "m1",
       }),

@@ -27,7 +27,7 @@ export async function POST(request: Request): Promise<Response> {
     const { repos } = await resolveStudio();
     const input = createBookingSchema.parse(await request.json());
     return created(
-      await createBooking(repos, createNotificationProvider(), createExperimentClient(), input),
+      await createBooking(repos, createNotificationProvider(), createExperimentClient, input),
     );
   });
 }

@@ -68,7 +68,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
-  experiments: ExperimentClient,
+  getExperiments: () => ExperimentClient,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -89,7 +89,12 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  // Only ever consult the experiment client when a session is actually full
+  // (and waitlisting is enabled) — a `booked` decision must never depend on
+  // it, so a missing/unreachable PostHog config can't break normal bookings.
+  let experiments: ExperimentClient | undefined;
   if (decision.status === "waitlisted") {
+    experiments = getExperiments();
     const variant = await experiments.getWaitlistVariant(member.id);
     if (variant === CONTROL_VARIANT) {
       throw new HttpError(
@@ -117,7 +122,7 @@ export async function createBooking(
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   } else {
-    await experiments.captureWaitlistJoined({ memberId: member.id, sessionId: session.id });
+    await experiments?.captureWaitlistJoined({ memberId: member.id, sessionId: session.id });
   }
   return { bookingId, status: decision.status };
 }
