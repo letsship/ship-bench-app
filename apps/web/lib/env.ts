@@ -51,3 +51,10 @@ export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
 };
+
+// Canonical origin for anything that needs an absolute URL (SEO metadata,
+// sitemap, robots). Reads NEXT_PUBLIC_SITE_URL directly rather than through
+// clientEnv(), which would force Supabase vars to be present too — fake-backends
+// mode (and its build, e.g. for e2e) sets neither. Falls back to localhost so
+// local dev / fake-backends mode works without setting it.
+export const siteUrl = (): string => process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
