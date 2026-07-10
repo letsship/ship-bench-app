@@ -1,10 +1,11 @@
-import { Resend } from "resend";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  CLOUDFLARE_EMAIL_SEND_URL,
+  createCloudflareEmailProvider,
+} from "./cloudflare-email-provider";
 import { createFakeProvider } from "./fake-provider";
-import { createResendProvider } from "./resend-provider";
+import { createNotificationProvider } from "./provider";
 import type { NotificationMessage } from "./types";
-
-vi.mock("resend", () => ({ Resend: vi.fn() }));
 
 const message: NotificationMessage = {
   kind: "booking_confirmation",
@@ -25,37 +26,66 @@ describe("fake provider", () => {
   });
 });
 
-describe("resend provider", () => {
-  const send = vi.fn();
+describe("cloudflare email provider", () => {
+  const fetchMock = vi.fn();
 
   beforeEach(() => {
-    send.mockReset();
-    vi.mocked(Resend).mockImplementation(() => ({ emails: { send } }) as unknown as Resend);
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("maps a message onto the Resend send params", async () => {
-    send.mockResolvedValue({ data: { id: "re_x" }, error: null });
-    const provider = createResendProvider({ apiKey: "k", from: "Studiobook <s@b.co>" });
+  it("posts to the Cloudflare email send API with the bearer token and message body", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "cf_x" }),
+    });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
     const result = await provider.send(message);
-    expect(result.providerMessageId).toBe("re_x");
-    expect(send).toHaveBeenCalledWith({
-      from: "Studiobook <s@b.co>",
-      to: ["a@b.co"],
+    expect(result.providerMessageId).toBe("cf_x");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(CLOUDFLARE_EMAIL_SEND_URL);
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer tok");
+    expect(JSON.parse(init.body)).toEqual({
+      to: "a@b.co",
       subject: "Hi",
       text: "Body text",
-      tags: [{ name: "kind", value: "booking_confirmation" }],
     });
   });
 
-  it("throws when Resend returns an error", async () => {
-    send.mockResolvedValue({ data: null, error: { message: "bad recipient" } });
-    const provider = createResendProvider({ apiKey: "k", from: "s@b.co" });
-    await expect(provider.send(message)).rejects.toThrow(/Resend send failed: bad recipient/);
+  it("throws when the Cloudflare email API responds with a non-OK status", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      text: async () => "invalid token",
+    });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
+    await expect(provider.send(message)).rejects.toThrow(/Cloudflare Email send failed/);
   });
 
-  it("throws when Resend returns no id", async () => {
-    send.mockResolvedValue({ data: null, error: null });
-    const provider = createResendProvider({ apiKey: "k", from: "s@b.co" });
+  it("throws when the Cloudflare email API returns no message id", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
+    const provider = createCloudflareEmailProvider({ apiToken: "tok" });
     await expect(provider.send(message)).rejects.toThrow(/no message id/);
+  });
+});
+
+describe("createNotificationProvider", () => {
+  const originalUseFake = process.env.USE_FAKE_BACKENDS;
+  const originalToken = process.env.CF_EMAIL_API_TOKEN;
+
+  afterEach(() => {
+    if (originalUseFake === undefined) delete process.env.USE_FAKE_BACKENDS;
+    else process.env.USE_FAKE_BACKENDS = originalUseFake;
+    if (originalToken === undefined) delete process.env.CF_EMAIL_API_TOKEN;
+    else process.env.CF_EMAIL_API_TOKEN = originalToken;
+  });
+
+  it("throws when CF_EMAIL_API_TOKEN is unset", () => {
+    delete process.env.USE_FAKE_BACKENDS;
+    delete process.env.CF_EMAIL_API_TOKEN;
+    expect(() => createNotificationProvider()).toThrow(/CF_EMAIL_API_TOKEN is not set/);
   });
 });
