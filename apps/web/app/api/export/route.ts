@@ -2,13 +2,14 @@ import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { badRequest, handle } from "@/lib/http";
 import { resolveStudio } from "@/lib/services/context";
-import { invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
+import { bookingsToCsv, invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
+import { listBookingRows } from "@/lib/services/booking-list";
 import { listInvoices } from "@/lib/services/invoices";
 import { listMembers } from "@/lib/services/members";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/export?type=members|invoices — a CSV download.
+// GET /api/export?type=members|invoices|bookings[&from=&to=] — a CSV download.
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
     await requireSession();
@@ -20,6 +21,14 @@ export async function GET(request: NextRequest): Promise<Response> {
       csv = membersToCsv(await listMembers(repos, ctx.studio.id));
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
+    } else if (type === "bookings") {
+      const from = request.nextUrl.searchParams.get("from") ?? undefined;
+      const to = request.nextUrl.searchParams.get("to") ?? undefined;
+      // SessionRange.to is exclusive downstream (see fakes/supabase repos), but
+      // this export's `to` bound is inclusive, so it's applied here instead of
+      // being passed into the range query.
+      const rows = await listBookingRows(repos, ctx.studio.id, { from });
+      csv = bookingsToCsv(rows.filter((row) => !to || row.startsAt <= to));
     } else {
       return badRequest(`Unknown export type: ${type}`);
     }
