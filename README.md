@@ -113,14 +113,14 @@ Persistence needs no env var: the D1 binding (`DB`) is configured in
 ## Deploying a preview (Cloudflare)
 
 `ship.yml` wires `.github/workflows/deploy-preview.yml` for SHIP's deploy stage.
-On `action=deploy` it builds with OpenNext (Supabase URL + publishable key
-injected at build time) and deploys a `*.workers.dev` Worker, then sets
-`SUPABASE_SECRET_KEY` + `RESEND_API_KEY` as Worker secrets; `action=delete` tears
+On `action=deploy` it applies migrations and reseeds the demo dataset against
+the preview D1 database, builds with OpenNext, deploys a `*.workers.dev`
+Worker, then sets `RESEND_API_KEY` as a Worker secret; `action=delete` tears
 the Worker down on PR close.
 
-> Limitation: preview environments share **one seeded Supabase project** — there
-> is no ephemeral per-PR database. Point the workflow's `SUPABASE_*` /
-> `RESEND_API_KEY` GitHub secrets at a dedicated preview project.
+> Limitation: preview environments share **one D1 database** — there is no
+> ephemeral per-PR database. Every deploy reseeds it fresh from
+> `apps/web/seed.sql`, so concurrent preview deploys can race each other's data.
 
 ## Migrations
 

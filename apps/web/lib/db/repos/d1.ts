@@ -1,5 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { and, asc, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import {
   bookings,
@@ -134,8 +134,11 @@ export function createD1Repositories(): Repositories {
       getById: async (id): Promise<Invoice | null> =>
         (await db().select().from(invoices).where(eq(invoices.id, id)))[0] ?? null,
       countByStudio: async (studioId): Promise<number> => {
-        const rows = await db().select().from(invoices).where(eq(invoices.studioId, studioId));
-        return rows.length;
+        const rows = await db()
+          .select({ count: sql<number>`count(*)` })
+          .from(invoices)
+          .where(eq(invoices.studioId, studioId));
+        return rows[0]?.count ?? 0;
       },
       insert: async (invoice: Invoice): Promise<Invoice> =>
         (await db().insert(invoices).values(invoice).returning())[0] as Invoice,
