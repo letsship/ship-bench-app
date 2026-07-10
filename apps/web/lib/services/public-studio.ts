@@ -37,6 +37,7 @@ export function buildStudioMetaDescription(studio: Studio): string {
 }
 
 interface StudioEvent {
+  "@context": "https://schema.org";
   "@type": "Event";
   name: string;
   startDate: string;
@@ -58,6 +59,7 @@ export function buildStudioJsonLd(
   canonicalUrl: string,
 ): StudioEvent[] {
   return sessions.map((session) => ({
+    "@context": "https://schema.org",
     "@type": "Event",
     name: session.classTypeName,
     startDate: session.startsAt,

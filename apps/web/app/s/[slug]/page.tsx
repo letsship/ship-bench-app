@@ -60,7 +60,7 @@ export default async function PublicStudioPage({ params }: PageProps) {
     <main className="mx-auto max-w-3xl px-6 py-16">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
       <img

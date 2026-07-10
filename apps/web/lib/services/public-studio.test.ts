@@ -112,6 +112,7 @@ describe("buildStudioJsonLd", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
+      "@context": "https://schema.org",
       "@type": "Event",
       name: "Yoga",
       startDate: FUTURE,

@@ -30,6 +30,7 @@ test.describe("public studio page", () => {
     expect(Array.isArray(events)).toBe(true);
     expect(events.length).toBeGreaterThan(0);
     for (const event of events) {
+      expect(event["@context"]).toBe("https://schema.org");
       expect(event["@type"]).toBe("Event");
       expect(event.name).toBeTruthy();
       expect(event.startDate).toBeTruthy();
