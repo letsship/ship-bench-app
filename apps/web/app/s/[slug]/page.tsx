@@ -39,11 +39,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       url: canonicalUrl,
       type: "website",
+      images: [{ url: "/studio-cover.svg" }],
     },
     twitter: {
       card: "summary",
       title,
       description,
+      images: ["/studio-cover.svg"],
     },
   };
 }

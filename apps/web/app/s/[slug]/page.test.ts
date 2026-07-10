@@ -26,7 +26,11 @@ describe("generateMetadata for the public studio page", () => {
       title: "Riverbank Movement — book a class",
       type: "website",
     });
+    expect(metadata.openGraph?.images).toBeTruthy();
     expect(metadata.twitter).toMatchObject({ card: "summary" });
+    expect(
+      metadata.twitter && "images" in metadata.twitter && metadata.twitter.images,
+    ).toBeTruthy();
   });
 
   it("leaves an unknown slug unindexed", async () => {
