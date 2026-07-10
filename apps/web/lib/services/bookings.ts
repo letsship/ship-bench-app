@@ -84,7 +84,9 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
-  await drawCreditForBooking(repos, member.id);
+  if (decision.status === "booked") {
+    await drawCreditForBooking(repos, member.id);
+  }
 
   const bookingId = newId();
   await repos.bookings.insert({
