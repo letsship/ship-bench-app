@@ -43,6 +43,49 @@ test("an operator can schedule a new class from the UI", async ({ page }) => {
   await expect(page.getByTestId("schedule").getByText("E2E Tester").first()).toBeVisible();
 });
 
+test("an invoice line-item description containing HTML renders as literal text, not markup", async ({
+  page,
+}) => {
+  const dialogs: string[] = [];
+  page.on("dialog", (dialog) => {
+    dialogs.push(dialog.message());
+    void dialog.dismiss();
+  });
+
+  const payload = '<img src=x onerror="alert(document.cookie)">';
+
+  await signIn(page);
+  await page.goto("/invoices");
+
+  const form = page.getByRole("form", { name: "New invoice" });
+  await form.getByPlaceholder("Description").first().fill(payload);
+  await form.getByLabel("Unit price").first().fill("10.00");
+
+  await form.getByRole("button", { name: "+ Add line" }).click();
+  await form.getByPlaceholder("Description").nth(1).fill("Studio rental");
+  await form.getByLabel("Unit price").nth(1).fill("25.00");
+
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/invoices") && response.request().method() === "POST",
+  );
+  await form.getByRole("button", { name: "Issue invoice" }).click();
+  const invoiceId = (await responsePromise.then((response) => response.json())).invoice.id;
+
+  await page.goto(`/invoices/${invoiceId}`);
+
+  const table = page.locator("table.sb-table");
+  const rows = table.locator("tbody tr");
+  const payloadCell = rows.nth(0).locator("td").first();
+  const plainCell = rows.nth(1).locator("td").first();
+
+  await expect(payloadCell).toContainText(payload);
+  await expect(payloadCell.locator("img")).toHaveCount(0);
+  await expect(plainCell).toContainText("Studio rental");
+
+  expect(dialogs).toEqual([]);
+});
+
 test("the dashboard renders with zero console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
