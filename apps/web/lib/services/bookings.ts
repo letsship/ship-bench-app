@@ -111,11 +111,15 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  studioId: string,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
   const session = await loadSession(repos, booking.sessionId);
+  if (session.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Booking not found");
+  }
   const { settings } = await getStudioContext(repos);
 
   const decision = canCancel({
@@ -142,7 +146,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
