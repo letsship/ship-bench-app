@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { resolveRepositories } from "@/lib/db/repos";
 import { siteUrl } from "@/lib/env";
 import { formatDateTime } from "@/lib/format";
 import { getPublicStudioBySlug } from "@/lib/services/public-studio";
 
 export const dynamic = "force-dynamic";
+
+// Deduped per-request so generateMetadata and the page body share one DB lookup.
+const loadPublicStudio = cache(async (slug: string) => {
+  const repos = await resolveRepositories();
+  return getPublicStudioBySlug(repos, slug);
+});
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -20,8 +27,7 @@ const PLACEHOLDER_IMAGE = `data:image/svg+xml;utf8,${encodeURIComponent(
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const repos = await resolveRepositories();
-  const data = await getPublicStudioBySlug(repos, slug);
+  const data = await loadPublicStudio(slug);
   if (!data) return {};
 
   const { studio } = data;
@@ -49,8 +55,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PublicStudioPage({ params }: PageProps) {
   const { slug } = await params;
-  const repos = await resolveRepositories();
-  const data = await getPublicStudioBySlug(repos, slug);
+  const data = await loadPublicStudio(slug);
   if (!data) notFound();
 
   const { studio, upcomingSessions } = data;
@@ -75,7 +80,7 @@ export default async function PublicStudioPage({ params }: PageProps) {
     <main className="mx-auto max-w-3xl px-6 py-16">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
       <img
