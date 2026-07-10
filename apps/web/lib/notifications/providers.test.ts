@@ -33,15 +33,21 @@ describe("cloudflare email provider", () => {
   it("posts the message to the Cloudflare email send API", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ id: "cf_x" }),
+      json: async () => ({
+        success: true,
+        errors: [],
+        messages: [],
+        result: { delivered: ["a@b.co"], permanent_bounces: [], queued: [] },
+      }),
     });
     const provider = createCloudflareEmailProvider({
       apiToken: "k",
+      accountId: "acct1",
       apiUrl: "https://example.test/email/send",
     });
     const result = await provider.send(message);
 
-    expect(result.providerMessageId).toBe("cf_x");
+    expect(result.providerMessageId.startsWith("cf_")).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith("https://example.test/email/send", {
       method: "POST",
       headers: {
@@ -52,6 +58,25 @@ describe("cloudflare email provider", () => {
     });
   });
 
+  it("defaults to the account-scoped Cloudflare send endpoint", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        errors: [],
+        messages: [],
+        result: { delivered: ["a@b.co"], permanent_bounces: [], queued: [] },
+      }),
+    });
+    const provider = createCloudflareEmailProvider({ apiToken: "k", accountId: "acct1" });
+    await provider.send(message);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.cloudflare.com/client/v4/accounts/acct1/email/sending/send",
+      expect.anything(),
+    );
+  });
+
   it("throws when the Cloudflare API responds with a non-ok status", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
@@ -59,16 +84,34 @@ describe("cloudflare email provider", () => {
       statusText: "Unauthorized",
       text: async () => "bad token",
     });
-    const provider = createCloudflareEmailProvider({ apiToken: "k" });
+    const provider = createCloudflareEmailProvider({ apiToken: "k", accountId: "acct1" });
     await expect(provider.send(message)).rejects.toThrow(/Cloudflare Email send failed: 401/);
   });
 
-  it("throws when Cloudflare returns no id", async () => {
+  it("throws when the Cloudflare API reports success: false", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({}),
+      json: async () => ({
+        success: false,
+        errors: [{ code: 1000, message: "Sender domain not verified" }],
+        result: null,
+      }),
     });
-    const provider = createCloudflareEmailProvider({ apiToken: "k" });
-    await expect(provider.send(message)).rejects.toThrow(/no message id/);
+    const provider = createCloudflareEmailProvider({ apiToken: "k", accountId: "acct1" });
+    await expect(provider.send(message)).rejects.toThrow(/Sender domain not verified/);
+  });
+
+  it("throws when the recipient permanently bounces", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        errors: [],
+        messages: [],
+        result: { delivered: [], permanent_bounces: ["a@b.co"], queued: [] },
+      }),
+    });
+    const provider = createCloudflareEmailProvider({ apiToken: "k", accountId: "acct1" });
+    await expect(provider.send(message)).rejects.toThrow(/permanently bounced/);
   });
 });
