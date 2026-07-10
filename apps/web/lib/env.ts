@@ -20,6 +20,9 @@ const serverSchema = clientSchema.extend({
   // deployment when a single database hosts several isolated copies of the app
   // (e.g. one schema per preview environment).
   SUPABASE_SCHEMA: z.string().min(1).default("public"),
+  // Error monitoring (Sentry). Optional: unset locally/in fake-backends/test
+  // runs, where no Sentry account is configured.
+  SENTRY_DSN: z.string().url().optional(),
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;
@@ -40,6 +43,7 @@ const getServerVars = () => ({
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   STUDIOBOOK_FROM_EMAIL: process.env.STUDIOBOOK_FROM_EMAIL,
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
+  SENTRY_DSN: process.env.SENTRY_DSN,
 });
 
 export const clientEnv = (): ClientEnv => {
