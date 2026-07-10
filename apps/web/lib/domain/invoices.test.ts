@@ -44,6 +44,19 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("taxes only the billable line when a line is refunded (€100 billable + €50 refunded @ 9%)", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 10_000 },
+        { quantity: 1, unitAmountCents: 5_000, refunded: true },
+      ],
+      900,
+    );
+    expect(totals.subtotalCents).toBe(10_000);
+    expect(totals.taxCents).toBe(900);
+    expect(totals.totalCents).toBe(10_900);
+  });
 });
 
 describe("formatInvoiceNumber", () => {

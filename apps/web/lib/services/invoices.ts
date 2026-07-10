@@ -4,6 +4,7 @@ import type { Invoice, InvoiceLineItem, Member } from "@/lib/db/types";
 import {
   type InvoiceStatus,
   canTransitionInvoice,
+  computeInvoiceTotals,
   formatInvoiceNumber,
 } from "@/lib/domain/invoices";
 import { HttpError } from "@/lib/http";
@@ -70,13 +71,7 @@ export async function createInvoice(
     throw new HttpError(400, "bad_request", "Unknown member for this invoice");
   }
 
-  // Inline invoice math for the create path.
-  let subtotalCents = 0;
-  for (const line of input.lineItems) {
-    subtotalCents += line.quantity * line.unitAmountCents;
-  }
-  const taxCents = Math.round((subtotalCents * settings.taxRateBps) / 10_000);
-  const totals = { subtotalCents, refundedCents: 0, taxCents, totalCents: subtotalCents + taxCents };
+  const totals = computeInvoiceTotals(input.lineItems, settings.taxRateBps);
   const existingCount = await repos.invoices.countByStudio(studioId);
   const issuedAt = new Date().toISOString();
   const invoiceId = newId();
@@ -116,7 +111,12 @@ export async function createInvoice(
     provider,
     invoiceIssued(
       { memberId: member.id, email: member.email, name: member.name },
-      { number: invoice.number, totalCents: invoice.totalCents, currency: invoice.currency, dueAt: invoice.dueAt },
+      {
+        number: invoice.number,
+        totalCents: invoice.totalCents,
+        currency: invoice.currency,
+        dueAt: invoice.dueAt,
+      },
     ),
   );
   return getInvoiceDetail(repos, invoiceId);
@@ -130,7 +130,11 @@ export async function updateInvoiceStatus(
   const invoice = await repos.invoices.getById(id);
   if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
   if (!canTransitionInvoice(invoice.status as InvoiceStatus, status)) {
-    throw new HttpError(409, "invalid_transition", `Cannot move invoice from ${invoice.status} to ${status}`);
+    throw new HttpError(
+      409,
+      "invalid_transition",
+      `Cannot move invoice from ${invoice.status} to ${status}`,
+    );
   }
   const paidAt = status === "paid" ? new Date().toISOString() : invoice.paidAt;
   return repos.invoices.update(id, { status, paidAt });
