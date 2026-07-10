@@ -105,3 +105,9 @@ export interface NotificationOutboxRow {
   providerMessageId: string | null;
   error: string | null;
 }
+
+export interface ProcessedStripeEvent {
+  id: string;
+  type: string;
+  createdAt: string;
+}

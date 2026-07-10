@@ -51,3 +51,18 @@ export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
 };
+
+// Kept separate from clientSchema/serverSchema so hermetic tests can exercise
+// the Stripe webhook route without setting Supabase/Resend vars.
+const stripeWebhookSchema = z.object({ STRIPE_WEBHOOK_SECRET: z.string().min(1) });
+
+let cachedStripeWebhookSecret: string | undefined;
+
+export const stripeWebhookSecret = (): string => {
+  if (!cachedStripeWebhookSecret) {
+    cachedStripeWebhookSecret = stripeWebhookSchema.parse({
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    }).STRIPE_WEBHOOK_SECRET;
+  }
+  return cachedStripeWebhookSecret;
+};

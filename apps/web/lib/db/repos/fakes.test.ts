@@ -91,4 +91,14 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("processedStripeEvents.exists is false before insert and true after", async () => {
+    expect(await repos.processedStripeEvents.exists("evt_1")).toBe(false);
+    await repos.processedStripeEvents.insert({
+      id: "evt_1",
+      type: "invoice.paid",
+      createdAt: NOW.toISOString(),
+    });
+    expect(await repos.processedStripeEvents.exists("evt_1")).toBe(true);
+  });
 });

@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  ProcessedStripeEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -26,6 +27,7 @@ export interface SeedData {
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  processedStripeEvents?: ProcessedStripeEvent[];
 }
 
 interface Store {
@@ -38,6 +40,7 @@ interface Store {
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  processedStripeEvents: ProcessedStripeEvent[];
 }
 
 const clone = <T>(row: T): T => ({ ...row });
@@ -67,6 +70,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
+    processedStripeEvents: seed?.processedStripeEvents ? cloneAll(seed.processedStripeEvents) : [],
   };
 
   return {
@@ -81,7 +85,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +106,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -206,6 +213,15 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
+      },
+    },
+    processedStripeEvents: {
+      async exists(id) {
+        return store.processedStripeEvents.some((row) => row.id === id);
+      },
+      async insert(row) {
+        store.processedStripeEvents.push(clone(row));
+        return clone(row);
       },
     },
   };
