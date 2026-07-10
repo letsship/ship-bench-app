@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "db:seed-sql": "tsx scripts/emit-seed-sql.ts",
+    "db:seed-sql:d1": "tsx scripts/emit-d1-seed-sql.ts",
     "db:generate": "drizzle-kit generate",
     "e2e": "playwright test"
   },

@@ -12,13 +12,12 @@ name: deploy-preview
 #   action=deploy : build (OpenNext) + deploy a *.workers.dev Worker.
 #   action=delete : tear down the preview Worker on PR merge/close.
 #
-# Preview environments share ONE Supabase project but are ISOLATED per schema:
-# each PR maps (by number) to one schema from a pre-exposed pool (bench_1..N),
-# reseeded fresh before every deploy, so concurrent previews never share mutable
-# data. The Supabase URL + publishable key are injected at build time (inlined),
-# and SUPABASE_SECRET_KEY + RESEND_API_KEY + SUPABASE_SCHEMA are Worker secrets
-# set after deploy. Requires secret SUPABASE_DB_URL (a direct/pooler psql URL) +
-# a one-time `provision-pool.sh` run to expose the pool.
+# Persistence is a Cloudflare D1 binding (see apps/web/wrangler.preview.jsonc):
+# all previews share ONE seeded D1 database (no per-PR database). After each
+# deploy, this workflow applies the D1 migrations (idempotent — wrangler skips
+# already-applied ones) and reseeds the demo dataset (delete + reinsert) so
+# every preview shows the same fresh demo data regardless of which PR last
+# deployed. RESEND_API_KEY is the only Worker secret set after deploy.
 #
 # NOTE: this file must live on the DEFAULT branch for workflow_dispatch to
 # resolve it; ship.yml is read at the PR head SHA.
@@ -94,26 +93,10 @@ jobs:
           CONFIG="$(basename "${{ inputs.config_file }}")"
           pnpm exec wrangler delete -c "$CONFIG" --name "${{ inputs.worker_name }}" || true
 
-      # --- DEPLOY: isolate this PR's data, build, deploy, set secrets ---
-      - name: Reseed this PR's isolated schema
-        if: inputs.action == 'deploy'
-        id: schema
-        env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          POOL=12
-          PR="${{ inputs.pr_number }}"
-          # Deterministic schema per PR from the pre-exposed pool (bench_1..bench_POOL).
-          IDX=$(( ( ${PR:-0} % POOL ) + 1 ))
-          SCHEMA="bench_${IDX}"
-          echo "schema=$SCHEMA" >> "$GITHUB_OUTPUT"
-          bash packages/db/scripts/reseed-schema.sh "$SCHEMA"
-
+      # --- DEPLOY: build, deploy, migrate + reseed D1, set secrets ---
       - name: Build apps/web for Cloudflare (OpenNext)
         if: inputs.action == 'deploy'
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_SITE_URL: https://${{ inputs.worker_name }}.${{ inputs.account_subdomain }}.workers.dev
         run: pnpm --filter @studiobook/web build:cf
 
@@ -126,18 +109,30 @@ jobs:
           pnpm exec wrangler deploy -c "$CONFIG" --name "${{ inputs.worker_name }}"
           echo "url=https://${{ inputs.worker_name }}.${{ inputs.account_subdomain }}.workers.dev" >> "$GITHUB_OUTPUT"
 
+      - name: Apply D1 migrations
+        if: inputs.action == 'deploy'
+        working-directory: apps/web
+        run: |
+          CONFIG="$(basename "${{ inputs.config_file }}")"
+          pnpm exec wrangler d1 migrations apply DB --remote -c "$CONFIG"
+
+      - name: Reseed D1 demo dataset
+        if: inputs.action == 'deploy'
+        working-directory: apps/web
+        run: |
+          CONFIG="$(basename "${{ inputs.config_file }}")"
+          SEED_FILE="$(mktemp)"
+          pnpm exec tsx scripts/emit-d1-seed-sql.ts "$SEED_FILE"
+          pnpm exec wrangler d1 execute DB --remote -c "$CONFIG" --file "$SEED_FILE" --yes
+
       - name: Set Worker runtime secrets
         if: inputs.action == 'deploy'
         working-directory: apps/web
         env:
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          SUPABASE_SCHEMA: ${{ steps.schema.outputs.schema }}
         run: |
           CONFIG="$(basename "${{ inputs.config_file }}")"
-          printf '%s' "$SUPABASE_SECRET_KEY" | pnpm exec wrangler secret put SUPABASE_SECRET_KEY -c "$CONFIG" --name "${{ inputs.worker_name }}"
           printf '%s' "$RESEND_API_KEY" | pnpm exec wrangler secret put RESEND_API_KEY -c "$CONFIG" --name "${{ inputs.worker_name }}"
-          printf '%s' "$SUPABASE_SCHEMA" | pnpm exec wrangler secret put SUPABASE_SCHEMA -c "$CONFIG" --name "${{ inputs.worker_name }}"
 
       - name: Signal deployment status to SHIP
         if: inputs.action == 'deploy'
