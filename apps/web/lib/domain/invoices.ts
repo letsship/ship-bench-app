@@ -20,14 +20,21 @@ export function lineAmountCents(item: LineItemInput): number {
 }
 
 // Tax applies only to the non-refunded subtotal, rounded to the nearest cent.
+//
+// Uses a plain accumulator loop rather than Array.reduce(): an invoice can have
+// zero billable line items (none at all, or every line refunded), and
+// reduce() without an initial value throws on an empty array. Keep the
+// initial-value-free reduce() out of here.
 export function computeInvoiceTotals(
   items: readonly LineItemInput[],
   taxRateBps: number,
 ): InvoiceTotals {
-  const payable = items.filter((item) => !item.refunded).map(lineAmountCents);
-  const refunded = items.filter((item) => item.refunded).map(lineAmountCents);
-  const subtotalCents = payable.reduce((total, cents) => total + cents);
-  const refundedCents = refunded.reduce((total, cents) => total + cents, 0);
+  let subtotalCents = 0;
+  let refundedCents = 0;
+  for (const item of items) {
+    if (item.refunded) refundedCents += lineAmountCents(item);
+    else subtotalCents += lineAmountCents(item);
+  }
   const taxCents = Math.round((subtotalCents * taxRateBps) / 10_000);
   return { subtotalCents, refundedCents, taxCents, totalCents: subtotalCents + taxCents };
 }
@@ -52,10 +59,7 @@ export function canTransitionInvoice(from: InvoiceStatus, to: InvoiceStatus): bo
 }
 
 // An invoice is overdue when it is still open past its due date.
-export function isOverdue(
-  invoice: { status: string; dueAt: string | null },
-  now: string,
-): boolean {
+export function isOverdue(invoice: { status: string; dueAt: string | null }, now: string): boolean {
   if (invoice.status !== "open" || !invoice.dueAt) return false;
   return new Date(now).getTime() > new Date(invoice.dueAt).getTime();
 }
