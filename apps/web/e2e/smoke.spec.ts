@@ -43,6 +43,31 @@ test("an operator can schedule a new class from the UI", async ({ page }) => {
   await expect(page.getByTestId("schedule").getByText("E2E Tester").first()).toBeVisible();
 });
 
+test("opening a fully-refunded invoice renders zero totals instead of erroring", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await signIn(page);
+  await page.goto("/invoices");
+
+  const row = page
+    .getByTestId("invoices-table")
+    .locator("tbody tr")
+    .filter({ hasText: "Femke Jansen" });
+  await row.getByRole("link").click();
+
+  const lineRow = page.locator("tbody tr").filter({ hasText: "Pottery intensive" });
+  await expect(lineRow).toBeVisible();
+  await expect(lineRow.getByText("refunded")).toBeVisible();
+  await expect(page.getByText("Subtotal €0.00")).toBeVisible();
+  await expect(page.getByText("Tax (9.0%) €0.00")).toBeVisible();
+  await expect(page.getByText("Total €0.00", { exact: true })).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
 test("the dashboard renders with zero console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {

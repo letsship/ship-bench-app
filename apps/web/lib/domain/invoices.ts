@@ -26,7 +26,7 @@ export function computeInvoiceTotals(
 ): InvoiceTotals {
   const payable = items.filter((item) => !item.refunded).map(lineAmountCents);
   const refunded = items.filter((item) => item.refunded).map(lineAmountCents);
-  const subtotalCents = payable.reduce((total, cents) => total + cents);
+  const subtotalCents = payable.reduce((total, cents) => total + cents, 0);
   const refundedCents = refunded.reduce((total, cents) => total + cents, 0);
   const taxCents = Math.round((subtotalCents * taxRateBps) / 10_000);
   return { subtotalCents, refundedCents, taxCents, totalCents: subtotalCents + taxCents };
@@ -52,10 +52,7 @@ export function canTransitionInvoice(from: InvoiceStatus, to: InvoiceStatus): bo
 }
 
 // An invoice is overdue when it is still open past its due date.
-export function isOverdue(
-  invoice: { status: string; dueAt: string | null },
-  now: string,
-): boolean {
+export function isOverdue(invoice: { status: string; dueAt: string | null }, now: string): boolean {
   if (invoice.status !== "open" || !invoice.dueAt) return false;
   return new Date(now).getTime() > new Date(invoice.dueAt).getTime();
 }
