@@ -104,7 +104,10 @@ jobs:
           CONFIG="$(basename "${{ inputs.config_file }}")"
           # Idempotent: fails harmlessly if the database already exists.
           pnpm exec wrangler d1 create "$DB_NAME" || true
-          DB_ID="$(pnpm exec wrangler d1 info "$DB_NAME" --json | jq -r '.uuid')"
+          # `d1 info` resolves through local config discovery and would pick up the
+          # placeholder database_id still checked into wrangler*.jsonc, so look the
+          # real UUID up via the account-wide listing instead.
+          DB_ID="$(pnpm exec wrangler d1 list --json | jq -r --arg name "$DB_NAME" '.[] | select(.name == $name) | .uuid')"
           sed -i "s/REPLACE_ME_WITH_WRANGLER_D1_CREATE_OUTPUT/$DB_ID/" "$CONFIG"
           pnpm exec wrangler d1 migrations apply "$DB_NAME" -c "$CONFIG" --remote
 
