@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,57 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("issues a bounded number of member/class-session repository reads regardless of booking count", async () => {
+    const members = Array.from({ length: 3 }, (_, i) => member(`bm${i}`));
+    const sessions = [session("bs1"), session("bs2")];
+    const bookings = Array.from({ length: 200 }, (_, i) =>
+      booking(`bb${i}`, members[i % members.length].id, {
+        sessionId: sessions[i % sessions.length].id,
+      }),
+    );
+    const manyRepos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members,
+        sessions,
+        bookings,
+      }),
+    );
+    const manyStudioId = (await manyRepos.studios.getFirst())?.id ?? "";
+
+    let membersListCalls = 0;
+    let sessionsListCalls = 0;
+    const countingRepos: Repositories = {
+      ...manyRepos,
+      members: {
+        ...manyRepos.members,
+        listByStudio: (...args) => {
+          membersListCalls += 1;
+          return manyRepos.members.listByStudio(...args);
+        },
+      },
+      classSessions: {
+        ...manyRepos.classSessions,
+        listByStudio: (...args) => {
+          sessionsListCalls += 1;
+          return manyRepos.classSessions.listByStudio(...args);
+        },
+      },
+    };
+
+    const rows = await listBookingRows(countingRepos, manyStudioId);
+
+    expect(rows.length).toBe(bookings.length);
+    expect(membersListCalls).toBe(1);
+    expect(sessionsListCalls).toBe(1);
+
+    const sorted = [...rows].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    expect(rows).toEqual(sorted);
+    for (const row of rows) {
+      expect(row.memberName).not.toBe("—");
+      expect(row.className).toBe("Yoga");
+    }
   });
 });
