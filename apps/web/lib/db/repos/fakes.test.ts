@@ -35,6 +35,12 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("finds a studio by its public slug", async () => {
+    const found = await repos.studios.getBySlug("riverbank");
+    expect(found?.name).toBe("Riverbank Movement");
+    expect(await repos.studios.getBySlug("does-not-exist")).toBeNull();
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;

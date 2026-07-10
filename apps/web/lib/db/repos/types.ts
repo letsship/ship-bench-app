@@ -25,6 +25,7 @@ export interface SessionRange {
 
 export interface StudioRepo {
   getFirst(): Promise<Studio | null>;
+  getBySlug(slug: string): Promise<Studio | null>;
 }
 
 export interface StudioSettingsRepo {

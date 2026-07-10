@@ -12,13 +12,32 @@ export interface StudioContext {
 export async function getStudioContext(repos: Repositories): Promise<StudioContext> {
   const studio = await repos.studios.getFirst();
   if (!studio) {
-    throw new HttpError(503, "not_provisioned", "No studio has been provisioned. Seed the database.");
+    throw new HttpError(
+      503,
+      "not_provisioned",
+      "No studio has been provisioned. Seed the database.",
+    );
   }
   const settings = await repos.settings.getByStudioId(studio.id);
   if (!settings) {
-    throw new HttpError(503, "not_provisioned", "Studio settings are missing. Reseed the database.");
+    throw new HttpError(
+      503,
+      "not_provisioned",
+      "Studio settings are missing. Reseed the database.",
+    );
   }
   return { studio, settings };
+}
+
+// Public counterpart to getStudioContext: resolves a studio by its public
+// slug for the unauthenticated `/s/[slug]` page. 404s (not 503) on a miss —
+// an unknown slug is a routing miss, not an unprovisioned database.
+export async function getPublicStudioBySlug(repos: Repositories, slug: string): Promise<Studio> {
+  const studio = await repos.studios.getBySlug(slug);
+  if (!studio) {
+    throw new HttpError(404, "not_found", "Studio not found");
+  }
+  return studio;
 }
 
 export interface UpdateSettingsInput {
