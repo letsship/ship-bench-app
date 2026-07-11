@@ -75,6 +75,44 @@ describe("in-memory repositories", () => {
     expect(refetched?.status).toBe("paused");
   });
 
+  it("inserts, spends, and lists class packages newest first for a member", async () => {
+    const memberId = (await repos.members.listByStudio(studioId))[0].id;
+    const older = await repos.classPackages.insert({
+      id: "pkg_older",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 1000,
+      status: "active",
+      purchasedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const newer = await repos.classPackages.insert({
+      id: "pkg_newer",
+      studioId,
+      memberId,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 1000,
+      status: "active",
+      purchasedAt: "2026-02-01T00:00:00.000Z",
+    });
+
+    const list = await repos.classPackages.listByMember(memberId);
+    expect(list.map((row) => row.id)).toEqual([newer.id, older.id]);
+
+    const spent = await repos.classPackages.update(older.id, { creditsRemaining: 4 });
+    expect(spent.creditsRemaining).toBe(4);
+    expect(await repos.classPackages.getById(older.id)).toEqual(spent);
+
+    const refunded = await repos.classPackages.update(newer.id, {
+      creditsRemaining: 0,
+      status: "refunded",
+    });
+    expect(refunded.status).toBe("refunded");
+    expect(refunded.creditsRemaining).toBe(0);
+  });
+
   it("counts invoices for the studio", async () => {
     const count = await repos.invoices.countByStudio(studioId);
     const list = await repos.invoices.listByStudio(studioId);

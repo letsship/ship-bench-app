@@ -27,10 +27,13 @@ describe("escapeCsvField", () => {
 
 describe("toCsv", () => {
   it("emits a header and CRLF-joined rows with escaping", () => {
-    const csv = toCsv([{ a: 1, b: "x,y" }], [
-      { header: "A", value: (row) => row.a },
-      { header: "B", value: (row) => row.b },
-    ]);
+    const csv = toCsv(
+      [{ a: 1, b: "x,y" }],
+      [
+        { header: "A", value: (row) => row.a },
+        { header: "B", value: (row) => row.b },
+      ],
+    );
     expect(csv).toBe('A,B\r\n1,"x,y"');
   });
 });
@@ -38,7 +41,13 @@ describe("toCsv", () => {
 describe("membersToCsv", () => {
   it("includes headers and renders a null phone as empty", () => {
     const csv = membersToCsv([
-      { name: "Amara", email: "amara@example.com", phone: null, status: "active", createdAt: "2026-01-01T00:00:00Z" },
+      {
+        name: "Amara",
+        email: "amara@example.com",
+        phone: null,
+        status: "active",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
     ]);
     const [header, row] = csv.split("\r\n");
     expect(header).toBe("Name,Email,Phone,Status,Joined");

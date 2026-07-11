@@ -1,6 +1,6 @@
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
-import type { ClassSession, Member } from "@/lib/db/types";
+import type { ClassPackage, ClassSession, Member } from "@/lib/db/types";
 import {
   type BookingDenyReason,
   canBook,
@@ -8,6 +8,7 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import { pickPackToSpendFrom } from "@/lib/domain/class-packages";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -55,6 +56,26 @@ async function loadSession(repos: Repositories, sessionId: string): Promise<Clas
   return session;
 }
 
+// A member who has never bought a pack books unchanged. A member who has
+// bought at least one pack must draw from it — reject with 402 once every
+// pack they own is exhausted or refunded.
+async function loadPackToSpend(
+  repos: Repositories,
+  memberId: string,
+): Promise<ClassPackage | null> {
+  const packs = await repos.classPackages.listByMember(memberId);
+  if (packs.length === 0) return null;
+  const pickId = pickPackToSpendFrom(packs);
+  if (!pickId) {
+    throw new HttpError(
+      402,
+      "pack_exhausted",
+      "This member has no class credits left — buy another pack",
+    );
+  }
+  return packs.find((pack) => pack.id === pickId) ?? null;
+}
+
 export interface BookingResult {
   bookingId: string;
   status: "booked" | "waitlisted";
@@ -83,6 +104,8 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  const packToSpend = decision.status === "booked" ? await loadPackToSpend(repos, member.id) : null;
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +115,12 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  if (packToSpend) {
+    await repos.classPackages.update(packToSpend.id, {
+      creditsRemaining: packToSpend.creditsRemaining - 1,
+    });
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
@@ -142,7 +171,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
