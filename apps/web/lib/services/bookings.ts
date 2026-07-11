@@ -180,6 +180,12 @@ export async function cancelBooking(
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 
+// Waitlist promotion never draws a pack credit: the AC scopes credit spend to
+// a confirmed `POST /api/bookings` call, and promotion happens later, out of
+// band, triggered by someone else's cancellation. Extending credit spend (and
+// the pack_exhausted gate) here would mean picking a different waitlisted
+// member when the front-of-queue one can't pay — a product decision the
+// founder hasn't made yet, so it's deliberately left out of this change.
 async function promoteFromWaitlist(
   repos: Repositories,
   provider: NotificationProvider,
