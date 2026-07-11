@@ -46,6 +46,7 @@ function seedWith(
     invoices: [],
     lineItems: [],
     outbox: [],
+    classPackages: [],
   };
 }
 
