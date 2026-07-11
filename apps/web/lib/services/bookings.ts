@@ -104,7 +104,7 @@ export async function createBooking(
     cancelledAt: null,
   });
 
-  if (drawablePack) {
+  if (drawablePack && decision.status === "booked") {
     await repos.classPackages.update(drawablePack.id, {
       creditsRemaining: drawablePack.creditsRemaining - 1,
     });
