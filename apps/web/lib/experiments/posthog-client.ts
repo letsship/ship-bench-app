@@ -25,7 +25,12 @@ export function createPostHogExperimentsClient(config: PostHogConfig): Experimen
     },
     // Per AGENTS.md's Cloudflare Workers rule, never fire-and-forget in a
     // request: captureImmediate awaits delivery before OpenNext can end the
-    // request context.
+    // request context. The mirrored docs (docs/vendor/posthog-nextjs.md)
+    // describe an older capture()+shutdown() pattern, but the pinned
+    // posthog-node@5.41.0 (see node_modules/posthog-node/dist/client.d.ts)
+    // no longer exposes a public shutdown() — only captureImmediate() is a
+    // publicly typed, awaited single-event send, which is exactly this
+    // short-lived-request use case.
     async capture(event) {
       await client.captureImmediate({
         distinctId: event.distinctId,
