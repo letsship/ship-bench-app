@@ -7,8 +7,13 @@ import type { CreatePackageInput } from "@/lib/validation";
 
 export async function listPackagesForMember(
   repos: Repositories,
+  studioId: string,
   memberId: string,
 ): Promise<ClassPackage[]> {
+  const member = await repos.members.getById(memberId);
+  if (!member || member.studioId !== studioId) {
+    throw new HttpError(400, "bad_request", "Unknown member for this studio");
+  }
   return repos.classPackages.listByMember(memberId);
 }
 

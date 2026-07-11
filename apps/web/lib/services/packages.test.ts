@@ -113,8 +113,15 @@ describe("packages service", () => {
         ],
       }),
     );
-    const list = await listPackagesForMember(repos, "m1");
+    const list = await listPackagesForMember(repos, "s1", "m1");
     expect(list.map((p) => p.id)).toEqual(["newer", "older"]);
+  });
+
+  it("rejects listing packages for a member outside the resolved studio", async () => {
+    repos = createInMemoryRepositories(
+      baseSeed({ members: [member("m1", { studioId: "s2" })], classPackages: [pack("p1", "m1")] }),
+    );
+    await expect(listPackagesForMember(repos, "s1", "m1")).rejects.toMatchObject({ status: 400 });
   });
 
   it("refunds a pack: zeroes creditsRemaining and flips status", async () => {

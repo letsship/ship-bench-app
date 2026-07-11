@@ -10,10 +10,10 @@ export const dynamic = "force-dynamic";
 // GET /api/packages?memberId= — a member's class packs, newest first.
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
-    const { repos } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const memberId = request.nextUrl.searchParams.get("memberId");
     if (!memberId) return badRequest("memberId query parameter is required");
-    return ok(await listPackagesForMember(repos, memberId));
+    return ok(await listPackagesForMember(repos, ctx.studio.id, memberId));
   });
 }
 
