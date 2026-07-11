@@ -8,6 +8,11 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import type { ExperimentsClient } from "@/lib/experiments/types";
+import {
+  recordWaitlistJoined,
+  resolveWaitlistExperimentGroup,
+} from "@/lib/experiments/waitlist-experiment";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -63,20 +68,30 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  experiments: ExperimentsClient,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
   const session = await loadSession(repos, input.sessionId);
   const member = await loadMember(repos, input.memberId);
   const sessionBookings = await repos.bookings.listBySession(session.id);
+  const occupancy = computeOccupancy(session.capacity, sessionBookings);
+
+  // Only evaluate the waitlist experiment on the path it actually governs —
+  // a full session with waitlisting on. This keeps PostHog (and the exposure
+  // event it implies) off the common, non-full booking path.
+  const waitlistEnabled =
+    occupancy.isFull && settings.waitlistEnabled
+      ? (await resolveWaitlistExperimentGroup(experiments, member.id)) !== "control"
+      : settings.waitlistEnabled;
 
   const decision = canBook({
     sessionStatus: session.status,
     sessionStartsAt: session.startsAt,
     memberStatus: member.status,
     memberBookings: sessionBookings.filter((booking) => booking.memberId === member.id),
-    occupancy: computeOccupancy(session.capacity, sessionBookings),
-    waitlistEnabled: settings.waitlistEnabled,
+    occupancy,
+    waitlistEnabled,
     now: nowIso(),
   });
   if (!decision.ok) {
@@ -99,6 +114,8 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+  } else {
+    await recordWaitlistJoined(experiments, member.id, session.id);
   }
   return { bookingId, status: decision.status };
 }
@@ -142,7 +159,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
