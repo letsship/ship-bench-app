@@ -75,6 +75,81 @@ describe("in-memory repositories", () => {
     expect(refetched?.status).toBe("paused");
   });
 
+  it("classPackages: inserts then reads back by id", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const pkg = {
+      id: "pkg_new",
+      studioId,
+      memberId: members[0].id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+    };
+    await repos.classPackages.insert(pkg);
+    expect(await repos.classPackages.getById("pkg_new")).toEqual(pkg);
+  });
+
+  it("classPackages: listByMember returns only that member's packs, newest first", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const [member, other] = members;
+    await repos.classPackages.insert({
+      id: "pkg_older",
+      studioId,
+      memberId: member.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await repos.classPackages.insert({
+      id: "pkg_newer",
+      studioId,
+      memberId: member.id,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10000,
+      status: "active",
+      purchasedAt: "2026-02-01T00:00:00.000Z",
+    });
+    await repos.classPackages.insert({
+      id: "pkg_other_member",
+      studioId,
+      memberId: other.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2026-03-01T00:00:00.000Z",
+    });
+    const list = await repos.classPackages.listByMember(member.id);
+    expect(list.map((p) => p.id)).toEqual(["pkg_newer", "pkg_older"]);
+  });
+
+  it("classPackages: update returns an isolated clone (store not mutated by reference)", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const inserted = await repos.classPackages.insert({
+      id: "pkg_update",
+      studioId,
+      memberId: members[0].id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+    });
+    const updated = await repos.classPackages.update(inserted.id, {
+      creditsRemaining: 0,
+      status: "refunded",
+    });
+    updated.status = "active"; // mutate the returned object
+    const refetched = await repos.classPackages.getById(inserted.id);
+    expect(refetched?.status).toBe("refunded");
+    expect(refetched?.creditsRemaining).toBe(0);
+  });
+
   it("counts invoices for the studio", async () => {
     const count = await repos.invoices.countByStudio(studioId);
     const list = await repos.invoices.listByStudio(studioId);
