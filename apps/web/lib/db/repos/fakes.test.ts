@@ -75,6 +75,43 @@ describe("in-memory repositories", () => {
     expect(refetched?.status).toBe("paused");
   });
 
+  it("lists a member's class packages, newest purchasedAt first", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const [memberA, memberB] = members;
+    await repos.classPackages.insert({
+      id: "pkg_old",
+      studioId,
+      memberId: memberA.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await repos.classPackages.insert({
+      id: "pkg_new",
+      studioId,
+      memberId: memberA.id,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10000,
+      status: "active",
+      purchasedAt: "2026-02-01T00:00:00.000Z",
+    });
+    await repos.classPackages.insert({
+      id: "pkg_other_member",
+      studioId,
+      memberId: memberB.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2026-03-01T00:00:00.000Z",
+    });
+    const packs = await repos.classPackages.listByMember(memberA.id);
+    expect(packs.map((p) => p.id)).toEqual(["pkg_new", "pkg_old"]);
+  });
+
   it("counts invoices for the studio", async () => {
     const count = await repos.invoices.countByStudio(studioId);
     const list = await repos.invoices.listByStudio(studioId);
