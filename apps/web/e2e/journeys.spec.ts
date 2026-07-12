@@ -17,7 +17,9 @@ test.describe("operator journeys (fake backends)", () => {
     const form = page.getByRole("form", { name: "New booking" });
     await expect(form).toBeVisible();
 
-    const member = ((await form.getByLabel("Member").locator("option:checked").textContent()) ?? "").trim();
+    const member = (
+      (await form.getByLabel("Member").locator("option:checked").textContent()) ?? ""
+    ).trim();
     await form.getByRole("button", { name: "Book" }).click();
 
     // Order-independent + retry-safe: whether the click books, waitlists, or the
@@ -51,7 +53,38 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByTestId("revenue-table")).toBeVisible();
   });
 
-  test("every authenticated page loads, holds the session, and logs zero console errors", async ({ page }) => {
+  test("filters the members roster by name and clears back to the full list", async ({ page }) => {
+    await page.goto("/members");
+    const headerCount = await page.getByRole("heading", { level: 1 }).locator("..").textContent();
+    const rows = page.getByTestId("members-table").locator("tbody tr");
+    const totalRows = await rows.count();
+
+    const fullName = ((await rows.first().locator("td").first().textContent()) ?? "").trim();
+    const searchTerm = fullName.slice(0, Math.max(3, Math.ceil(fullName.length / 2))).toLowerCase();
+
+    const search = page.getByTestId("member-search");
+    await expect(search).toBeVisible();
+    await search.fill(searchTerm);
+
+    await expect(rows.first()).toBeVisible();
+    const filteredCount = await rows.count();
+    expect(filteredCount).toBeGreaterThan(0);
+    expect(filteredCount).toBeLessThanOrEqual(totalRows);
+    for (const name of await rows.locator("td").first().allTextContents()) {
+      expect(name.toLowerCase()).toContain(searchTerm);
+    }
+
+    await search.fill("");
+    await expect(rows).toHaveCount(totalRows);
+
+    // Header count and the add-member form keep working alongside the filter.
+    expect(headerCount).toContain(`${totalRows}`);
+    await expect(page.getByRole("form", { name: "Add member" })).toBeVisible();
+  });
+
+  test("every authenticated page loads, holds the session, and logs zero console errors", async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
