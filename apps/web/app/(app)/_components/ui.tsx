@@ -47,6 +47,7 @@ const BADGE_CLASS: Record<string, string> = {
   no_show: "sb-badge-muted",
   cancelled: "sb-badge-muted",
   paused: "sb-badge-muted",
+  inactive: "sb-badge-muted",
   draft: "sb-badge-muted",
   void: "sb-badge-muted",
   refunded: "sb-badge-muted",

@@ -121,6 +121,18 @@ describe("members service", () => {
   it("getMember 404s for an unknown id", async () => {
     await expect(getMember(repos, "nope")).rejects.toMatchObject({ status: 404 });
   });
+
+  it("deactivates and reactivates a member", async () => {
+    const created = await createMember(repos, studioId, {
+      name: "Toggle",
+      email: "toggle@example.com",
+      status: "active",
+    });
+    const deactivated = await updateMember(repos, created.id, { status: "inactive" });
+    expect(deactivated.status).toBe("inactive");
+    const reactivated = await updateMember(repos, created.id, { status: "active" });
+    expect(reactivated.status).toBe("active");
+  });
 });
 
 describe("classes service", () => {
@@ -160,7 +172,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +215,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);

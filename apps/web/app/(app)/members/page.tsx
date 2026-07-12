@@ -4,6 +4,7 @@ import { listMembers } from "@/lib/services/members";
 import { EmptyState, PageHeader, StatusBadge } from "../_components/ui";
 import { AddMemberForm } from "./add-member-form";
 import { OptOutToggle } from "./opt-out-toggle";
+import { StatusToggle } from "./status-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,10 @@ export default async function MembersPage() {
                       <td className="font-medium">{member.name}</td>
                       <td className="text-[var(--color-muted)]">{member.email}</td>
                       <td>
-                        <StatusBadge status={member.status} />
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={member.status} />
+                          <StatusToggle memberId={member.id} status={member.status} />
+                        </div>
                       </td>
                       <td>
                         <OptOutToggle
