@@ -13,7 +13,10 @@ export default async function MembersPage() {
 
   return (
     <>
-      <PageHeader title="Members" subtitle={`${members.length} people at the studio`} />
+      <PageHeader
+        title={`Members (${members.length})`}
+        subtitle={`${members.length} people at the studio`}
+      />
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0">
           {members.length === 0 ? (
