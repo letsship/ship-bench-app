@@ -17,7 +17,9 @@ test.describe("operator journeys (fake backends)", () => {
     const form = page.getByRole("form", { name: "New booking" });
     await expect(form).toBeVisible();
 
-    const member = ((await form.getByLabel("Member").locator("option:checked").textContent()) ?? "").trim();
+    const member = (
+      (await form.getByLabel("Member").locator("option:checked").textContent()) ?? ""
+    ).trim();
     await form.getByRole("button", { name: "Book" }).click();
 
     // Order-independent + retry-safe: whether the click books, waitlists, or the
@@ -51,7 +53,36 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByTestId("revenue-table")).toBeVisible();
   });
 
-  test("every authenticated page loads, holds the session, and logs zero console errors", async ({ page }) => {
+  test("adding a member shows a named confirmation, clears the form, and lists the member", async ({
+    page,
+  }) => {
+    await page.goto("/members");
+    const form = page.getByRole("form", { name: "Add member" });
+    await expect(form).toBeVisible();
+
+    const name = "Jane Doe";
+    const email = `jane.doe.${Date.now()}@example.com`;
+    await form.getByLabel("Name").fill(name);
+    await form.getByLabel("Email").fill(email);
+    await form.getByRole("button", { name: "Add member" }).click();
+
+    await expect(page.getByRole("status")).toHaveText(`Added ${name}`);
+    await expect(form.getByLabel("Name")).toHaveValue("");
+    await expect(form.getByLabel("Email")).toHaveValue("");
+    await expect(page.getByTestId("members-table")).toContainText(name);
+
+    // Resubmitting the same email surfaces the existing error, never a confirmation.
+    await form.getByLabel("Name").fill(name);
+    await form.getByLabel("Email").fill(email);
+    await form.getByRole("button", { name: "Add member" }).click();
+
+    await expect(page.getByText(`A member with email ${email} already exists`)).toBeVisible();
+    await expect(page.getByRole("status")).toHaveCount(0);
+  });
+
+  test("every authenticated page loads, holds the session, and logs zero console errors", async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());

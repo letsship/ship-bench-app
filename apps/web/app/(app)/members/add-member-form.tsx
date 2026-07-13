@@ -8,6 +8,7 @@ export function AddMemberForm() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -15,18 +16,21 @@ export function AddMemberForm() {
   function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    setConfirmation(null);
     startTransition(async () => {
       try {
-        await sendJson("/api/members", "POST", {
+        const created = (await sendJson("/api/members", "POST", {
           name,
           email,
           ...(phone.trim() ? { phone } : {}),
-        });
+        })) as { name: string };
+        setConfirmation(`Added ${created.name}`);
         setName("");
         setEmail("");
         setPhone("");
         router.refresh();
       } catch (caught) {
+        setConfirmation(null);
         setError(caught instanceof Error ? caught.message : "Could not add member");
       }
     });
@@ -71,6 +75,11 @@ export function AddMemberForm() {
           onChange={(event) => setPhone(event.target.value)}
         />
       </div>
+      {confirmation ? (
+        <p role="status" className="text-sm text-[var(--color-sage)]">
+          {confirmation}
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
       <button type="submit" className="sb-btn sb-btn-primary w-full" disabled={pending}>
         {pending ? "Adding…" : "Add member"}
