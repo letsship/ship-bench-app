@@ -17,7 +17,9 @@ test.describe("operator journeys (fake backends)", () => {
     const form = page.getByRole("form", { name: "New booking" });
     await expect(form).toBeVisible();
 
-    const member = ((await form.getByLabel("Member").locator("option:checked").textContent()) ?? "").trim();
+    const member = (
+      (await form.getByLabel("Member").locator("option:checked").textContent()) ?? ""
+    ).trim();
     await form.getByRole("button", { name: "Book" }).click();
 
     // Order-independent + retry-safe: whether the click books, waitlists, or the
@@ -29,6 +31,7 @@ test.describe("operator journeys (fake backends)", () => {
 
   test("opens an invoice from the list and reads its detail", async ({ page }) => {
     await page.goto("/invoices");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Invoices \(\d+\)$/);
     const table = page.getByTestId("invoices-table");
     await expect(table).toBeVisible();
 
@@ -41,6 +44,11 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("shows the class count in the Classes page heading", async ({ page }) => {
+    await page.goto("/classes");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Classes \(\d+\)$/);
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
@@ -51,7 +59,9 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByTestId("revenue-table")).toBeVisible();
   });
 
-  test("every authenticated page loads, holds the session, and logs zero console errors", async ({ page }) => {
+  test("every authenticated page loads, holds the session, and logs zero console errors", async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());

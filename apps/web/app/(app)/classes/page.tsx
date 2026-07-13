@@ -19,7 +19,10 @@ export default async function ClassesPage() {
 
   return (
     <>
-      <PageHeader title="Classes" subtitle="Your upcoming schedule and occupancy." />
+      <PageHeader
+        title={`Classes (${sessions.length})`}
+        subtitle="Your upcoming schedule and occupancy."
+      />
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0 space-y-6" data-testid="schedule">
           {days.length === 0 ? (

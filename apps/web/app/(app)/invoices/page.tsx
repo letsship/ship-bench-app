@@ -17,7 +17,7 @@ export default async function InvoicesPage() {
 
   return (
     <>
-      <PageHeader title="Invoices" subtitle={`${invoices.length} invoices`} />
+      <PageHeader title={`Invoices (${invoices.length})`} />
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0">
           {invoices.length === 0 ? (
