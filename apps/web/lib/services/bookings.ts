@@ -112,10 +112,14 @@ export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
   bookingId: string,
+  studioId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
   const session = await loadSession(repos, booking.sessionId);
+  if (session.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Booking not found");
+  }
   const { settings } = await getStudioContext(repos);
 
   const decision = canCancel({
