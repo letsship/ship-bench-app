@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { sendJson } from "../_components/client";
+import { cancellationPolicyCopy } from "./cancellation-policy";
 
 export interface SessionOption {
   id: string;
@@ -83,7 +84,12 @@ export function NewBookingForm({
         </select>
       </div>
       {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
-      {notice ? <p className="text-sm text-[var(--color-sage)]">{notice}</p> : null}
+      {notice ? (
+        <div className="space-y-1">
+          <p className="text-sm text-[var(--color-sage)]">{notice}</p>
+          <p className="text-sm text-[var(--color-sage)]">{cancellationPolicyCopy()}</p>
+        </div>
+      ) : null}
       <button
         type="submit"
         className="sb-btn sb-btn-primary w-full"
