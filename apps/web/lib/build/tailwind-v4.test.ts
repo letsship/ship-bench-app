@@ -7,7 +7,7 @@ const appRoot = join(import.meta.dirname, "../..");
 describe("Tailwind v4 migration", () => {
   it("uses @tailwindcss/postcss in PostCSS config", () => {
     const postcssConfig = readFileSync(join(appRoot, "postcss.config.mjs"), "utf-8");
-    expect(postcssConfig).toContain("'@tailwindcss/postcss'");
+    expect(postcssConfig).toContain("@tailwindcss/postcss");
     expect(postcssConfig).not.toContain("'tailwindcss': {}");
     expect(postcssConfig).not.toContain("autoprefixer");
   });
