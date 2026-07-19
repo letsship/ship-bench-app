@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as packagesGet } from "@/app/api/packages/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +45,17 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/packages?memberId returns that member's packs (newest first)", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const members = await repos.members.listByStudio((await repos.studios.getFirst())!.id);
+    __setTestRepositories(repos);
+
+    const res = await packagesGet(
+      new NextRequest(`http://localhost/api/packages?memberId=${members[0].id}`),
+    );
+    expect(res.status).toBe(200);
+    expect(Array.isArray(await res.json())).toBe(true);
   });
 });
