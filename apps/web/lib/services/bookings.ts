@@ -84,10 +84,14 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
-  const memberPacks = await repos.classPacks.listActiveByMember(member.id);
+  const allMemberPacks = await repos.classPacks.listByMember(member.id);
   let packToDraw = null;
-  if (memberPacks.length > 0) {
-    packToDraw = pickPackToDraw(memberPacks);
+
+  if (allMemberPacks.length > 0) {
+    // Member owns at least one pack, so all bookings must come from a pack
+    // Get active packs in oldest-first order for drawing
+    const activeMemberPacks = await repos.classPacks.listActiveByMember(member.id);
+    packToDraw = pickPackToDraw(activeMemberPacks);
     if (!packToDraw) {
       throw new HttpError(
         402,
@@ -107,7 +111,7 @@ export async function createBooking(
     cancelledAt: null,
   });
 
-  if (packToDraw) {
+  if (packToDraw && decision.status === "booked") {
     await repos.classPacks.update(packToDraw.id, {
       creditsRemaining: packToDraw.creditsRemaining - 1,
     });

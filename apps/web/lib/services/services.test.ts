@@ -343,6 +343,37 @@ describe("bookings service", () => {
     const pack = await repos.classPacks.getById("p1");
     expect(pack?.creditsRemaining).toBe(3);
   });
+
+  it("a refunded pack still prevents booking with 402 pack_exhausted", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        classPacks: [classPack("p1", "m1", { status: "refunded", creditsRemaining: 0 })],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
+  });
+
+  it("a waitlisted booking does not consume a credit", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+        classPacks: [classPack("p1", "m2", { creditsRemaining: 3 })],
+      }),
+    );
+    const provider = createFakeProvider();
+    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    expect(result.status).toBe("waitlisted");
+    const pack = await repos.classPacks.getById("p1");
+    expect(pack?.creditsRemaining).toBe(3);
+  });
 });
 
 describe("invoices service", () => {
