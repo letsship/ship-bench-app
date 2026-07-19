@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { UniqueViolationError } from "./errors";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
@@ -90,5 +91,54 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  it("rejects duplicate active bookings for the same member + session", async () => {
+    const emptyRepos = createInMemoryRepositories();
+    const booking1 = {
+      id: "b1",
+      sessionId: "s1",
+      memberId: "m1",
+      status: "waitlisted" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await emptyRepos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "s1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await expect(emptyRepos.bookings.insert(booking2)).rejects.toThrow(UniqueViolationError);
+  });
+
+  it("allows re-booking after a member's booking is cancelled", async () => {
+    const emptyRepos = createInMemoryRepositories();
+    const booking1 = {
+      id: "b1",
+      sessionId: "s1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await emptyRepos.bookings.insert(booking1);
+
+    await emptyRepos.bookings.update("b1", { status: "cancelled", cancelledAt: NOW.toISOString() });
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "s1",
+      memberId: "m1",
+      status: "waitlisted" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    const inserted = await emptyRepos.bookings.insert(booking2);
+    expect(inserted.id).toBe("b2");
   });
 });
