@@ -84,12 +84,14 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  // The canBook pre-check above rejects sequential re-booking attempts with a nice
-  // error message; however, concurrent double-clicks both read the same stale session
-  // bookings and both pass canBook. The partial unique index on (session_id, member_id)
-  // where status <> 'cancelled' is the authoritative guard that closes this window,
-  // and the bookings.insert implementation maps its 23505 violation to the same
-  // 'booking_already_booked' 409 response.
+  // The canBook pre-check above rejects sequential re-booking attempts for confirmed
+  // or attended bookings (ACTIVE_MEMBER_BOOKING includes only 'booked' and 'attended'),
+  // but NOT for waitlisted bookings (which hold no seat). Concurrent double-clicks on
+  // a full class both read the same stale session bookings and both pass canBook since
+  // one or both may be waitlist attempts. The partial unique index on (session_id, member_id)
+  // where status <> 'cancelled' is the authoritative guard that closes this concurrency
+  // window for all non-cancelled statuses, and the bookings.insert implementation maps
+  // its 23505 violation to the same 'booking_already_booked' 409 response.
   await repos.bookings.insert({
     id: bookingId,
     sessionId: session.id,

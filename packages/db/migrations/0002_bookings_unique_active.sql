@@ -6,8 +6,11 @@
 -- First, de-duplicate any pre-existing active bookings (cancelled rows are exempt from
 -- this constraint, so they don't need cleanup). For each (session_id, member_id) pair
 -- that has multiple non-cancelled bookings, keep the earliest booked_at and cancel the rest.
--- This ensures the index can be created on real production data.
-delete from public.bookings
+-- This ensures the index can be created on real production data. We use UPDATE to cancel
+-- rather than DELETE to avoid foreign-key violations (invoice_line_items may reference
+-- these bookings) and to preserve booking history.
+update public.bookings
+set status = 'cancelled'
 where id in (
   select b1.id
   from public.bookings b1
