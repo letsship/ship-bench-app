@@ -1,4 +1,5 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import type { BookingExportRow } from "@/lib/domain/csv";
 
 export interface BookingRow {
   id: string;
@@ -40,6 +41,42 @@ export async function listBookingRows(
         startsAt: session?.startsAt ?? "",
         status: booking.status,
       };
+    })
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Export-focused list of bookings with email included, filtered by session start time.
+// Filtering is INCLUSIVE on both ends: a session whose startsAt equals 'to' is included.
+// Does NOT use SessionRange.to (which is exclusive) to ensure inclusive upper bound.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  { from, to }: { from?: string; to?: string } = {},
+): Promise<BookingExportRow[]> {
+  const sessions = await repos.classSessions.listByStudio(studioId);
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const members = await repos.members.listByStudio(studioId);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
+
+  return bookings
+    .map((booking) => {
+      const session = sessionById.get(booking.sessionId);
+      const classType = session ? typeById.get(session.classTypeId) : undefined;
+      const member = memberById.get(booking.memberId);
+      return {
+        startsAt: session?.startsAt ?? "",
+        className: classType?.name ?? "Class",
+        memberName: member?.name ?? "—",
+        email: member?.email ?? "",
+        status: booking.status,
+      };
+    })
+    .filter((row) => {
+      const startsAt = row.startsAt;
+      return (!from || startsAt >= from) && (!to || startsAt <= to);
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }

@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,65 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("exports bookings with email included", async () => {
+    const rows = await listBookingsForExport(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("email");
+    expect(rows[0].email).toMatch(/@/);
+  });
+
+  it("filters bookings by inclusive [from, to] range", async () => {
+    const beforeDate = new Date(NOW.getTime() - 86_400_000).toISOString();
+    const afterDate = new Date(NOW.getTime() + 86_400_000).toISOString();
+    const futureDate = new Date(NOW.getTime() + 7 * 86_400_000).toISOString();
+    const futureDateEnd = new Date(NOW.getTime() + 7 * 86_400_000 + 3_600_000).toISOString();
+
+    const testRepos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1"), classType("ct2")],
+        sessions: [
+          session("cs1", { classTypeId: "ct1", startsAt: futureDate, endsAt: futureDateEnd }),
+          session("cs2", {
+            classTypeId: "ct2",
+            startsAt: afterDate,
+            endsAt: new Date(new Date(afterDate).getTime() + 3_600_000).toISOString(),
+          }),
+        ],
+        members: [member("m1"), member("m2")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m2", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+
+    // When no bounds given: returns all bookings
+    const allRows = await listBookingsForExport(testRepos, "s1");
+    expect(allRows.length).toBe(2);
+
+    // When from given: includes bookings from that date onward (inclusive)
+    const fromOnly = await listBookingsForExport(testRepos, "s1", { from: afterDate });
+    expect(fromOnly.length).toBe(2);
+    expect(fromOnly.every((r) => r.startsAt >= afterDate)).toBe(true);
+
+    // When to given: includes bookings up to and including that date
+    const toOnly = await listBookingsForExport(testRepos, "s1", { to: afterDate });
+    expect(toOnly.some((r) => r.startsAt === afterDate)).toBe(true);
+
+    // When both given: includes bookings in the inclusive range
+    const rangeRows = await listBookingsForExport(testRepos, "s1", {
+      from: beforeDate,
+      to: afterDate,
+    });
+    expect(rangeRows.length).toBe(1);
+    expect(rangeRows[0].startsAt).toBe(afterDate);
+
+    // When range excludes all bookings: returns empty
+    const emptyRows = await listBookingsForExport(testRepos, "s1", {
+      from: new Date(NOW.getTime() + 30 * 86_400_000).toISOString(),
+    });
+    expect(emptyRows.length).toBe(0);
   });
 });
