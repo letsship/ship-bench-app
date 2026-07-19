@@ -13,10 +13,12 @@ export type BookingDenyReason =
   | "already_booked"
   | "session_full_no_waitlist";
 
-export type BookingDecision = { ok: true; status: "booked" | "waitlisted" } | {
-  ok: false;
-  reason: BookingDenyReason;
-};
+export type BookingDecision =
+  | { ok: true; status: "booked" | "waitlisted" }
+  | {
+      ok: false;
+      reason: BookingDenyReason;
+    };
 
 export interface BookingContext {
   sessionStatus: string;
@@ -54,8 +56,7 @@ export function canBook(context: BookingContext): BookingDecision {
 export type CancellationDenyReason = "already_cancelled" | "session_passed";
 
 export type CancellationDecision =
-  | { ok: true; refundEligible: boolean }
-  | { ok: false; reason: CancellationDenyReason };
+  { ok: true; refundEligible: boolean } | { ok: false; reason: CancellationDenyReason };
 
 export interface CancellationContext {
   bookingStatus: string;

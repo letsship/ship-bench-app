@@ -56,11 +56,25 @@ describe("canBook", () => {
     });
   });
 
+  it("rejects a member who already holds an attended booking", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "attended" }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
   it("rejects when full and the waitlist is closed", () => {
     const occupancy = computeOccupancy(1, [{ status: "booked" }]);
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
       ok: false,
       reason: "session_full_no_waitlist",
+    });
+  });
+
+  it("allows a booking when the only prior booking is cancelled", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "cancelled" }] }))).toEqual({
+      ok: true,
+      status: "booked",
     });
   });
 });

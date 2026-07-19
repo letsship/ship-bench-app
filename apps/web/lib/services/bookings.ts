@@ -1,5 +1,6 @@
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
+import { UniqueViolationError } from "@/lib/db/repos/errors";
 import type { ClassSession, Member } from "@/lib/db/types";
 import {
   type BookingDenyReason,
@@ -84,14 +85,21 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  await repos.bookings.insert({
-    id: bookingId,
-    sessionId: session.id,
-    memberId: member.id,
-    status: decision.status,
-    bookedAt: nowIso(),
-    cancelledAt: null,
-  });
+  try {
+    await repos.bookings.insert({
+      id: bookingId,
+      sessionId: session.id,
+      memberId: member.id,
+      status: decision.status,
+      bookedAt: nowIso(),
+      cancelledAt: null,
+    });
+  } catch (err) {
+    if (err instanceof UniqueViolationError && err.constraint === "bookings_active_unique") {
+      throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+    }
+    throw err;
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
@@ -142,7 +150,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
