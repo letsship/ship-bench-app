@@ -8,6 +8,7 @@ const SETTING_FOR_KIND = {
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
+  booking_reminder: "notifyBookingConfirmations",
 } as const satisfies Record<NotificationKind, string>;
 
 export interface OptOutContext {
