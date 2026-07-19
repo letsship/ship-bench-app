@@ -44,6 +44,17 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("handles all-refunded line items safely", () => {
+    expect(
+      computeInvoiceTotals([{ quantity: 1, unitAmountCents: 9000, refunded: true }], 2100),
+    ).toEqual({
+      subtotalCents: 0,
+      refundedCents: 9000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
 });
 
 describe("formatInvoiceNumber", () => {
