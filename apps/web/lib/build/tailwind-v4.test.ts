@@ -31,7 +31,7 @@ describe("Tailwind v4 migration", () => {
     const postcssConfigPath = path.join(webAppRoot, "postcss.config.mjs");
     const config = fs.readFileSync(postcssConfigPath, "utf-8");
 
-    expect(config).toContain("'@tailwindcss/postcss'");
+    expect(config).toContain("@tailwindcss/postcss");
     expect(config).not.toMatch(/plugins:\s*{\s*tailwindcss:/);
   });
 
