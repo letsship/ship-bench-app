@@ -19,11 +19,11 @@ import { UniqueViolationError } from "./errors";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string; code?: string } | null;
+type PgError = { message: string; code?: string; details?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
-function fail(context: string, error: { message: string; code?: string }): never {
+function fail(context: string, error: { message: string; code?: string; details?: string }): never {
   throw new Error(`Supabase ${context} failed: ${error.message}`);
 }
 
@@ -49,8 +49,20 @@ export function createSupabaseRepositories(): Repositories {
       .select()
       .single();
     if (error) {
-      if (table === "bookings" && error.code === "23505") {
-        throw new UniqueViolationError("bookings_active_unique");
+      // Detect unique constraint violations on bookings table.
+      // Check both error.code (Postgres SQLSTATE) and error message/details
+      // for the constraint name to handle different Supabase versions.
+      if (table === "bookings") {
+        const hasUniqueViolationCode = error.code === "23505";
+        const hasConstraintInMessage = (error.message + (error.details ?? "")).includes(
+          "idx_bookings_active_unique",
+        );
+        const hasUniqueKeywordInMessage = (error.message + (error.details ?? "")).includes(
+          "duplicate key",
+        );
+        if (hasUniqueViolationCode || hasConstraintInMessage || hasUniqueKeywordInMessage) {
+          throw new UniqueViolationError("bookings_active_unique");
+        }
       }
       fail(`insert into ${table}`, error);
     }
