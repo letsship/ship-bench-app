@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as invoiceDetailGet } from "@/app/api/invoices/[id]/route";
+import { GET as memberDetailGet } from "@/app/api/members/[id]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +46,31 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/invoices/:id returns an invoice with member and line items", async () => {
+    const _members = (await membersGet().then((r) => r.json())) as { id: string }[];
+    const invoices = (await invoicesGet().then((r) => r.json())) as { id: string }[];
+    const invoiceId = invoices[0].id;
+    const res = await invoiceDetailGet(new NextRequest("http://localhost/api/invoices/123"), {
+      params: Promise.resolve({ id: invoiceId }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown;
+    expect(body).toHaveProperty("invoice");
+    expect(body).toHaveProperty("member");
+    expect(body).toHaveProperty("lineItems");
+  });
+
+  it("GET /api/members/:id returns a single member", async () => {
+    const members = (await membersGet().then((r) => r.json())) as { id: string }[];
+    const memberId = members[0].id;
+    const res = await memberDetailGet(new NextRequest("http://localhost/api/members/123"), {
+      params: Promise.resolve({ id: memberId }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown;
+    expect(body).toHaveProperty("id");
+    expect(body).toHaveProperty("email");
   });
 });

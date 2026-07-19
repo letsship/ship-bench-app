@@ -6,23 +6,27 @@ import { updateMemberSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: { id: string } };
-
 // GET /api/members/:id — a single member.
-export async function GET(_request: Request, { params }: RouteContext): Promise<Response> {
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
   return handle(async () => {
     const { repos } = await resolveStudio();
-    const { id } = params;
+    const { id } = await params;
     return ok(await getMember(repos, id));
   });
 }
 
 // PATCH /api/members/:id — update member details or notification opt-out.
-export async function PATCH(request: Request, { params }: RouteContext): Promise<Response> {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
   return handle(async () => {
     await requireSession();
     const { repos } = await resolveStudio();
-    const { id } = params;
+    const { id } = await params;
     const input = updateMemberSchema.parse(await request.json());
     return ok(await updateMember(repos, id, input));
   });
