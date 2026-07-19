@@ -170,11 +170,7 @@ export function createD1Repositories(db: AnyD1Database): Repositories {
         return rows[0] ?? null;
       },
       async countByStudio(studioId): Promise<number> {
-        const result = await drizzleDb
-          .select({ count: drizzleDb.$count(schema.invoices) })
-          .from(schema.invoices)
-          .where(eq(schema.invoices.studioId, studioId));
-        return result[0]?.count ?? 0;
+        return drizzleDb.$count(schema.invoices, eq(schema.invoices.studioId, studioId));
       },
       async insert(invoice): Promise<Invoice> {
         const rows = await drizzleDb.insert(schema.invoices).values(invoice).returning();
