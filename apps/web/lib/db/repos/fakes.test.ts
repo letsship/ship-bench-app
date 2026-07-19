@@ -35,6 +35,41 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("finds a member by calendar token", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const member = members[0];
+    const found = await repos.members.findByCalendarToken(member.calendarToken);
+    expect(found?.id).toBe(member.id);
+    expect(found?.name).toBe(member.name);
+  });
+
+  it("returns null for unknown calendar token", async () => {
+    const found = await repos.members.findByCalendarToken("unknown_token");
+    expect(found).toBeNull();
+  });
+
+  it("returns null for empty calendar token", async () => {
+    const found = await repos.members.findByCalendarToken("");
+    expect(found).toBeNull();
+  });
+
+  it("returns null for whitespace-only calendar token", async () => {
+    const found = await repos.members.findByCalendarToken("   ");
+    expect(found).toBeNull();
+  });
+
+  it("lists bookings for a member", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const member = members[0];
+    const bookings = await repos.bookings.listByMember(member.id);
+    expect(bookings.every((b) => b.memberId === member.id)).toBe(true);
+  });
+
+  it("returns empty list for member with no bookings", async () => {
+    const bookings = await repos.bookings.listByMember("nonexistent_member");
+    expect(bookings).toEqual([]);
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
@@ -60,6 +95,7 @@ describe("in-memory repositories", () => {
       phone: null,
       status: "active",
       notificationsOptedOut: false,
+      calendarToken: "test_token_abc123",
       createdAt: NOW.toISOString(),
     };
     await repos.members.insert(member);
