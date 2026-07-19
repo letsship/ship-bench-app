@@ -32,6 +32,7 @@ const sections: [string, readonly object[]][] = [
   ["class_types", seed.classTypes],
   ["class_sessions", seed.sessions],
   ["bookings", seed.bookings],
+  ["class_packs", seed.classPacks],
   ["invoices", seed.invoices],
   ["invoice_line_items", seed.lineItems],
   ["notification_outbox", seed.outbox],

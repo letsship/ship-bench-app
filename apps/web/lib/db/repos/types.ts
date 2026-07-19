@@ -1,5 +1,6 @@
 import type {
   Booking,
+  ClassPack,
   ClassSession,
   ClassType,
   Invoice,
@@ -79,6 +80,13 @@ export interface NotificationOutboxRepo {
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
+export interface ClassPacksRepo {
+  listByMember(memberId: string): Promise<ClassPack[]>;
+  getById(id: string): Promise<ClassPack | null>;
+  insert(pack: ClassPack): Promise<ClassPack>;
+  update(id: string, patch: Partial<ClassPack>): Promise<ClassPack>;
+}
+
 export interface Repositories {
   studios: StudioRepo;
   settings: StudioSettingsRepo;
@@ -86,6 +94,7 @@ export interface Repositories {
   classTypes: ClassTypesRepo;
   classSessions: ClassSessionsRepo;
   bookings: BookingsRepo;
+  classPacks: ClassPacksRepo;
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
   outbox: NotificationOutboxRepo;

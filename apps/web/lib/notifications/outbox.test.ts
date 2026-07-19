@@ -43,6 +43,7 @@ function seedWith(
     classTypes: [],
     sessions: [],
     bookings: [],
+    classPacks: [],
     invoices: [],
     lineItems: [],
     outbox: [],

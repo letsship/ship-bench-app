@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type {
   Booking,
+  ClassPack,
   ClassSession,
   ClassType,
   Invoice,
@@ -88,7 +89,10 @@ export function createSupabaseRepositories(): Repositories {
           "members.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Member>(db.from("members").select("*").eq("id", id).maybeSingle(), "members.getById"),
+        maybeOne<Member>(
+          db.from("members").select("*").eq("id", id).maybeSingle(),
+          "members.getById",
+        ),
       findByEmail: (studioId, email) =>
         maybeOne<Member>(
           db.from("members").select("*").eq("studio_id", studioId).eq("email", email).maybeSingle(),
@@ -138,18 +142,46 @@ export function createSupabaseRepositories(): Repositories {
           "bookings.listBySession",
         ),
       getById: (id) =>
-        maybeOne<Booking>(db.from("bookings").select("*").eq("id", id).maybeSingle(), "bookings.getById"),
+        maybeOne<Booking>(
+          db.from("bookings").select("*").eq("id", id).maybeSingle(),
+          "bookings.getById",
+        ),
       insert: (booking) => insertReturning("bookings", booking),
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
+    },
+    classPacks: {
+      listByMember: (memberId) =>
+        rows<ClassPack>(
+          db
+            .from("class_packs")
+            .select("*")
+            .eq("member_id", memberId)
+            .order("purchased_at", { ascending: false }),
+          "classPacks.listByMember",
+        ),
+      getById: (id) =>
+        maybeOne<ClassPack>(
+          db.from("class_packs").select("*").eq("id", id).maybeSingle(),
+          "classPacks.getById",
+        ),
+      insert: (pack) => insertReturning("class_packs", pack),
+      update: (id, patch) => updateReturning<ClassPack>("class_packs", "id", id, patch),
     },
     invoices: {
       listByStudio: (studioId) =>
         rows<Invoice>(
-          db.from("invoices").select("*").eq("studio_id", studioId).order("issued_at", { ascending: false }),
+          db
+            .from("invoices")
+            .select("*")
+            .eq("studio_id", studioId)
+            .order("issued_at", { ascending: false }),
           "invoices.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Invoice>(db.from("invoices").select("*").eq("id", id).maybeSingle(), "invoices.getById"),
+        maybeOne<Invoice>(
+          db.from("invoices").select("*").eq("id", id).maybeSingle(),
+          "invoices.getById",
+        ),
       countByStudio: async (studioId) => {
         const { count, error } = await db
           .from("invoices")
@@ -174,7 +206,9 @@ export function createSupabaseRepositories(): Repositories {
           .insert(items.map((item) => toSnakeRow(item as unknown as Record<string, unknown>)))
           .select();
         if (error) fail("invoiceLineItems.insertMany", error);
-        return (data ?? []).map((row) => toCamelRow<InvoiceLineItem>(row as Record<string, unknown>));
+        return (data ?? []).map((row) =>
+          toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
+        );
       },
     },
     outbox: {

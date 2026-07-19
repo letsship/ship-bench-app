@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as packagesGet } from "@/app/api/packages/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +45,40 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/packages?memberId=<id> returns member's packs newest-first", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const memberId = (await repos.members.listByStudio(studioId))[0].id;
+    await repos.classPacks.insert({
+      id: "p1",
+      studioId,
+      memberId,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10000,
+      status: "active",
+      purchasedAt: "2026-07-01T00:00:00Z",
+    });
+    await repos.classPacks.insert({
+      id: "p2",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2026-07-02T00:00:00Z",
+    });
+    __setTestRepositories(repos);
+    const res = await packagesGet(
+      new NextRequest(`http://localhost/api/packages?memberId=${memberId}`),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown[];
+    expect(body).toHaveLength(2);
+    expect((body[0] as Record<string, unknown>).id).toBe("p2");
+    expect((body[1] as Record<string, unknown>).id).toBe("p1");
   });
 });
