@@ -60,7 +60,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         const result = await drizzleDb
           .select()
           .from(schema.members)
-          .where(eq(schema.members.studioId, studioId) && eq(schema.members.email, email));
+          .where(and(eq(schema.members.studioId, studioId), eq(schema.members.email, email)));
         return result[0] || null;
       },
       insert: async (member) => {
