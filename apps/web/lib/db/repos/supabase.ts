@@ -1,3 +1,4 @@
+import { HttpError } from "@/lib/http";
 import { createServiceClient } from "@/lib/supabase/service";
 import type {
   Booking,
@@ -88,7 +89,10 @@ export function createSupabaseRepositories(): Repositories {
           "members.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Member>(db.from("members").select("*").eq("id", id).maybeSingle(), "members.getById"),
+        maybeOne<Member>(
+          db.from("members").select("*").eq("id", id).maybeSingle(),
+          "members.getById",
+        ),
       findByEmail: (studioId, email) =>
         maybeOne<Member>(
           db.from("members").select("*").eq("studio_id", studioId).eq("email", email).maybeSingle(),
@@ -138,18 +142,51 @@ export function createSupabaseRepositories(): Repositories {
           "bookings.listBySession",
         ),
       getById: (id) =>
-        maybeOne<Booking>(db.from("bookings").select("*").eq("id", id).maybeSingle(), "bookings.getById"),
-      insert: (booking) => insertReturning("bookings", booking),
+        maybeOne<Booking>(
+          db.from("bookings").select("*").eq("id", id).maybeSingle(),
+          "bookings.getById",
+        ),
+      insert: async (booking) => {
+        const { data, error } = await db
+          .from("bookings")
+          .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+          .select()
+          .single();
+        // Detect unique constraint violation on the partial unique index
+        // (bookings_one_active_per_member) and map it to the existing
+        // 'already_booked' conflict code so concurrent double-clicks surface the
+        // same 409 error as sequential re-booking attempts.
+        if (
+          error &&
+          (error.message.includes("bookings_one_active_per_member") ||
+            (error as unknown as { code?: string }).code === "23505")
+        ) {
+          throw new HttpError(
+            409,
+            "booking_already_booked",
+            "This member already has a booking for this class",
+          );
+        }
+        if (error) fail("bookings.insert", error);
+        return toCamelRow<Booking>(data as Record<string, unknown>);
+      },
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {
       listByStudio: (studioId) =>
         rows<Invoice>(
-          db.from("invoices").select("*").eq("studio_id", studioId).order("issued_at", { ascending: false }),
+          db
+            .from("invoices")
+            .select("*")
+            .eq("studio_id", studioId)
+            .order("issued_at", { ascending: false }),
           "invoices.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Invoice>(db.from("invoices").select("*").eq("id", id).maybeSingle(), "invoices.getById"),
+        maybeOne<Invoice>(
+          db.from("invoices").select("*").eq("id", id).maybeSingle(),
+          "invoices.getById",
+        ),
       countByStudio: async (studioId) => {
         const { count, error } = await db
           .from("invoices")
@@ -174,7 +211,9 @@ export function createSupabaseRepositories(): Repositories {
           .insert(items.map((item) => toSnakeRow(item as unknown as Record<string, unknown>)))
           .select();
         if (error) fail("invoiceLineItems.insertMany", error);
-        return (data ?? []).map((row) => toCamelRow<InvoiceLineItem>(row as Record<string, unknown>));
+        return (data ?? []).map((row) =>
+          toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
+        );
       },
     },
     outbox: {

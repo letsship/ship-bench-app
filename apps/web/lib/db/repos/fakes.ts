@@ -1,3 +1,4 @@
+import { HttpError } from "@/lib/http";
 import type {
   Booking,
   ClassSession,
@@ -81,7 +82,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +103,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -157,6 +161,23 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        // Enforce the unique-active constraint: a member can have at most one
+        // non-cancelled booking for any given session. This mirrors the database-level
+        // partial unique index and ensures concurrent double-clicks both hit the same
+        // 409 error in tests.
+        const existingActive = store.bookings.find(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            row.status !== "cancelled",
+        );
+        if (existingActive) {
+          throw new HttpError(
+            409,
+            "booking_already_booked",
+            "This member already has a booking for this class",
+          );
+        }
         store.bookings.push(clone(booking));
         return clone(booking);
       },

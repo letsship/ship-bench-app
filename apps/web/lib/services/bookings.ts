@@ -84,6 +84,12 @@ export async function createBooking(
   }
 
   const bookingId = newId();
+  // The canBook pre-check above rejects sequential re-booking attempts with a nice
+  // error message; however, concurrent double-clicks both read the same stale session
+  // bookings and both pass canBook. The partial unique index on (session_id, member_id)
+  // where status <> 'cancelled' is the authoritative guard that closes this window,
+  // and the bookings.insert implementation maps its 23505 violation to the same
+  // 'booking_already_booked' 409 response.
   await repos.bookings.insert({
     id: bookingId,
     sessionId: session.id,
@@ -142,7 +148,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }

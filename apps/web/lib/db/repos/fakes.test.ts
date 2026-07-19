@@ -91,4 +91,44 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("enforces the unique-active constraint on bookings", async () => {
+    const empty = createInMemoryRepositories();
+    const sessionId = "session1";
+    const memberId = "member1";
+    // First insert succeeds
+    await empty.bookings.insert({
+      id: "booking1",
+      sessionId,
+      memberId,
+      status: "waitlisted",
+      bookedAt: "2026-03-15T10:00:00.000Z",
+      cancelledAt: null,
+    });
+    // Second insert with same session + member + non-cancelled status fails
+    await expect(
+      empty.bookings.insert({
+        id: "booking2",
+        sessionId,
+        memberId,
+        status: "booked",
+        bookedAt: "2026-03-15T10:01:00.000Z",
+        cancelledAt: null,
+      }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    // Insert after the first booking is cancelled succeeds
+    await empty.bookings.update("booking1", {
+      status: "cancelled",
+      cancelledAt: "2026-03-15T10:02:00.000Z",
+    });
+    const afterCancel = await empty.bookings.insert({
+      id: "booking3",
+      sessionId,
+      memberId,
+      status: "waitlisted",
+      bookedAt: "2026-03-15T10:03:00.000Z",
+      cancelledAt: null,
+    });
+    expect(afterCancel.id).toBe("booking3");
+  });
 });
