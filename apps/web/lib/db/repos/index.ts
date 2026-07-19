@@ -1,11 +1,13 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
+import { createD1Repositories } from "./d1";
 import type { Repositories } from "./types";
 
-// Resolve the request's repositories. Production uses the Supabase-backed
+// Resolve the request's repositories. Production uses the D1/Drizzle-backed
 // implementation; `USE_FAKE_BACKENDS=1` (local dev, `next start` for e2e) uses a
 // seeded in-memory set; tests inject their own via __setTestRepositories. This
-// is the single seam that a Supabase→other-database migration replaces.
+// is the single seam that a Supabase→D1 migration replaces.
 
 let testRepositories: Repositories | null = null;
 
@@ -30,8 +32,8 @@ export async function resolveRepositories(): Promise<Repositories> {
     }
     return globalForFakes.__studiobookFakeRepos;
   }
-  const { createSupabaseRepositories } = await import("./supabase");
-  return createSupabaseRepositories();
+  const env = getCloudflareContext().env;
+  return createD1Repositories(env.DB);
 }
 
 // Test-only: re-seed the in-memory store to a clean, known dataset so e2e specs
