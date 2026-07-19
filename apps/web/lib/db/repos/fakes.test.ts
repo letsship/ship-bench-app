@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { UniqueActiveBookingError } from "./errors";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
@@ -90,5 +91,141 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  it("throws UniqueActiveBookingError when inserting duplicate active booking", async () => {
+    const repos = createInMemoryRepositories({
+      studio: { id: "s1", name: "S", slug: "s", timezone: "UTC", createdAt: NOW.toISOString() },
+      settings: {
+        studioId: "s1",
+        currency: "EUR",
+        taxRateBps: 0,
+        cancellationWindowHours: 12,
+        waitlistEnabled: true,
+        notifyBookingConfirmations: true,
+        notifyCancellations: true,
+        notifyWaitlistPromotions: true,
+        notifyInvoices: true,
+      },
+      members: [
+        {
+          id: "m1",
+          studioId: "s1",
+          name: "M1",
+          email: "m1@e.co",
+          phone: null,
+          status: "active",
+          notificationsOptedOut: false,
+          createdAt: NOW.toISOString(),
+        },
+      ],
+      classTypes: [],
+      sessions: [
+        {
+          id: "cs1",
+          studioId: "s1",
+          classTypeId: "ct1",
+          instructor: "I",
+          startsAt: NOW.toISOString(),
+          endsAt: new Date(NOW.getTime() + 3600000).toISOString(),
+          capacity: 10,
+          priceCents: 0,
+          status: "scheduled",
+          createdAt: NOW.toISOString(),
+        },
+      ],
+      bookings: [
+        {
+          id: "b1",
+          sessionId: "cs1",
+          memberId: "m1",
+          status: "booked",
+          bookedAt: NOW.toISOString(),
+          cancelledAt: null,
+        },
+      ],
+      invoices: [],
+      lineItems: [],
+      outbox: [],
+    });
+
+    await expect(
+      repos.bookings.insert({
+        id: "b2",
+        sessionId: "cs1",
+        memberId: "m1",
+        status: "waitlisted",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).rejects.toThrow(UniqueActiveBookingError);
+  });
+
+  it("allows rebooking after cancellation", async () => {
+    const repos = createInMemoryRepositories({
+      studio: { id: "s1", name: "S", slug: "s", timezone: "UTC", createdAt: NOW.toISOString() },
+      settings: {
+        studioId: "s1",
+        currency: "EUR",
+        taxRateBps: 0,
+        cancellationWindowHours: 12,
+        waitlistEnabled: true,
+        notifyBookingConfirmations: true,
+        notifyCancellations: true,
+        notifyWaitlistPromotions: true,
+        notifyInvoices: true,
+      },
+      members: [
+        {
+          id: "m1",
+          studioId: "s1",
+          name: "M1",
+          email: "m1@e.co",
+          phone: null,
+          status: "active",
+          notificationsOptedOut: false,
+          createdAt: NOW.toISOString(),
+        },
+      ],
+      classTypes: [],
+      sessions: [
+        {
+          id: "cs1",
+          studioId: "s1",
+          classTypeId: "ct1",
+          instructor: "I",
+          startsAt: NOW.toISOString(),
+          endsAt: new Date(NOW.getTime() + 3600000).toISOString(),
+          capacity: 10,
+          priceCents: 0,
+          status: "scheduled",
+          createdAt: NOW.toISOString(),
+        },
+      ],
+      bookings: [
+        {
+          id: "b1",
+          sessionId: "cs1",
+          memberId: "m1",
+          status: "cancelled",
+          bookedAt: NOW.toISOString(),
+          cancelledAt: NOW.toISOString(),
+        },
+      ],
+      invoices: [],
+      lineItems: [],
+      outbox: [],
+    });
+
+    const newBooking = await repos.bookings.insert({
+      id: "b2",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    expect(newBooking.id).toBe("b2");
+    expect(newBooking.status).toBe("booked");
   });
 });
