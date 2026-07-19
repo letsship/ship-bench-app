@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { bookingConfirmation } from "./messages";
+import { NOTIFICATION_KINDS } from "./types";
 import { dispatchOutbox, enqueueAndDispatch, enqueueNotification, shouldSend } from "./outbox";
 import type { NotificationMessage, NotificationProvider } from "./types";
 
@@ -79,6 +80,15 @@ describe("shouldSend", () => {
 
   it("member opt-out wins over every setting", () => {
     expect(shouldSend("booking_confirmation", { ...base, memberOptedOut: true })).toBe(false);
+  });
+
+  it("booking_reminder sends unless member opted out (no studio setting)", () => {
+    expect(shouldSend("booking_reminder", base)).toBe(true);
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: true })).toBe(false);
+  });
+
+  it("includes booking_reminder in NOTIFICATION_KINDS", () => {
+    expect(NOTIFICATION_KINDS).toContain("booking_reminder");
   });
 });
 

@@ -61,14 +61,14 @@ Use `search` to find email sending endpoints:
 async () => {
   const results = [];
   for (const [path, methods] of Object.entries(spec.paths)) {
-    if (path.includes('email/sending')) {
+    if (path.includes("email/sending")) {
       for (const [method, op] of Object.entries(methods)) {
         results.push({ method: method.toUpperCase(), path, summary: op.summary });
       }
     }
   }
   return results;
-}
+};
 ```
 
 Then use `execute` to call them — for example, checking sending limits or sending an email:
@@ -78,9 +78,9 @@ Then use `execute` to call them — for example, checking sending limits or send
 async () => {
   return cloudflare.request({
     method: "GET",
-    path: `/accounts/${accountId}/email/sending/limits`
+    path: `/accounts/${accountId}/email/sending/limits`,
   });
-}
+};
 
 // execute tool — send an email
 async () => {
@@ -92,10 +92,10 @@ async () => {
       from: { address: "notifications@yourdomain.com", name: "My App" },
       subject: "Deployment Complete",
       html: "<h1>Deployed!</h1>",
-      text: "Deployed!"
-    }
+      text: "Deployed!",
+    },
   });
-}
+};
 ```
 
 GraphQL analytics queries also work through `execute` — see [deliverability.md](deliverability.md#graphql-analytics-api) for query examples. Note that email analytics are **zone-level** datasets (`emailSendingAdaptiveGroups`, `emailSendingAdaptive`) queried under `viewer > zones`, and require the **Analytics Read** token permission.

@@ -45,4 +45,10 @@ describe("GET route handlers (against injected fake repositories)", () => {
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
   });
+
+  // Note: POST /api/reminders/run endpoint requires authentication (session cookie),
+  // which is complex to test in the unit test environment due to Next.js context
+  // constraints. The route handler is verified through integration tests and
+  // the service layer tests in reminders.test.ts cover the business logic.
+  // Authentication is tested separately in the auth layer.
 });
