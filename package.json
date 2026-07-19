@@ -26,6 +26,14 @@
     "turbo": "^2.8.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "supabase", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "supabase",
+      "workerd"
+    ]
+  },
+  "dependencies": {
+    "posthog-node": "^5.45.2"
   }
 }

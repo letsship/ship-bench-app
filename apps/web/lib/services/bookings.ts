@@ -9,6 +9,7 @@ import {
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
 import { HttpError } from "@/lib/http";
+import type { AnalyticsTracker } from "@/lib/analytics/types";
 import {
   bookingCancellation,
   bookingConfirmation,
@@ -63,6 +64,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -99,6 +101,17 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    await tracker.capture({
+      distinctId: member.id,
+      event: "booking_created",
+      properties: { session_id: session.id },
+    });
+  } else if (decision.status === "waitlisted") {
+    await tracker.capture({
+      distinctId: member.id,
+      event: "waitlist_joined",
+      properties: { session_id: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -111,6 +124,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -142,8 +156,17 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
+  await tracker.capture({
+    distinctId: member.id,
+    event: "booking_cancelled",
+    properties: { session_id: session.id },
+  });
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 
