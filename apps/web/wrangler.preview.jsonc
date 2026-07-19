@@ -2,25 +2,21 @@
   // Route-less preview config — deploys to *.workers.dev ONLY. The per-PR worker
   // name is supplied by the SHIP orchestrator via `wrangler deploy --name`.
   //
-  // Preview environments use a shared D1 database. The deploy-preview workflow
-  // supplies the D1 binding at build time and sets RESEND_API_KEY as a Worker
-  // secret after deploy. See the README's deploy section.
+  // Preview environments use seeded in-memory fake backends (no external database
+  // dependency). This allows concurrent previews to run without requiring
+  // pre-provisioned D1 databases. RESEND_API_KEY is set as a Worker secret after
+  // deploy. See the README's deploy section.
   "name": "studiobook-preview",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-06-01",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "USE_FAKE_BACKENDS": "1",
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "studiobook-preview",
-      "database_id": "00000000-0000-0000-0000-000000000001",
-      "migrations_dir": "migrations",
-    },
-  ],
   "observability": {
     "enabled": true,
   },
