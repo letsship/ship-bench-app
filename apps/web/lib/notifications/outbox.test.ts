@@ -45,6 +45,7 @@ function seedWith(
     bookings: [],
     invoices: [],
     lineItems: [],
+    packages: [],
     outbox: [],
   };
 }

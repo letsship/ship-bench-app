@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  Package,
   Studio,
   StudioSettings,
 } from "../types";
@@ -25,6 +26,7 @@ export interface SeedData {
   bookings: Booking[];
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
+  packages: Package[];
   outbox: NotificationOutboxRow[];
 }
 
@@ -37,6 +39,7 @@ interface Store {
   bookings: Booking[];
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
+  packages: Package[];
   outbox: NotificationOutboxRow[];
 }
 
@@ -66,6 +69,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     bookings: seed ? cloneAll(seed.bookings) : [],
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
+    packages: seed ? cloneAll(seed.packages) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
   };
 
@@ -81,7 +85,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +106,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -194,6 +201,26 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       async insertMany(items) {
         for (const item of items) store.invoiceLineItems.push(clone(item));
         return cloneAll(items);
+      },
+    },
+    packages: {
+      async listByMember(memberId) {
+        return cloneAll(
+          store.packages
+            .filter((row) => row.memberId === memberId)
+            .sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)),
+        );
+      },
+      async getById(id) {
+        const found = store.packages.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(pkg) {
+        store.packages.push(clone(pkg));
+        return clone(pkg);
+      },
+      async update(id, patch) {
+        return patched(store.packages, (row) => row.id === id, patch, "Package");
       },
     },
     outbox: {

@@ -8,6 +8,7 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import { hasEverPurchased, pickPackToDraw } from "@/lib/domain/packages";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -83,6 +84,23 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  if (decision.status === "booked") {
+    const memberPackages = await repos.packages.listByMember(member.id);
+    if (hasEverPurchased(memberPackages)) {
+      const packToDraw = pickPackToDraw(memberPackages);
+      if (!packToDraw) {
+        throw new HttpError(
+          402,
+          "pack_exhausted",
+          "No credits available; please purchase another pack",
+        );
+      }
+      await repos.packages.update(packToDraw.id, {
+        creditsRemaining: packToDraw.creditsRemaining - 1,
+      });
+    }
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -142,7 +160,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
