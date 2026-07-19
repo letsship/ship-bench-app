@@ -85,8 +85,9 @@ export async function createBooking(
   }
 
   const packs = await repos.classPacks.listByMember(member.id);
+  let packToSpend: (typeof packs)[0] | null = null;
   if (packs.length > 0) {
-    const packToSpend = pickPackToSpend(packs);
+    packToSpend = pickPackToSpend(packs);
     if (!packToSpend) {
       throw new HttpError(402, "pack_exhausted", "No available credits to book this class");
     }
@@ -102,8 +103,7 @@ export async function createBooking(
     cancelledAt: null,
   });
 
-  const packToSpend = pickPackToSpend(packs);
-  if (packToSpend) {
+  if (decision.status === "booked" && packToSpend) {
     await repos.classPacks.update(packToSpend.id, spendCredit(packToSpend));
   }
 
