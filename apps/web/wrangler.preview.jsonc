@@ -17,7 +17,7 @@
     {
       "binding": "DB",
       "database_name": "studiobook-preview",
-      "database_id": "REPLACE_ME",
+      "database_id": "00000000-0000-0000-0000-000000000001",
       "migrations_dir": "migrations",
     },
   ],

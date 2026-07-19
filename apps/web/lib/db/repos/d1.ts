@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { D1Database } from "@cloudflare/workers-types";
 import * as schema from "../schema";
@@ -175,10 +175,11 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
       countByStudio: async (studioId) => {
         const result = await drizzleDb
-          .select({ count: schema.invoices.id })
+          .select({ value: count() })
           .from(schema.invoices)
-          .where(eq(schema.invoices.studioId, studioId));
-        return result.length > 0 ? result.filter((row) => row.count !== null).length : 0;
+          .where(eq(schema.invoices.studioId, studioId))
+          .limit(1);
+        return result.length > 0 ? result[0].value : 0;
       },
       insert: async (invoice) => {
         const inserted = await drizzleDb.insert(schema.invoices).values(invoice).returning();
