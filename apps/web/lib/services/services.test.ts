@@ -4,6 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { createFakeTracker } from "@/lib/analytics/fake-tracker";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -158,17 +159,31 @@ describe("classes service", () => {
 });
 
 describe("bookings service", () => {
-  it("books an open future session and sends a confirmation", async () => {
+  it("books an open future session and sends a confirmation + analytics", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, provider, tracker, {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
     expect(result.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind)).toEqual(["booking_confirmation"]);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0]).toMatchObject({
+      event: "booking_created",
+      distinctId: "m1",
+      properties: { session_id: "cs1" },
+    });
   });
 
-  it("waitlists when full (and sends no confirmation)", async () => {
+  it("waitlists when full (and sends no confirmation or booking_created)", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
         classTypes: [classType("ct1")],
@@ -178,9 +193,19 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, provider, tracker, {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
     expect(result.status).toBe("waitlisted");
     expect(provider.sent).toHaveLength(0);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0]).toMatchObject({
+      event: "waitlist_joined",
+      distinctId: "m2",
+      properties: { session_id: "cs1" },
+    });
   });
 
   it("rejects a double booking with 409", async () => {
@@ -192,17 +217,31 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
+    const tracker = createFakeTracker();
     await expect(
-      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+      createBooking(repos, createFakeProvider(), tracker, { sessionId: "cs1", memberId: "m1" }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
   });
 
-  it("marks a far-off cancellation refund-eligible", async () => {
+  it("marks a far-off cancellation refund-eligible and captures booking_cancelled", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const provider = createFakeProvider();
+    const tracker = createFakeTracker();
+    const result = await cancelBooking(repos, provider, tracker, "b1");
     expect(result.refundEligible).toBe(true);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0]).toMatchObject({
+      event: "booking_cancelled",
+      distinctId: "m1",
+      properties: { session_id: "cs1" },
+    });
   });
 
   it("marks a last-minute cancellation refund-ineligible", async () => {
@@ -214,7 +253,9 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const provider = createFakeProvider();
+    const tracker = createFakeTracker();
+    const result = await cancelBooking(repos, provider, tracker, "b1");
     expect(result.refundEligible).toBe(false);
   });
 
@@ -232,13 +273,39 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const tracker = createFakeTracker();
+    const result = await cancelBooking(repos, provider, tracker, "b1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("booking_cancelled");
+  });
+
+  it("captured events have no PII (no email, name, or phone)", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [
+          member("m1", { email: "secret@example.com", name: "Secret Name", phone: "555-1234" }),
+        ],
+      }),
+    );
+    const tracker = createFakeTracker();
+    await createBooking(repos, createFakeProvider(), tracker, { sessionId: "cs1", memberId: "m1" });
+
+    const captured = tracker.captured[0];
+    expect(captured.properties).not.toHaveProperty("email");
+    expect(captured.properties).not.toHaveProperty("name");
+    expect(captured.properties).not.toHaveProperty("phone");
+    const propsString = JSON.stringify(captured.properties);
+    expect(propsString).not.toContain("secret@example.com");
+    expect(propsString).not.toContain("Secret Name");
+    expect(propsString).not.toContain("555-1234");
   });
 });
 
