@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,97 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("does not scale repository reads with the number of bookings (N+1 regression)", async () => {
+    // Create sessions and members for a studio
+    const testSessionCount = 3;
+    const testMembers = Array.from({ length: 50 }, (_, i) =>
+      member(`m${i}`, { name: `Member ${i}` }),
+    );
+    const testSessions = Array.from({ length: testSessionCount }, (_, i) =>
+      session(`cs${i}`, {
+        classTypeId: "ct1",
+        startsAt: new Date(NOW.getTime() + i * 3600_000).toISOString(),
+      }),
+    );
+
+    // Create small and large booking sets
+    const smallBookings = testSessions.flatMap((s) => [
+      booking(`b_small_${s.id}_1`, testMembers[0].id, { sessionId: s.id }),
+      booking(`b_small_${s.id}_2`, testMembers[1].id, { sessionId: s.id }),
+    ]);
+    const largeBookings = testSessions.flatMap((s) =>
+      Array.from({ length: 15 }, (_, i) =>
+        booking(`b_large_${s.id}_${i}`, testMembers[i % testMembers.length].id, {
+          sessionId: s.id,
+        }),
+      ),
+    );
+
+    // Test with small N
+    const smallRepos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: testSessions,
+        members: testMembers,
+        bookings: smallBookings,
+      }),
+    );
+    const membersListSpy = vi.spyOn(smallRepos.members, "listByStudio");
+    const sessionsListSpy = vi.spyOn(smallRepos.classSessions, "listByStudio");
+
+    const smallRows = await listBookingRows(smallRepos, "s1");
+    const smallMembersReads = membersListSpy.mock.calls.length;
+    const smallSessionsReads = sessionsListSpy.mock.calls.length;
+
+    membersListSpy.mockClear();
+    sessionsListSpy.mockClear();
+
+    // Test with large N
+    const largeRepos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: testSessions,
+        members: testMembers,
+        bookings: largeBookings,
+      }),
+    );
+    const largeMembersListSpy = vi.spyOn(largeRepos.members, "listByStudio");
+    const largeSessionsListSpy = vi.spyOn(largeRepos.classSessions, "listByStudio");
+
+    const largeRows = await listBookingRows(largeRepos, "s1");
+    const largeMembersReads = largeMembersListSpy.mock.calls.length;
+    const largeSessionsReads = largeSessionsListSpy.mock.calls.length;
+
+    // Verify read counts are constant regardless of N
+    expect(smallMembersReads).toBe(largeMembersReads);
+    expect(smallSessionsReads).toBe(largeSessionsReads);
+    expect(smallMembersReads).toBe(1);
+    expect(smallSessionsReads).toBe(1);
+
+    // Verify both return valid rows with expected properties
+    expect(smallRows.length).toBe(smallBookings.length);
+    expect(largeRows.length).toBe(largeBookings.length);
+    expect(smallRows[0]).toHaveProperty("id");
+    expect(smallRows[0]).toHaveProperty("memberName");
+    expect(smallRows[0]).toHaveProperty("className");
+    expect(smallRows[0]).toHaveProperty("startsAt");
+    expect(largeRows[0]).toHaveProperty("id");
+    expect(largeRows[0]).toHaveProperty("memberName");
+    expect(largeRows[0]).toHaveProperty("className");
+    expect(largeRows[0]).toHaveProperty("startsAt");
+
+    // Verify rows are sorted by startsAt
+    for (let i = 1; i < smallRows.length; i++) {
+      expect(smallRows[i].startsAt.localeCompare(smallRows[i - 1].startsAt)).toBeGreaterThanOrEqual(
+        0,
+      );
+    }
+    for (let i = 1; i < largeRows.length; i++) {
+      expect(largeRows[i].startsAt.localeCompare(largeRows[i - 1].startsAt)).toBeGreaterThanOrEqual(
+        0,
+      );
+    }
   });
 });
