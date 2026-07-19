@@ -19,12 +19,17 @@ if ! [[ "$SCHEMA" =~ ^bench_[0-9]+$ ]]; then
 fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INIT="$HERE/../migrations/0001_init.sql"
+MIGRATIONS_DIR="$HERE/../migrations"
 SEED="$HERE/../../../supabase/seed.sql"
 
 echo "reseeding schema $SCHEMA ..."
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "DROP SCHEMA IF EXISTS $SCHEMA CASCADE; CREATE SCHEMA $SCHEMA;"
-sed "s/public\./$SCHEMA./g" "$INIT" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q
+
+# Apply all migrations in numeric order (0001_*.sql, 0002_*.sql, etc.)
+for migration in $(find "$MIGRATIONS_DIR" -name '000*.sql' -type f | sort); do
+  sed "s/public\./$SCHEMA./g" "$migration" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q
+done
+
 sed "s/public\./$SCHEMA./g" "$SEED" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q
 # Supabase roles need access to the fresh schema (service_role bypasses RLS but
 # still needs the grants). Re-granted every reseed since DROP CASCADE clears them.
