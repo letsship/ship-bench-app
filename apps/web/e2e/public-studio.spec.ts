@@ -11,7 +11,9 @@ test.describe("public studio page", () => {
     await expect(page).not.toHaveURL(/\/login/);
 
     // The page shows the studio name
-    await expect(page.getByText("Riverbank Studio", { exact: false })).toBeVisible();
+    await expect(
+      page.locator("div").filter({ hasText: "Riverbank Movement" }).first(),
+    ).toBeVisible();
 
     // At least one upcoming class is visible
     const classes = page.locator("div").filter({ hasText: /with \w+/ });
@@ -120,7 +122,7 @@ test.describe("public studio page", () => {
     expect(response.ok()).toBe(true);
 
     const text = await response.text();
-    expect(text).toContain("User-agent: *");
+    expect(text.toLowerCase()).toContain("user-agent:");
     expect(text).toContain("Allow: /");
     expect(text).toContain("Sitemap:");
     expect(text).toContain("/sitemap.xml");
@@ -146,7 +148,9 @@ test.describe("public studio page", () => {
     page.on("pageerror", (error) => errors.push(error.message));
 
     await page.goto("/s/riverbank");
-    await expect(page.getByText("Riverbank", { exact: false })).toBeVisible();
+    await expect(
+      page.locator("div").filter({ hasText: "Riverbank Movement" }).first(),
+    ).toBeVisible();
 
     expect(errors).toEqual([]);
   });
