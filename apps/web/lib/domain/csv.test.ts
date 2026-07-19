@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv, bookingsToCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -27,10 +27,13 @@ describe("escapeCsvField", () => {
 
 describe("toCsv", () => {
   it("emits a header and CRLF-joined rows with escaping", () => {
-    const csv = toCsv([{ a: 1, b: "x,y" }], [
-      { header: "A", value: (row) => row.a },
-      { header: "B", value: (row) => row.b },
-    ]);
+    const csv = toCsv(
+      [{ a: 1, b: "x,y" }],
+      [
+        { header: "A", value: (row) => row.a },
+        { header: "B", value: (row) => row.b },
+      ],
+    );
     expect(csv).toBe('A,B\r\n1,"x,y"');
   });
 });
@@ -38,7 +41,13 @@ describe("toCsv", () => {
 describe("membersToCsv", () => {
   it("includes headers and renders a null phone as empty", () => {
     const csv = membersToCsv([
-      { name: "Amara", email: "amara@example.com", phone: null, status: "active", createdAt: "2026-01-01T00:00:00Z" },
+      {
+        name: "Amara",
+        email: "amara@example.com",
+        phone: null,
+        status: "active",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
     ]);
     const [header, row] = csv.split("\r\n");
     expect(header).toBe("Name,Email,Phone,Status,Joined");
@@ -61,5 +70,57 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits correct header and column order", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T10:00:00Z",
+        className: "Pilates",
+        memberName: "Alice",
+        email: "alice@example.com",
+        status: "confirmed",
+      },
+    ]);
+    const [header] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("quotes member names containing a comma", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T10:00:00Z",
+        className: "Pilates",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "confirmed",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Rossi, Chiara"');
+  });
+
+  it("joins rows with CRLF", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T10:00:00Z",
+        className: "Pilates",
+        memberName: "Alice",
+        email: "alice@example.com",
+        status: "confirmed",
+      },
+      {
+        startsAt: "2026-06-16T10:00:00Z",
+        className: "Yoga",
+        memberName: "Bob",
+        email: "bob@example.com",
+        status: "cancelled",
+      },
+    ]);
+    const parts = csv.split("\r\n");
+    expect(parts.length).toBe(3);
+    expect(parts[0]).toBe("Starts,Class,Member,Email,Status");
   });
 });

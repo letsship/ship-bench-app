@@ -8,6 +8,7 @@ export interface BookingRow {
   instructor: string;
   startsAt: string;
   status: string;
+  email: string;
 }
 
 // Flat list of bookings joined (in-memory) to member + session + class type,
@@ -39,7 +40,24 @@ export async function listBookingRows(
         instructor: session?.instructor ?? "",
         startsAt: session?.startsAt ?? "",
         status: booking.status,
+        email: member?.email ?? "",
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// List booking rows filtered with inclusive both-ends date filtering.
+// SessionRange treats the upper bound as exclusive, but exports require inclusive bounds.
+export async function listBookingRowsInRange(
+  repos: Repositories,
+  studioId: string,
+  from?: string,
+  to?: string,
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  return rows.filter((row) => {
+    if (from && row.startsAt < from) return false;
+    if (to && row.startsAt > to) return false;
+    return true;
+  });
 }
