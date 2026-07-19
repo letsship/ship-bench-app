@@ -1,0 +1,2 @@
+overrides.semver=>=7.5.2
+onlyBuiltDependencies=esbuild, sharp, supabase, workerd
