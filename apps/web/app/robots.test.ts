@@ -13,7 +13,8 @@ describe("robots.txt", () => {
       ? robotsConfig.rules.disallow
       : [robotsConfig.rules.disallow];
     expect(disallow).toContain("/api/");
-    expect(disallow).toContain("/(app)");
+    expect(disallow).toContain("/dashboard");
+    expect(disallow).toContain("/bookings");
   });
 
   it("references sitemap URL", () => {

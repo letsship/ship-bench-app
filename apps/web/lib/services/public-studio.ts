@@ -21,17 +21,6 @@ export interface PublicStudio {
   classes: PublicClass[];
 }
 
-// The site's public origin. Absolute URLs (canonical, Open Graph, sitemap) need
-// one; it comes from NEXT_PUBLIC_SITE_URL in a real deployment and falls back to
-// localhost for dev/build, matching Next's own metadataBase default.
-export function publicBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-}
-
-export function publicStudioUrl(slug: string): string {
-  return `${publicBaseUrl()}/s/${slug}`;
-}
-
 // Resolve a studio by its public slug plus its upcoming classes, or null when no
 // studio owns that slug (the page turns null into a 404).
 export async function resolvePublicStudio(slug: string): Promise<PublicStudio | null> {
