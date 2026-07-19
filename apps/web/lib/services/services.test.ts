@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingExportRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,53 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("lists booking export rows with email and filters by inclusive date range", async () => {
+    const date1 = new Date(NOW.getTime() + 1 * 86_400_000).toISOString();
+    const date1End = new Date(NOW.getTime() + 1 * 86_400_000 + 3_600_000).toISOString();
+    const date2 = new Date(NOW.getTime() + 2 * 86_400_000).toISOString();
+    const date2End = new Date(NOW.getTime() + 2 * 86_400_000 + 3_600_000).toISOString();
+    const date3 = new Date(NOW.getTime() + 3 * 86_400_000).toISOString();
+    const date3End = new Date(NOW.getTime() + 3 * 86_400_000 + 3_600_000).toISOString();
+
+    repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member("m1", { name: "Rossi, Chiara" }), member("m2")],
+        sessions: [
+          session("cs1", { startsAt: date1, endsAt: date1End }),
+          session("cs2", { startsAt: date2, endsAt: date2End }),
+          session("cs3", { startsAt: date3, endsAt: date3End }),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m2", { sessionId: "cs2" }),
+          booking("b3", "m1", { sessionId: "cs3", status: "waitlisted" }),
+        ],
+      }),
+    );
+
+    // No range: all bookings
+    const all = await listBookingExportRows(repos, "s1");
+    expect(all).toHaveLength(3);
+    expect(all[0].email).toBe("m1@e.co");
+    expect(all[0].memberName).toBe("Rossi, Chiara");
+    expect(all[0].status).toBe("booked");
+
+    // From bound: inclusive
+    const fromDate2 = await listBookingExportRows(repos, "s1", { from: date2 });
+    expect(fromDate2).toHaveLength(2);
+    expect(fromDate2[0].startsAt).toBe(date2);
+
+    // To bound: inclusive (critical difference from repo SessionRange)
+    const toDate2 = await listBookingExportRows(repos, "s1", { to: date2 });
+    expect(toDate2).toHaveLength(2);
+    expect(toDate2.some((r) => r.startsAt === date2)).toBe(true);
+
+    // Both bounds: inclusive on both ends
+    const range = await listBookingExportRows(repos, "s1", { from: date2, to: date2 });
+    expect(range).toHaveLength(1);
+    expect(range[0].startsAt).toBe(date2);
   });
 });
