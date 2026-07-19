@@ -24,7 +24,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "resend": "^4.5.1",
-    "semver": "7.5.1",
+    "semver": "^7.5.2",
     "zod": "^4.0.14"
   },
   "devDependencies": {
@@ -34,7 +34,7 @@
     "@studiobook/config-typescript": "workspace:*",
     "@tailwindcss/postcss": "^4.1.8",
     "@types/node": "^22.10.0",
-    "@types/semver": "^7.5.0",
+    "@types/semver": "^7.5.8",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.18.0",
