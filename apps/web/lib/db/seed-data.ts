@@ -1,3 +1,4 @@
+import { generateCalendarToken } from "@/lib/domain/calendar-token";
 import { newId } from "./ids";
 import type { SeedData } from "./repos/fakes";
 import type {
@@ -21,7 +22,9 @@ const DAY_MS = 86_400_000;
 
 function atUtc(now: Date, dayOffset: number, hour: number): string {
   const base = new Date(now.getTime() + dayOffset * DAY_MS);
-  const day = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), hour));
+  const day = new Date(
+    Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), hour),
+  );
   return day.toISOString();
 }
 
@@ -84,6 +87,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    calendarToken: generateCalendarToken(),
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }
@@ -167,7 +171,9 @@ function fillWaitlistSession(
   );
   if (!target) return;
   const active = members.filter((member) => member.status === "active");
-  const existing = new Set(bookings.filter((b) => b.sessionId === target.id).map((b) => b.memberId));
+  const existing = new Set(
+    bookings.filter((b) => b.sessionId === target.id).map((b) => b.memberId),
+  );
   let seatsLeft = target.capacity - existing.size;
   let waitlistLeft = 2;
   for (const member of active) {
@@ -191,12 +197,51 @@ interface InvoiceSeed {
 }
 
 const INVOICE_SEED: InvoiceSeed[] = [
-  { memberIndex: 0, status: "paid", monthsAgo: 2, day: 4, lines: [{ description: "10-class pass", quantity: 1, unit: 16000 }] },
-  { memberIndex: 1, status: "paid", monthsAgo: 1, day: 6, lines: [{ description: "Monthly unlimited", quantity: 1, unit: 12000 }] },
-  { memberIndex: 2, status: "open", monthsAgo: 0, day: 2, lines: [{ description: "Drop-in x4", quantity: 4, unit: 1800 }] },
-  { memberIndex: 3, status: "paid", monthsAgo: 1, day: 12, lines: [{ description: "Reformer 5-pack", quantity: 1, unit: 12000 }, { description: "Grip socks", quantity: 1, unit: 1400 }] },
-  { memberIndex: 5, status: "refunded", monthsAgo: 1, day: 20, lines: [{ description: "Pottery intensive", quantity: 1, unit: 9000, refunded: true }] },
-  { memberIndex: 7, status: "draft", monthsAgo: 0, day: 1, lines: [{ description: "Hand building x2", quantity: 2, unit: 3600 }] },
+  {
+    memberIndex: 0,
+    status: "paid",
+    monthsAgo: 2,
+    day: 4,
+    lines: [{ description: "10-class pass", quantity: 1, unit: 16000 }],
+  },
+  {
+    memberIndex: 1,
+    status: "paid",
+    monthsAgo: 1,
+    day: 6,
+    lines: [{ description: "Monthly unlimited", quantity: 1, unit: 12000 }],
+  },
+  {
+    memberIndex: 2,
+    status: "open",
+    monthsAgo: 0,
+    day: 2,
+    lines: [{ description: "Drop-in x4", quantity: 4, unit: 1800 }],
+  },
+  {
+    memberIndex: 3,
+    status: "paid",
+    monthsAgo: 1,
+    day: 12,
+    lines: [
+      { description: "Reformer 5-pack", quantity: 1, unit: 12000 },
+      { description: "Grip socks", quantity: 1, unit: 1400 },
+    ],
+  },
+  {
+    memberIndex: 5,
+    status: "refunded",
+    monthsAgo: 1,
+    day: 20,
+    lines: [{ description: "Pottery intensive", quantity: 1, unit: 9000, refunded: true }],
+  },
+  {
+    memberIndex: 7,
+    status: "draft",
+    monthsAgo: 0,
+    day: 1,
+    lines: [{ description: "Hand building x2", quantity: 2, unit: 3600 }],
+  },
 ];
 
 function buildInvoices(
@@ -264,7 +309,11 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
       id: newId(),
       memberId: members[1].id,
       kind: "invoice_issued",
-      payload: JSON.stringify({ subject: "Invoice ready", body: "Your invoice is ready.", data: {} }),
+      payload: JSON.stringify({
+        subject: "Invoice ready",
+        body: "Your invoice is ready.",
+        data: {},
+      }),
       createdAt,
       sentAt: null,
       providerMessageId: null,
