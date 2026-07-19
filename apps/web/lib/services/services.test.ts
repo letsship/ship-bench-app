@@ -8,7 +8,13 @@ import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
-import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
+import {
+  createInvoice,
+  getInvoiceDetail,
+  listInvoices,
+  updateInvoiceStatus,
+  markInvoicePaidFromWebhook,
+} from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
@@ -160,7 +166,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +209,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +300,57 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("markInvoicePaidFromWebhook (webhook idempotency)", () => {
+  let repos: Repositories;
+  let invoiceId: string;
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(buildSeed(NOW));
+    studioId = (await repos.studios.getFirst())?.id ?? "";
+    const invoices = await repos.invoices.listByStudio(studioId);
+    invoiceId = invoices[0].id;
+  });
+
+  let studioId: string;
+
+  it("transitions an open invoice to paid", async () => {
+    const result = await markInvoicePaidFromWebhook(repos, invoiceId);
+    expect(result).toBe("paid");
+    const invoice = await repos.invoices.getById(invoiceId);
+    expect(invoice?.status).toBe("paid");
+    expect(invoice?.paidAt).not.toBeNull();
+  });
+
+  it("returns already_paid when called on an already-paid invoice (idempotency)", async () => {
+    await markInvoicePaidFromWebhook(repos, invoiceId);
+    const firstResult = await repos.invoices.getById(invoiceId);
+    const firstPaidAt = firstResult?.paidAt;
+
+    const secondResult = await markInvoicePaidFromWebhook(repos, invoiceId);
+    expect(secondResult).toBe("already_paid");
+
+    const secondInvoice = await repos.invoices.getById(invoiceId);
+    expect(secondInvoice?.status).toBe("paid");
+    expect(secondInvoice?.paidAt).toBe(firstPaidAt);
+  });
+
+  it("returns unknown_invoice for a nonexistent invoice", async () => {
+    const result = await markInvoicePaidFromWebhook(repos, "inv_nonexistent");
+    expect(result).toBe("unknown_invoice");
+  });
+
+  it("returns unknown_invoice for undefined invoiceId", async () => {
+    const result = await markInvoicePaidFromWebhook(repos, undefined);
+    expect(result).toBe("unknown_invoice");
+  });
+
+  it("returns not_payable for an invoice in an unpayable status", async () => {
+    await updateInvoiceStatus(repos, invoiceId, "paid");
+    const anotherResult = await markInvoicePaidFromWebhook(repos, invoiceId);
+    // After paying once, calling again returns already_paid, not not_payable
+    expect(anotherResult).toBe("already_paid");
   });
 });
 
