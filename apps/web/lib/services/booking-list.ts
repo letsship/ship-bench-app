@@ -8,6 +8,7 @@ export interface BookingRow {
   instructor: string;
   startsAt: string;
   status: string;
+  email: string;
 }
 
 // Flat list of bookings joined (in-memory) to member + session + class type,
@@ -39,6 +40,7 @@ export async function listBookingRows(
         instructor: session?.instructor ?? "",
         startsAt: session?.startsAt ?? "",
         status: booking.status,
+        email: member?.email ?? "",
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
