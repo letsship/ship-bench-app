@@ -44,6 +44,22 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("handles the canonical example: €100 billable + €50 refunded at 9% tax", () => {
+    // €100 billable line and €50 refunded line at 9% tax should give €109.00
+    // (tax applies only to the €100 billable portion)
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 10000 },
+        { quantity: 1, unitAmountCents: 5000, refunded: true },
+      ],
+      900,
+    );
+    expect(totals.subtotalCents).toBe(10000);
+    expect(totals.refundedCents).toBe(5000);
+    expect(totals.taxCents).toBe(900);
+    expect(totals.totalCents).toBe(10900);
+  });
 });
 
 describe("formatInvoiceNumber", () => {
