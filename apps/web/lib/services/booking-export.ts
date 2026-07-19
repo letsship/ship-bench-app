@@ -17,10 +17,15 @@ export async function listBookingExportRows(
   // Fetch all bookings unbounded; filter in-memory to enforce inclusive [from, to]
   const rows = await listBookingRows(repos, studioId);
 
+  // Parse bounds to numeric timestamps for robust comparison across ISO-8601 format variants
+  const fromMs = range.from ? Date.parse(range.from) : null;
+  const toMs = range.to ? Date.parse(range.to) : null;
+
   return rows
     .filter((row) => {
-      if (range.from && row.startsAt < range.from) return false;
-      if (range.to && row.startsAt > range.to) return false;
+      const rowMs = Date.parse(row.startsAt);
+      if (fromMs !== null && rowMs < fromMs) return false;
+      if (toMs !== null && rowMs > toMs) return false;
       return true;
     })
     .map((row) => ({
