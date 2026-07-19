@@ -12,6 +12,7 @@ import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } fr
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
+import { getMemberStatement } from "./account-statements";
 
 // Anchored to the real clock: the booking/cancellation rules compare against
 // `new Date()` inside the services, so fixtures must be genuinely future/past.
@@ -160,7 +161,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +204,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +295,22 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("computes statement total using domain function matching stored invoice total", async () => {
+    // Create an invoice and verify that the statement computes totals
+    // using the domain function consistently with the stored invoice total
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Item", quantity: 2, unitAmountCents: 1000 }],
+    });
+    const statement = await getMemberStatement(repos, studioId, memberId);
+    const invoiceDetail = await getInvoiceDetail(repos, detail.invoice.id);
+    // The statement's computed total should match the stored invoice total
+    const statementLine = statement.lines.find((line) => line.invoiceId === detail.invoice.id);
+    expect(statementLine?.totalCents).toBe(invoiceDetail.invoice.totalCents);
+    expect(statementLine?.totalCents).toBe(2180);
   });
 });
 
