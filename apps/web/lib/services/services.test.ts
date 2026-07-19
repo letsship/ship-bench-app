@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +294,20 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("loads an all-refunded invoice with zero totals and refunded line items", async () => {
+    const list = await listInvoices(repos, studioId);
+    const refundedInvoice = list.find((inv) => inv.status === "refunded");
+    expect(refundedInvoice).toBeDefined();
+    if (!refundedInvoice) return;
+
+    const detail = await getInvoiceDetail(repos, refundedInvoice.id);
+    expect(detail.invoice.subtotalCents).toBe(0);
+    expect(detail.invoice.taxCents).toBe(0);
+    expect(detail.invoice.totalCents).toBe(0);
+    expect(detail.lineItems.length).toBeGreaterThan(0);
+    expect(detail.lineItems.every((item) => item.refunded)).toBe(true);
   });
 });
 
