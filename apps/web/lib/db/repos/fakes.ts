@@ -81,7 +81,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +102,11 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
+        return found ? clone(found) : null;
+      },
+      async findByCalendarToken(token) {
+        const found = store.members.find((row) => row.calendarToken === token);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -151,6 +158,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async listBySession(sessionId) {
         return cloneAll(store.bookings.filter((row) => row.sessionId === sessionId));
+      },
+      async listByMember(memberId) {
+        return cloneAll(store.bookings.filter((row) => row.memberId === memberId));
       },
       async getById(id) {
         const found = store.bookings.find((row) => row.id === id);
