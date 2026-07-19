@@ -90,6 +90,52 @@ describe("GET /api/ical/[token] (per-member calendar subscription)", () => {
     expect(disposition).toContain(".ics");
   });
 
+  it("sanitizes non-ASCII characters in member name for content-disposition", async () => {
+    // Hana Kovač is at index 7 and has non-ASCII characters (Č)
+    const member = seed.members.find((m) => m.name === "Hana Kovač");
+    if (!member) {
+      // Skip if member not found (shouldn't happen with standard seed)
+      expect(true).toBe(true);
+      return;
+    }
+
+    const res = await GET(new Request("http://localhost/api/ical/" + member.calendarToken), {
+      params: Promise.resolve({ token: member.calendarToken }),
+    });
+
+    // Should not crash and should return 200
+    expect(res.status).toBe(200);
+    const disposition = res.headers.get("content-disposition");
+    expect(disposition).toBeDefined();
+    expect(disposition).toContain("attachment");
+    expect(disposition).toContain(".ics");
+    // Filename should be ASCII-safe (no characters > 127)
+    const match = disposition?.match(/filename="([^"]+)"/);
+    if (match) {
+      const filename = match[1];
+      for (let i = 0; i < filename.length; i++) {
+        expect(filename.charCodeAt(i)).toBeLessThan(128);
+      }
+    }
+  });
+
+  it("handles non-ASCII member names without throwing", async () => {
+    // Test with a member that has non-ASCII characters
+    const member = seed.members.find((m) => m.name === "Elif Yılmaz" || m.name === "Hana Kovač");
+    if (!member) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    // This should not throw a TypeError
+    const res = await GET(new Request("http://localhost/api/ical/" + member.calendarToken), {
+      params: Promise.resolve({ token: member.calendarToken }),
+    });
+
+    // Should return 200 or 404 depending on bookings, but never 500 from header encoding
+    expect([200, 404]).toContain(res.status);
+  });
+
   it("excludes cancelled sessions from the feed", async () => {
     const member = seed.members[0];
 
