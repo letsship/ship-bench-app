@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,115 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("exports booking rows with member email", async () => {
+    const rows = await listBookingsForExport(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("memberName");
+    expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("email");
+    expect(typeof rows[0].email).toBe("string");
+  });
+
+  it("filters export rows by inclusive date range", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { startsAt: FUTURE }), session("cs2", { startsAt: SOON })],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+    const studioId = "s1";
+
+    const fromDate = SOON;
+    const toDate = new Date(new Date(SOON).getTime() + 3_600_000).toISOString();
+
+    const filtered = await listBookingsForExport(repos, studioId, {
+      from: fromDate,
+      to: toDate,
+    });
+
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].startsAt).toBe(SOON);
+  });
+
+  it("includes bookings at inclusive boundaries", async () => {
+    const exactStart = new Date(FUTURE).toISOString();
+    const exactEnd = new Date(FUTURE_END).toISOString();
+
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs1", { startsAt: exactStart }),
+          session("cs2", { startsAt: exactEnd }),
+        ],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+    const studioId = "s1";
+
+    const filtered = await listBookingsForExport(repos, studioId, {
+      from: exactStart,
+      to: exactEnd,
+    });
+
+    expect(filtered.length).toBe(2);
+    expect(filtered.some((r) => r.startsAt === exactStart)).toBe(true);
+    expect(filtered.some((r) => r.startsAt === exactEnd)).toBe(true);
+  });
+
+  it("omitted bounds are unbounded", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { startsAt: FUTURE }), session("cs2", { startsAt: SOON })],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+    const studioId = "s1";
+
+    const allRows = await listBookingsForExport(repos, studioId);
+    expect(allRows.length).toBe(2);
+
+    const fromOnly = await listBookingsForExport(repos, studioId, { from: SOON });
+    expect(fromOnly.length).toBe(2);
+
+    const toOnly = await listBookingsForExport(repos, studioId, {
+      to: SOON,
+    });
+    expect(toOnly.length).toBe(1);
+  });
+
+  it("orders export rows by session start", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { startsAt: FUTURE }), session("cs2", { startsAt: SOON })],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+    const studioId = "s1";
+
+    const rows = await listBookingsForExport(repos, studioId);
+    expect(rows[0].startsAt).toBe(SOON);
+    expect(rows[1].startsAt).toBe(FUTURE);
   });
 });
