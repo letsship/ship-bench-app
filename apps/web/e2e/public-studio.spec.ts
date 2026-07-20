@@ -16,7 +16,7 @@ test.describe("public studio page (unauthenticated)", () => {
     await expect(page.getByRole("heading", { name: "Riverbank Movement" })).toBeVisible();
     await expect(page.getByText(/Upcoming classes/i)).toBeVisible();
     // At least one class should be visible from the seeded data
-    await expect(page.getByText(/with \w+/)).toBeVisible();
+    await expect(page.getByText(/with \w+/).first()).toBeVisible();
   });
 
   test("has proper SEO metadata", async ({ page }) => {
