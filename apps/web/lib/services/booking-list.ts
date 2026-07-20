@@ -8,6 +8,7 @@ export interface BookingRow {
   instructor: string;
   startsAt: string;
   status: string;
+  email?: string;
 }
 
 // Flat list of bookings joined (in-memory) to member + session + class type,
@@ -39,7 +40,24 @@ export async function listBookingRows(
         instructor: session?.instructor ?? "",
         startsAt: session?.startsAt ?? "",
         status: booking.status,
+        email: member?.email ?? "",
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// List bookings for export with optional date-range filtering (inclusive on both bounds).
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  options: { from?: string; to?: string } = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+
+  const { from, to } = options;
+  return rows.filter((row) => {
+    const isAfterOrAtFrom = !from || row.startsAt >= from;
+    const isBeforeOrAtTo = !to || row.startsAt <= to;
+    return isAfterOrAtFrom && isBeforeOrAtTo;
+  });
 }
