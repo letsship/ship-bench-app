@@ -86,6 +86,8 @@ export async function createBooking(
 
   let drawablePack = null;
   if (decision.status === "booked") {
+    // For direct bookings (not promotions), draw a credit from the member's pack.
+    // Waitlisted bookings don't consume credits; only confirmed (booked) bookings do.
     drawablePack = await drawCreditForMember(repos, member.id);
   }
 
@@ -179,6 +181,11 @@ async function promoteFromWaitlist(
   const promoted = waitlisted.find((entry) => entry.id === promoteId);
   if (!promoted) return null;
 
+  // Note: when a waitlisted booking is promoted to 'booked', no credit is drawn.
+  // This is intentional: members are only charged a pack credit at the moment they book
+  // (POST /api/bookings with status 'booked'). Waitlist promotions bypass that charge,
+  // treating the confirmed booking as free. This can be revisited if waitlist pricing
+  // semantics change in the future.
   await repos.bookings.update(promoteId, { status: "booked" });
   const member = await loadMember(repos, promoted.memberId);
   await enqueueAndDispatch(
