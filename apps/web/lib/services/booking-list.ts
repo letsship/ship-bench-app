@@ -1,12 +1,5 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
-
-export interface BookingExportRow {
-  startsAt: string;
-  className: string;
-  memberName: string;
-  memberEmail: string;
-  status: string;
-}
+import type { BookingExportRow } from "@/lib/domain/csv";
 
 export interface BookingRow {
   id: string;
@@ -62,10 +55,14 @@ export async function listBookingExportRows(
   options: { from?: string; to?: string } = {},
 ): Promise<BookingExportRow[]> {
   const rows = await listBookingRows(repos, studioId);
+  const fromMs = options.from ? new Date(options.from).getTime() : undefined;
+  const toMs = options.to ? new Date(options.to).getTime() : undefined;
+
   return rows
     .filter((row) => {
-      if (options.from && row.startsAt < options.from) return false;
-      if (options.to && row.startsAt > options.to) return false;
+      const rowMs = new Date(row.startsAt).getTime();
+      if (fromMs !== undefined && rowMs < fromMs) return false;
+      if (toMs !== undefined && rowMs > toMs) return false;
       return true;
     })
     .map((row) => ({
