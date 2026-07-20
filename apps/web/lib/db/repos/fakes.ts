@@ -217,14 +217,18 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     },
     packages: {
       async listByMember(memberId) {
-        return cloneAll(
-          store.classPacks
-            .filter((row) => row.memberId === memberId)
-            .sort((a, b) => {
-              const cmp = b.purchasedAt.localeCompare(a.purchasedAt);
-              return cmp !== 0 ? cmp : a.id.localeCompare(b.id);
-            }),
-        );
+        const memberPacks = store.classPacks
+          .filter((row) => row.memberId === memberId)
+          .map((row, index) => ({ row, originalIndex: index }));
+
+        memberPacks.sort((a, b) => {
+          const cmp = b.row.purchasedAt.localeCompare(a.row.purchasedAt);
+          if (cmp !== 0) return cmp;
+          // When timestamps are equal, preserve insertion order (newer insertion first)
+          return b.originalIndex - a.originalIndex;
+        });
+
+        return cloneAll(memberPacks.map((item) => item.row));
       },
       async getById(id) {
         const found = store.classPacks.find((row) => row.id === id);
