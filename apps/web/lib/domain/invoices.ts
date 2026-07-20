@@ -54,10 +54,7 @@ export function canTransitionInvoice(from: InvoiceStatus, to: InvoiceStatus): bo
 }
 
 // An invoice is overdue when it is still open past its due date.
-export function isOverdue(
-  invoice: { status: string; dueAt: string | null },
-  now: string,
-): boolean {
+export function isOverdue(invoice: { status: string; dueAt: string | null }, now: string): boolean {
   if (invoice.status !== "open" || !invoice.dueAt) return false;
   return new Date(now).getTime() > new Date(invoice.dueAt).getTime();
 }
