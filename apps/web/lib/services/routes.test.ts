@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as icalTokenGet } from "@/app/api/ical/[token]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +45,41 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/ical/[token] returns 200 with iCalendar content for a valid token", async () => {
+    const seed = buildSeed(NOW);
+    __setTestRepositories(createInMemoryRepositories(seed));
+
+    const member = seed.members[0];
+    const res = await icalTokenGet(new NextRequest("http://localhost/api/ical/test"), {
+      params: Promise.resolve({ token: member.calendarToken }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/calendar");
+    const body = await res.text();
+    expect(body).toContain("BEGIN:VCALENDAR");
+    expect(body).toContain("END:VCALENDAR");
+  });
+
+  it("GET /api/ical/[token] returns 404 for unknown token", async () => {
+    const res = await icalTokenGet(new NextRequest("http://localhost/api/ical/test"), {
+      params: Promise.resolve({ token: "unknown-token" }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toHaveProperty("error.code", "not_found");
+  });
+
+  it("GET /api/ical/[token] returns 404 for empty token", async () => {
+    const res = await icalTokenGet(new NextRequest("http://localhost/api/ical/test"), {
+      params: Promise.resolve({ token: "" }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toHaveProperty("error.code", "not_found");
   });
 });

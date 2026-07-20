@@ -5,3 +5,10 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Generate a cryptographically random calendar token (~128 bits of entropy).
+export function newCalendarToken(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}

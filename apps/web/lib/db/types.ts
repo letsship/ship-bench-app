@@ -31,6 +31,7 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  calendarToken: string;
   createdAt: string;
 }
 
