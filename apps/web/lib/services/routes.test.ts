@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
+import { GET as icalByTokenGet } from "@/app/api/ical/[token]/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
 import { __setTestRepositories } from "@/lib/db/repos";
@@ -44,5 +45,32 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/ical/[token] returns a calendar feed for a valid token", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    __setTestRepositories(repos);
+    const [seededMember] = await repos.members.listByStudio(
+      (await repos.studios.getFirst())?.id ?? "",
+    );
+    const res = await icalByTokenGet(new NextRequest("http://localhost/api/ical/x"), {
+      params: Promise.resolve({ token: seededMember.calendarToken }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/calendar");
+  });
+
+  it("GET /api/ical/[token] 404s for an unknown token", async () => {
+    const res = await icalByTokenGet(new NextRequest("http://localhost/api/ical/nope"), {
+      params: Promise.resolve({ token: "not-a-real-token" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /api/ical/[token] 404s for an empty token", async () => {
+    const res = await icalByTokenGet(new NextRequest("http://localhost/api/ical/"), {
+      params: Promise.resolve({ token: "" }),
+    });
+    expect(res.status).toBe(404);
   });
 });

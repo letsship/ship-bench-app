@@ -8,8 +8,9 @@ import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
+import { getMemberCalendarEvents } from "./calendar";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
-import { createMember, getMember, updateMember } from "./members";
+import { createMember, getMember, getMemberByCalendarToken, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
 
@@ -121,6 +122,49 @@ describe("members service", () => {
 
   it("getMember 404s for an unknown id", async () => {
     await expect(getMember(repos, "nope")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("getMemberByCalendarToken finds the matching member", async () => {
+    const [seeded] = await repos.members.listByStudio(studioId);
+    const found = await getMemberByCalendarToken(repos, seeded.calendarToken);
+    expect(found?.id).toBe(seeded.id);
+  });
+
+  it("getMemberByCalendarToken returns null for an unknown token", async () => {
+    expect(await getMemberByCalendarToken(repos, "not-a-real-token")).toBeNull();
+  });
+
+  it("getMemberByCalendarToken returns null for an empty or whitespace token", async () => {
+    expect(await getMemberByCalendarToken(repos, "")).toBeNull();
+    expect(await getMemberByCalendarToken(repos, "   ")).toBeNull();
+  });
+});
+
+describe("calendar service", () => {
+  it("includes only future booked sessions for the given member", async () => {
+    const PAST = new Date(NOW.getTime() - 7 * 86_400_000).toISOString();
+    const PAST_END = new Date(NOW.getTime() - 7 * 86_400_000 + 3_600_000).toISOString();
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1"), member("m2")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs1"),
+          session("cs2", { startsAt: PAST, endsAt: PAST_END }),
+          session("cs3"),
+        ],
+        bookings: [
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+          booking("b3", "m1", { sessionId: "cs3", status: "waitlisted" }),
+          booking("b4", "m2", { sessionId: "cs1" }),
+        ],
+      }),
+    );
+    const [m1] = await repos.members.listByStudio("s1");
+    const events = await getMemberCalendarEvents(repos, m1, NOW);
+    expect(events).toHaveLength(1);
+    expect(events[0].uid).toBe("b1@studiobook");
   });
 });
 

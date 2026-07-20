@@ -12,13 +12,13 @@ export async function getMemberCalendarEvents(
 
   const events: CalendarEvent[] = [];
   const nowIso = now.toISOString();
+  const studio = await repos.studios.getFirst();
 
   for (const booking of confirmedBookings) {
     const session = await repos.classSessions.getById(booking.sessionId);
     if (!session || session.startsAt <= nowIso) continue;
 
     const classType = await repos.classTypes.getById(session.classTypeId);
-    const studio = await repos.studios.getFirst();
 
     events.push({
       uid: `${booking.id}@studiobook`,
