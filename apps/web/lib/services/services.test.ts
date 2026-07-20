@@ -3,6 +3,7 @@ import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes"
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -160,7 +161,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +204,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -254,16 +264,21 @@ describe("invoices service", () => {
 
   it("computes subtotal + tax + total and sends invoice_issued", async () => {
     const provider = createFakeProvider();
-    const detail = await createInvoice(repos, provider, studioId, {
-      memberId,
-      lineItems: [{ description: "Pass", quantity: 2, unitAmountCents: 1000 }],
-    });
+    const lineItems = [{ description: "Pass", quantity: 2, unitAmountCents: 1000 }];
+    const detail = await createInvoice(repos, provider, studioId, { memberId, lineItems });
     expect(detail.invoice.subtotalCents).toBe(2000);
     expect(detail.invoice.taxCents).toBe(180);
     expect(detail.invoice.totalCents).toBe(2180);
     // buildSeed already has one pending outbox row, so assert our specific
     // invoice notification went out rather than an exact array.
     expect(provider.sent.some((m) => m.subject === `Invoice ${detail.invoice.number}`)).toBe(true);
+
+    // Verify createInvoice stores exactly the totals from computeInvoiceTotals
+    const settings = await getStudioContext(repos);
+    const domainTotals = computeInvoiceTotals(lineItems, settings.settings.taxRateBps);
+    expect(detail.invoice.subtotalCents).toBe(domainTotals.subtotalCents);
+    expect(detail.invoice.taxCents).toBe(domainTotals.taxCents);
+    expect(detail.invoice.totalCents).toBe(domainTotals.totalCents);
   });
 
   it("allows a valid status transition and rejects an invalid one", async () => {
