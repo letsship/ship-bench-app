@@ -105,14 +105,14 @@ test.describe("public studio page", () => {
   test("renders studio name and upcoming classes", async ({ page }) => {
     await page.goto("/s/riverbank");
 
-    // Studio name should be visible
-    expect(await page.getByText("Riverbank Movement")).toBeVisible();
+    // Studio name should be visible (use first() to avoid strict mode violation with link text)
+    expect(await page.getByText("Riverbank Movement").first()).toBeVisible();
 
     // Upcoming classes section should be visible
     expect(await page.getByText("Upcoming classes")).toBeVisible();
 
-    // At least one class with name and instructor
-    const hasClassContent = await page.getByText(/with /).isVisible();
+    // At least one class with name and instructor (use first() to get first instructor match)
+    const hasClassContent = await page.getByText(/with /).first().isVisible();
     expect(hasClassContent).toBe(true);
   });
 
@@ -145,7 +145,7 @@ test.describe("public studio page", () => {
     expect(response.status()).toBe(200);
 
     const content = await response.text();
-    expect(content).toContain("User-agent: *");
+    expect(content).toContain("User-Agent: *");
     expect(content).toContain("Allow: /");
     expect(content).toContain("Sitemap:");
   });
