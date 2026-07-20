@@ -210,7 +210,8 @@ export function createSupabaseRepositories(): Repositories {
             .from("class_packs")
             .select("*")
             .eq("member_id", memberId)
-            .order("purchased_at", { ascending: false }),
+            .order("purchased_at", { ascending: false })
+            .order("id", { ascending: true }),
           "packages.listByMember",
         ),
       getById: (id) =>

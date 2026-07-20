@@ -220,7 +220,10 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return cloneAll(
           store.classPacks
             .filter((row) => row.memberId === memberId)
-            .sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)),
+            .sort((a, b) => {
+              const cmp = b.purchasedAt.localeCompare(a.purchasedAt);
+              return cmp !== 0 ? cmp : a.id.localeCompare(b.id);
+            }),
         );
       },
       async getById(id) {
