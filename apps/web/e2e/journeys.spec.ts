@@ -11,22 +11,24 @@ test("opens an invoice from the list and reads its detail", async ({ page }) => 
   await signIn(page);
   await page.goto("/invoices");
 
-  // Click on the first invoice in the list
-  const invoiceRow = page.getByRole("row").nth(1);
-  await invoiceRow.click();
+  // Click the first invoice number link in the table (skip header row with nth(1))
+  const firstInvoiceLink = page.locator("table tbody tr").first().locator("a");
+  await firstInvoiceLink.click();
 
   // Verify invoice detail page renders
   await expect(page.getByRole("heading", { name: /INV-/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Total" })).toBeVisible();
+  // Verify the Total section with money value is visible
+  await expect(page.locator(".sb-card").filter({ hasText: "Total" })).toBeVisible();
 });
 
 test("opens the fully refunded invoice and renders normally", async ({ page }) => {
   await signIn(page);
   await page.goto("/invoices");
 
-  // Find and click the Pottery intensive invoice (fully refunded for Femke)
-  const potteryRow = page.getByRole("row").filter({ has: page.getByText("Pottery intensive") });
-  await potteryRow.click();
+  // Find Femke's invoice in the list and click the invoice number link
+  const femkeRow = page.locator("table tbody tr").filter({ hasText: "Femke" });
+  const invoiceLink = femkeRow.locator("a");
+  await invoiceLink.click();
 
   // Verify the invoice detail page renders without error
   await expect(page.getByRole("heading", { name: /INV-/i })).toBeVisible();
@@ -34,9 +36,11 @@ test("opens the fully refunded invoice and renders normally", async ({ page }) =
   // Verify the line items are displayed
   await expect(page.getByText("Pottery intensive")).toBeVisible();
 
-  // Verify the refunded badge is shown
-  await expect(page.getByRole("status", { name: /refunded/i })).toBeVisible();
+  // Verify the refunded badge is shown (StatusBadge renders as span with "refunded" text)
+  await expect(page.locator("span.sb-badge").filter({ hasText: "refunded" })).toBeVisible();
 
-  // Verify the total is €0.00
-  await expect(page.getByText("€0.00")).toBeVisible();
+  // Verify the total is €0.00 (look for the Total card with €0.00)
+  await expect(
+    page.locator(".sb-card").filter({ hasText: "Total" }).locator("text=/€0\\.00/"),
+  ).toBeVisible();
 });
