@@ -62,7 +62,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .update(schema.studioSettings)
-          .set(toUpdate as any)
+          .set(toUpdate as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .where(eq(schema.studioSettings.studio_id, studioId))
           .returning();
         if (!result[0]) throw new Error("Studio settings not found");
@@ -103,7 +103,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .insert(schema.members)
-          .values(toInsert as any)
+          .values(toInsert as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .returning();
         return mapRow<Member>(result[0] as Record<string, unknown>);
       },
@@ -118,7 +118,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .update(schema.members)
-          .set(toUpdate as any)
+          .set(toUpdate as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .where(eq(schema.members.id, id))
           .returning();
         if (!result[0]) throw new Error("Member not found");
@@ -153,7 +153,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .insert(schema.classTypes)
-          .values(toInsert as any)
+          .values(toInsert as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .returning();
         return mapRow<ClassType>(result[0] as Record<string, unknown>);
       },
@@ -192,7 +192,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .insert(schema.classSessions)
-          .values(toInsert as any)
+          .values(toInsert as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .returning();
         return mapRow<ClassSession>(result[0] as Record<string, unknown>);
       },
@@ -232,7 +232,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .insert(schema.bookings)
-          .values(toInsert as any)
+          .values(toInsert as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .returning();
         return mapRow<Booking>(result[0] as Record<string, unknown>);
       },
@@ -248,7 +248,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .update(schema.bookings)
-          .set(toUpdate as any)
+          .set(toUpdate as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .where(eq(schema.bookings.id, id))
           .returning();
         if (!result[0]) throw new Error("Booking not found");
@@ -296,7 +296,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .insert(schema.invoices)
-          .values(toInsert as any)
+          .values(toInsert as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .returning();
         return mapRow<Invoice>(result[0] as Record<string, unknown>);
       },
@@ -318,7 +318,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .update(schema.invoices)
-          .set(toUpdate as any)
+          .set(toUpdate as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .where(eq(schema.invoices.id, id))
           .returning();
         if (!result[0]) throw new Error("Invoice not found");
@@ -348,7 +348,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .insert(schema.invoiceLineItems)
-          .values(toInsert as any)
+          .values(toInsert as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .returning();
         return mapRows<InvoiceLineItem>(result as Record<string, unknown>[]);
       },
@@ -366,7 +366,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .insert(schema.notificationOutbox)
-          .values(toInsert as any)
+          .values(toInsert as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .returning();
         return mapRow<NotificationOutboxRow>(result[0] as Record<string, unknown>);
       },
@@ -389,7 +389,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = await drizzleDb
           .update(schema.notificationOutbox)
-          .set(toUpdate as any)
+          .set(toUpdate as any) // eslint-disable-line @typescript-eslint/no-explicit-any
           .where(eq(schema.notificationOutbox.id, id))
           .returning();
         if (!result[0]) throw new Error("Outbox row not found");
