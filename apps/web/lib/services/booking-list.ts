@@ -1,8 +1,17 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 
+export interface BookingExportRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  memberEmail: string;
+  status: string;
+}
+
 export interface BookingRow {
   id: string;
   memberName: string;
+  memberEmail: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +43,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        memberEmail: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +52,27 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Export rows for bookings CSV with optional date-range filtering.
+// Date bounds are INCLUSIVE on both ends (unlike the repo's exclusive 'to' in SessionRange).
+export async function listBookingExportRows(
+  repos: Repositories,
+  studioId: string,
+  options: { from?: string; to?: string } = {},
+): Promise<BookingExportRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  return rows
+    .filter((row) => {
+      if (options.from && row.startsAt < options.from) return false;
+      if (options.to && row.startsAt > options.to) return false;
+      return true;
+    })
+    .map((row) => ({
+      startsAt: row.startsAt,
+      className: row.className,
+      memberName: row.memberName,
+      memberEmail: row.memberEmail,
+      status: row.status,
+    }));
 }
