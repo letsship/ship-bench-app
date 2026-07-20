@@ -1,20 +1,41 @@
 import { defineConfig, devices } from "@playwright/test";
+import { STORAGE_STATE } from "./e2e/support/auth";
 
 const PORT = 3100;
 const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // The fake backend is one in-process store, so tests run sequentially and each
+  // isolates itself by re-seeding via /api/test-reset (see resetBackend).
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? "github" : "list",
+  retries: process.env.CI ? 2 : 0,
+  workers: 1,
+  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: BASE_URL,
     trace: "on-first-retry",
+    screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // `setup` signs in once and writes storageState; `chromium` depends on it and
+    // loads that session, so specs don't re-authenticate per test.
+    { name: "setup", testMatch: /support\/auth\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: STORAGE_STATE,
+        // Reuse Playwright's bundled Chromium (Desktop Chrome sets no `channel`, so
+        // no system Chrome is needed). CI containers give Chromium a tiny /dev/shm;
+        // without this flag it aborts with SIGABRT under load — same flag the agent
+        // sandbox passes for its lighthouse pass.
+        launchOptions: { args: ["--disable-dev-shm-usage"] },
+      },
+      dependencies: ["setup"],
+    },
+  ],
   // Smoke specs run against a production `next start` server in fake-backends
   // mode (seeded in-memory repositories + fake email provider), so the suite is
   // self-contained — no Supabase/Postgres or Resend account needed.
