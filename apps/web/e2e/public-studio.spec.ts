@@ -8,12 +8,12 @@ test.describe("public studio page (unauthenticated)", () => {
   test("renders without login at /s/[slug]", async ({ page }) => {
     await page.goto("/s/riverbank");
     await expect(page).toHaveURL("/s/riverbank");
-    await expect(page.getByText("Riverbank Movement")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Riverbank Movement" })).toBeVisible();
   });
 
   test("displays studio name and upcoming classes", async ({ page }) => {
     await page.goto("/s/riverbank");
-    await expect(page.getByText("Riverbank Movement")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Riverbank Movement" })).toBeVisible();
     await expect(page.getByText(/Upcoming classes/i)).toBeVisible();
     // At least one class should be visible from the seeded data
     await expect(page.locator("div").filter({ hasText: /with/ })).toBeVisible();
