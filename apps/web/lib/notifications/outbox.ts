@@ -2,13 +2,14 @@ import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { NotificationKind, NotificationMessage, NotificationProvider } from "./types";
 
-// Which studio setting gates each notification kind.
+// Which studio setting gates each notification kind. booking_reminder is gated
+// only by member opt-out, so it's excluded from this map.
 const SETTING_FOR_KIND = {
   booking_confirmation: "notifyBookingConfirmations",
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
-} as const satisfies Record<NotificationKind, string>;
+} as const satisfies Record<Exclude<NotificationKind, "booking_reminder">, string>;
 
 export interface OptOutContext {
   memberOptedOut: boolean;
@@ -20,9 +21,11 @@ export interface OptOutContext {
 
 // A member opt-out wins over everything; otherwise the studio-level setting for
 // the kind decides. Pure so both the dispatcher and tests share one rule.
+// booking_reminder is gated only by member opt-out.
 export function shouldSend(kind: NotificationKind, context: OptOutContext): boolean {
   if (context.memberOptedOut) return false;
-  return context[SETTING_FOR_KIND[kind]];
+  if (kind === "booking_reminder") return true;
+  return context[SETTING_FOR_KIND[kind as Exclude<NotificationKind, "booking_reminder">]];
 }
 
 // Persist a notification as a pending outbox row. Delivery happens later in

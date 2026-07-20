@@ -80,6 +80,11 @@ describe("shouldSend", () => {
   it("member opt-out wins over every setting", () => {
     expect(shouldSend("booking_confirmation", { ...base, memberOptedOut: true })).toBe(false);
   });
+
+  it("booking_reminder is gated only by member opt-out", () => {
+    expect(shouldSend("booking_reminder", base)).toBe(true);
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: true })).toBe(false);
+  });
 });
 
 describe("dispatchOutbox", () => {
