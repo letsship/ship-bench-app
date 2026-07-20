@@ -19,12 +19,23 @@ if ! [[ "$SCHEMA" =~ ^bench_[0-9]+$ ]]; then
 fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INIT="$HERE/../migrations/0001_init.sql"
+MIGRATIONS="$HERE/../migrations"
 SEED="$HERE/../../../supabase/seed.sql"
 
 echo "reseeding schema $SCHEMA ..."
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "DROP SCHEMA IF EXISTS $SCHEMA CASCADE; CREATE SCHEMA $SCHEMA;"
-sed "s/public\./$SCHEMA./g" "$INIT" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q
+# Apply EVERY migration in lexical (= chronological) order, not just 0001_init.
+# A change whose correct solution adds a migration (e.g. a new column) was
+# otherwise deployed against a schema that never got it: the preview DB lacked
+# the column, so the preview deploy failed deterministically while the change
+# itself was correct — the held-out test passed. Globbing the directory keeps
+# new migrations working with no further edits here.
+shopt -s nullglob
+for MIGRATION in "$MIGRATIONS"/*.sql; do
+  echo "  applying $(basename "$MIGRATION")"
+  sed "s/public\./$SCHEMA./g" "$MIGRATION" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q
+done
+shopt -u nullglob
 sed "s/public\./$SCHEMA./g" "$SEED" | psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q
 # Supabase roles need access to the fresh schema (service_role bypasses RLS but
 # still needs the grants). Re-granted every reseed since DROP CASCADE clears them.

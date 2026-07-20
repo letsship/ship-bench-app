@@ -7,7 +7,7 @@ const BASE_URL = `http://localhost:${PORT}`;
 export default defineConfig({
   testDir: "./e2e",
   // The fake backend is one in-process store, so tests run sequentially and each
-  // isolates itself by re-seeding via /api/__test__/reset (see resetBackend).
+  // isolates itself by re-seeding via /api/test-reset (see resetBackend).
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -24,7 +24,15 @@ export default defineConfig({
     { name: "setup", testMatch: /support\/auth\.setup\.ts/ },
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], storageState: STORAGE_STATE },
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: STORAGE_STATE,
+        // Reuse Playwright's bundled Chromium (Desktop Chrome sets no `channel`, so
+        // no system Chrome is needed). CI containers give Chromium a tiny /dev/shm;
+        // without this flag it aborts with SIGABRT under load — same flag the agent
+        // sandbox passes for its lighthouse pass.
+        launchOptions: { args: ["--disable-dev-shm-usage"] },
+      },
       dependencies: ["setup"],
     },
   ],
