@@ -50,9 +50,15 @@ export async function listInvoices(
   }));
 }
 
-export async function getInvoiceDetail(repos: Repositories, id: string): Promise<InvoiceDetail> {
+export async function getInvoiceDetail(
+  repos: Repositories,
+  studioId: string,
+  id: string,
+): Promise<InvoiceDetail> {
   const invoice = await repos.invoices.getById(id);
-  if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
+  if (!invoice || invoice.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Invoice not found");
+  }
   const member = await repos.members.getById(invoice.memberId);
   if (!member) throw new HttpError(404, "not_found", "Invoice member not found");
   const lineItems = await repos.invoiceLineItems.listByInvoice(id);
@@ -111,21 +117,33 @@ export async function createInvoice(
     provider,
     invoiceIssued(
       { memberId: member.id, email: member.email, name: member.name },
-      { number: invoice.number, totalCents: invoice.totalCents, currency: invoice.currency, dueAt: invoice.dueAt },
+      {
+        number: invoice.number,
+        totalCents: invoice.totalCents,
+        currency: invoice.currency,
+        dueAt: invoice.dueAt,
+      },
     ),
   );
-  return getInvoiceDetail(repos, invoiceId);
+  return getInvoiceDetail(repos, studioId, invoiceId);
 }
 
 export async function updateInvoiceStatus(
   repos: Repositories,
+  studioId: string,
   id: string,
   status: InvoiceStatus,
 ): Promise<Invoice> {
   const invoice = await repos.invoices.getById(id);
-  if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
+  if (!invoice || invoice.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Invoice not found");
+  }
   if (!canTransitionInvoice(invoice.status as InvoiceStatus, status)) {
-    throw new HttpError(409, "invalid_transition", `Cannot move invoice from ${invoice.status} to ${status}`);
+    throw new HttpError(
+      409,
+      "invalid_transition",
+      `Cannot move invoice from ${invoice.status} to ${status}`,
+    );
   }
   const paidAt = status === "paid" ? new Date().toISOString() : invoice.paidAt;
   return repos.invoices.update(id, { status, paidAt });
