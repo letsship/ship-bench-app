@@ -55,9 +55,15 @@ export async function listBookingsForExport(
   const rows = await listBookingRows(repos, studioId);
 
   const { from, to } = options;
+  // Normalize filter bounds to canonical Z-form for consistent comparison with +00:00-stored timestamps.
+  const fromNormalized = from ? new Date(from).toISOString() : undefined;
+  const toNormalized = to ? new Date(to).toISOString() : undefined;
+
   return rows.filter((row) => {
-    const isAfterOrAtFrom = !from || row.startsAt >= from;
-    const isBeforeOrAtTo = !to || row.startsAt <= to;
+    // Normalize row start time to Z-form for lexicographic comparison.
+    const startsAtNormalized = new Date(row.startsAt).toISOString();
+    const isAfterOrAtFrom = !fromNormalized || startsAtNormalized >= fromNormalized;
+    const isBeforeOrAtTo = !toNormalized || startsAtNormalized <= toNormalized;
     return isAfterOrAtFrom && isBeforeOrAtTo;
   });
 }

@@ -237,4 +237,27 @@ describe("listBookingsForExport", () => {
     const rows = await listBookingsForExport(repos, studioId, {});
     expect(rows[0].email).toBe("");
   });
+
+  it("handles timestamp format differences: +00:00 stored vs Z filter (QA boundary fix)", async () => {
+    // Simulate real database storing timestamps as +00:00 while filter uses Z format.
+    // This was the root cause of QA failure: lexicographic string comparison failed
+    // because '+' (0x2B) < 'Z' (0x5A) in ASCII.
+    const storedTimestampPlus = "2026-06-27T08:00:00+00:00";
+    const filterTimestampZ = new Date("2026-06-27T08:00:00Z").toISOString(); // Z format
+
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", storedTimestampPlus)],
+        members: [member("m1")],
+        bookings: [booking("b1", "cs1", "m1")],
+      }),
+    );
+    const studioId = "s1";
+
+    // Filter with Z format should match +00:00 stored timestamp
+    const rows = await listBookingsForExport(repos, studioId, { from: filterTimestampZ });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].startsAt).toBe(storedTimestampPlus);
+  });
 });
