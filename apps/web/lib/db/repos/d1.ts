@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { and, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type {
   Booking,
@@ -273,7 +273,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
       async countByStudio(studioId) {
         const result = await drizzleDb
-          .select({ count: drizzleDb.$count(schema.invoices) })
+          .select({ count: count() })
           .from(schema.invoices)
           .where(eq(schema.invoices.studio_id, studioId));
         return result[0]?.count ?? 0;
