@@ -76,6 +76,7 @@ export interface InvoiceLineItemsRepo {
 export interface NotificationOutboxRepo {
   insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
   listPending(): Promise<NotificationOutboxRow[]>;
+  listByMemberAndKind(memberId: string, kind: string): Promise<NotificationOutboxRow[]>;
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
