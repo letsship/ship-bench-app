@@ -9,6 +9,7 @@ import type {
   NotificationOutboxRow,
   Studio,
   StudioSettings,
+  WebhookEvent,
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
@@ -88,7 +89,10 @@ export function createSupabaseRepositories(): Repositories {
           "members.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Member>(db.from("members").select("*").eq("id", id).maybeSingle(), "members.getById"),
+        maybeOne<Member>(
+          db.from("members").select("*").eq("id", id).maybeSingle(),
+          "members.getById",
+        ),
       findByEmail: (studioId, email) =>
         maybeOne<Member>(
           db.from("members").select("*").eq("studio_id", studioId).eq("email", email).maybeSingle(),
@@ -138,18 +142,28 @@ export function createSupabaseRepositories(): Repositories {
           "bookings.listBySession",
         ),
       getById: (id) =>
-        maybeOne<Booking>(db.from("bookings").select("*").eq("id", id).maybeSingle(), "bookings.getById"),
+        maybeOne<Booking>(
+          db.from("bookings").select("*").eq("id", id).maybeSingle(),
+          "bookings.getById",
+        ),
       insert: (booking) => insertReturning("bookings", booking),
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {
       listByStudio: (studioId) =>
         rows<Invoice>(
-          db.from("invoices").select("*").eq("studio_id", studioId).order("issued_at", { ascending: false }),
+          db
+            .from("invoices")
+            .select("*")
+            .eq("studio_id", studioId)
+            .order("issued_at", { ascending: false }),
           "invoices.listByStudio",
         ),
       getById: (id) =>
-        maybeOne<Invoice>(db.from("invoices").select("*").eq("id", id).maybeSingle(), "invoices.getById"),
+        maybeOne<Invoice>(
+          db.from("invoices").select("*").eq("id", id).maybeSingle(),
+          "invoices.getById",
+        ),
       countByStudio: async (studioId) => {
         const { count, error } = await db
           .from("invoices")
@@ -174,7 +188,9 @@ export function createSupabaseRepositories(): Repositories {
           .insert(items.map((item) => toSnakeRow(item as unknown as Record<string, unknown>)))
           .select();
         if (error) fail("invoiceLineItems.insertMany", error);
-        return (data ?? []).map((row) => toCamelRow<InvoiceLineItem>(row as Record<string, unknown>));
+        return (data ?? []).map((row) =>
+          toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
+        );
       },
     },
     outbox: {
@@ -186,6 +202,14 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+    },
+    webhookEvents: {
+      getById: (id) =>
+        maybeOne<WebhookEvent>(
+          db.from("webhook_events").select("*").eq("id", id).maybeSingle(),
+          "webhookEvents.getById",
+        ),
+      insert: (row) => insertReturning("webhook_events", row),
     },
   };
 }

@@ -7,9 +7,7 @@ const isoDatetime = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid ISO datetime" });
 
-const hexColor = z
-  .string()
-  .regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb hex color");
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb hex color");
 
 export const createClassTypeSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -72,6 +70,29 @@ export const createInvoiceSchema = z.object({
 export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
+
+export const stripeEventSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.string().min(1),
+    data: z
+      .object({
+        object: z
+          .object({
+            metadata: z
+              .object({
+                invoice_id: z.string().optional(),
+              })
+              .partial()
+              .optional(),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
 
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
