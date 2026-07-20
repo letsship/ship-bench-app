@@ -63,7 +63,10 @@ permissions:
 jobs:
   preview:
     name: ${{ inputs.action }} preview ${{ inputs.worker_name }}
-    runs-on: ubuntu-latest
+    # Ubicloud dedicated runner: the pipeline's deploying stage waits on this
+    # preview build, so a shared-queue wait here stalls the run the same way a
+    # queued check_suite does. Matches the ship-platform deploy-preview pattern.
+    runs-on: ubicloud-standard-2
     timeout-minutes: 20
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
