@@ -105,3 +105,15 @@ export interface NotificationOutboxRow {
   providerMessageId: string | null;
   error: string | null;
 }
+
+export interface ClassPack {
+  id: string;
+  studioId: string;
+  memberId: string;
+  creditsTotal: number;
+  creditsRemaining: number;
+  priceCents: number;
+  status: "active" | "refunded";
+  purchasedAt: string;
+  createdAt: string;
+}
