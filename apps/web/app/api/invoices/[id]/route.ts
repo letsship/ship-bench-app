@@ -11,9 +11,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 // GET /api/invoices/:id — invoice with member + line items.
 export async function GET(_request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
-    const { repos } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const { id } = await params;
-    return ok(await getInvoiceDetail(repos, id));
+    return ok(await getInvoiceDetail(repos, id, ctx.studio.id));
   });
 }
 
