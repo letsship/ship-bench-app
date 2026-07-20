@@ -9,6 +9,7 @@ import {
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
 import { HttpError } from "@/lib/http";
+import type { Tracker } from "@/lib/analytics/types";
 import {
   bookingCancellation,
   bookingConfirmation,
@@ -63,6 +64,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -94,11 +96,22 @@ export async function createBooking(
   });
 
   if (decision.status === "booked") {
+    tracker.capture({
+      event: "booking_created",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
     await enqueueAndDispatch(
       repos,
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+  } else if (decision.status === "waitlisted") {
+    tracker.capture({
+      event: "waitlist_joined",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -111,6 +124,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -134,6 +148,12 @@ export async function cancelBooking(
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
+  tracker.capture({
+    event: "booking_cancelled",
+    distinctId: booking.memberId,
+    properties: { session_id: session.id },
+  });
+
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
     : null;
@@ -142,7 +162,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }

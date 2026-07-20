@@ -3,6 +3,7 @@ import { handle, ok } from "@/lib/http";
 import { cancelBooking } from "@/lib/services/bookings";
 import { resolveStudio } from "@/lib/services/context";
 import { createNotificationProvider } from "@/lib/notifications/provider";
+import { resolveTracker } from "@/lib/analytics/tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function DELETE(
     await requireSession();
     const { repos } = await resolveStudio();
     const { id } = await params;
-    return ok(await cancelBooking(repos, createNotificationProvider(), id));
+    const tracker = await resolveTracker();
+    return ok(await cancelBooking(repos, createNotificationProvider(), tracker, id));
   });
 }
