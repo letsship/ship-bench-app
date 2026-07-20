@@ -110,7 +110,7 @@ test.describe("public studio page (unauthenticated)", () => {
     expect(response.ok()).toBe(true);
 
     const text = await response.text();
-    expect(text).toContain("User-agent: *");
+    expect(text).toContain("User-Agent: *");
     expect(text).toContain("Allow: /");
     expect(text).toContain("Sitemap:");
     expect(text).toContain("/sitemap.xml");
