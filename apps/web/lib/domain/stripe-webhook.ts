@@ -17,19 +17,18 @@ export function verifyStripeSignature({ payload, header, secret }: VerifyOptions
   }
 
   // Parse the header for t= and v1= fields
-  const pairs = header.split(",").reduce(
-    (acc, pair) => {
-      const [key, value] = pair.trim().split("=");
-      if (key && value) acc[key] = value;
-      return acc;
-    },
-    {} as Record<string, string>,
-  );
+  // Note: Stripe can send multiple v1 signatures (e.g., during secret rotation),
+  // so we collect all v1 values and check if any matches the computed HMAC.
+  let t: string | undefined;
+  const v1Values: string[] = [];
 
-  const t = pairs.t;
-  const v1 = pairs.v1;
+  for (const pair of header.split(",")) {
+    const [key, value] = pair.trim().split("=");
+    if (key === "t" && value) t = value;
+    if (key === "v1" && value) v1Values.push(value);
+  }
 
-  if (!t || !v1) {
+  if (!t || v1Values.length === 0) {
     return false;
   }
 
@@ -37,11 +36,17 @@ export function verifyStripeSignature({ payload, header, secret }: VerifyOptions
   const signed = `${t}.${payload}`;
   const computed = createHmac("sha256", secret).update(signed).digest("hex");
 
-  // Use timing-safe comparison to prevent timing attacks
-  try {
-    return timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(v1, "hex"));
-  } catch {
-    // Buffers have different lengths or other error
-    return false;
+  // Check if any v1 value matches the computed HMAC (timing-safe per comparison)
+  for (const v1 of v1Values) {
+    try {
+      if (timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(v1, "hex"))) {
+        return true;
+      }
+    } catch {
+      // Buffers have different lengths or other error; continue to next v1
+      continue;
+    }
   }
+
+  return false;
 }
