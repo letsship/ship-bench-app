@@ -100,7 +100,7 @@ test.describe("public studio page (unauthenticated)", () => {
     expect(cta).not.toContain("Click here");
   });
 
-  test("returns 404 for unknown studio slug", async ({ _page, context }) => {
+  test("returns 404 for unknown studio slug", async ({ context }) => {
     const response = await context.request.get("/s/unknown-studio-that-does-not-exist");
     expect(response.status()).toBe(404);
   });
