@@ -10,9 +10,15 @@ let Database: typeof import("better-sqlite3").default | null = null;
 
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Database = require("better-sqlite3");
+  const mod = require("better-sqlite3");
+  // Test that the module actually works by trying to create an in-memory database
+  // This will throw if the native bindings are missing
+  const testDb = mod(":memory:");
+  testDb.close();
+  Database = mod;
 } catch {
-  // better-sqlite3 native module not available; tests will be skipped
+  // better-sqlite3 native module not available or broken; tests will be skipped
+  Database = null;
 }
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
@@ -441,12 +447,17 @@ function seedDatabase(db: Database.Database, seed: ReturnType<typeof buildSeed>)
   }
 }
 
-describe.skipIf(!Database)("D1 repositories", () => {
+describe("D1 repositories", () => {
+  // Skip the entire suite if better-sqlite3 is not available (expected in CI without native build)
+  if (!Database) {
+    it.skip("skipped: better-sqlite3 not available", () => {});
+    return;
+  }
+
   let repos: Repositories;
   let studioId: string;
 
   beforeEach(() => {
-    if (!Database) throw new Error("better-sqlite3 not available");
     const sqliteDb = new Database(":memory:");
     createTestSchema(sqliteDb);
     const seed = buildSeed(NOW);
