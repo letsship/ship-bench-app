@@ -25,7 +25,13 @@
     "supabase": "^2.20.0",
     "turbo": "^2.8.3"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "supabase", "workerd"]
-  }
+  "overrides": {
+    "semver@7": ">=7.5.2"
+  },
+  "onlyBuiltDependencies": [
+    "esbuild",
+    "sharp",
+    "supabase",
+    "workerd"
+  ]
 }
