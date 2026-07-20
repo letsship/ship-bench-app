@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/auth/session";
 import { created, handle, ok } from "@/lib/http";
+import { HttpError } from "@/lib/http";
 import { resolveStudio } from "@/lib/services/context";
 import { createPack, listPacks } from "@/lib/services/packs";
 import { createPackSchema } from "@/lib/validation";
@@ -12,7 +13,7 @@ export async function GET(request: Request): Promise<Response> {
     const { repos } = await resolveStudio();
     const url = new URL(request.url);
     const memberId = url.searchParams.get("memberId");
-    if (!memberId) throw new Error("memberId query parameter required");
+    if (!memberId) throw new HttpError(400, "bad_request", "memberId query parameter required");
     return ok(await listPacks(repos, memberId));
   });
 }

@@ -81,6 +81,7 @@ export async function listPacks(
 
 export async function refundPack(
   repos: Repositories,
+  studioId: string,
   packId: string,
 ): Promise<{
   id: string;
@@ -92,6 +93,9 @@ export async function refundPack(
 }> {
   const pack = await repos.classPacks.getById(packId);
   if (!pack) throw new HttpError(404, "not_found", "Pack not found");
+  if (pack.studioId !== studioId) {
+    throw new HttpError(403, "forbidden", "Pack does not belong to this studio");
+  }
 
   const updated = await repos.classPacks.update(packId, {
     creditsRemaining: 0,

@@ -152,13 +152,13 @@ describe("packs service", () => {
       const p = pack("p1", { creditsRemaining: 3 });
       await repos.classPacks.insert(p);
 
-      const result = await refundPack(repos, "p1");
+      const result = await refundPack(repos, studioId, "p1");
       expect(result.status).toBe("refunded");
       expect(result.creditsRemaining).toBe(0);
     });
 
     it("404s for unknown pack", async () => {
-      await expect(refundPack(repos, "unknown")).rejects.toMatchObject({ status: 404 });
+      await expect(refundPack(repos, studioId, "unknown")).rejects.toMatchObject({ status: 404 });
     });
   });
 

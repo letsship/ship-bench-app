@@ -106,16 +106,15 @@ export async function createBooking(
     cancelledAt: null,
   });
 
-  if (memberHasPurchasedPack(packs)) {
-    const drawable = pickPackToDraw(packs);
-    if (drawable) {
-      await repos.classPacks.update(drawable.id, {
-        creditsRemaining: drawable.creditsRemaining - 1,
-      });
-    }
-  }
-
   if (decision.status === "booked") {
+    if (memberHasPurchasedPack(packs)) {
+      const drawable = pickPackToDraw(packs);
+      if (drawable) {
+        await repos.classPacks.update(drawable.id, {
+          creditsRemaining: drawable.creditsRemaining - 1,
+        });
+      }
+    }
     await enqueueAndDispatch(
       repos,
       provider,
