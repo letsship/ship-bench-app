@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import { UniqueConstraintError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -90,5 +91,235 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+});
+
+describe("in-memory bookings repository: unique active booking constraint", () => {
+  let repos: Repositories;
+
+  beforeEach(async () => {
+    const ISO = NOW.toISOString();
+    const seed = {
+      studio: { id: "s1", name: "S", slug: "s", timezone: "UTC", createdAt: ISO },
+      settings: {
+        studioId: "s1",
+        currency: "EUR",
+        taxRateBps: 0,
+        cancellationWindowHours: 12,
+        waitlistEnabled: true,
+        notifyBookingConfirmations: true,
+        notifyCancellations: true,
+        notifyWaitlistPromotions: true,
+        notifyInvoices: true,
+      },
+      members: [
+        {
+          id: "m1",
+          studioId: "s1",
+          name: "M1",
+          email: "m1@e.co",
+          phone: null,
+          status: "active",
+          notificationsOptedOut: false,
+          createdAt: ISO,
+        },
+      ],
+      classTypes: [
+        {
+          id: "ct1",
+          studioId: "s1",
+          name: "Yoga",
+          description: null,
+          color: "#111",
+          defaultCapacity: 10,
+          defaultPriceCents: 1000,
+          createdAt: ISO,
+        },
+      ],
+      sessions: [
+        {
+          id: "cs1",
+          studioId: "s1",
+          classTypeId: "ct1",
+          instructor: "I",
+          startsAt: "2026-03-22T10:00:00.000Z",
+          endsAt: "2026-03-22T11:00:00.000Z",
+          capacity: 10,
+          priceCents: 1000,
+          status: "scheduled",
+          createdAt: ISO,
+        },
+      ],
+      bookings: [],
+      invoices: [],
+      lineItems: [],
+      outbox: [],
+    };
+    repos = createInMemoryRepositories(seed);
+  });
+
+  it("throws UniqueConstraintError when inserting an active duplicate (booked)", async () => {
+    const ISO = NOW.toISOString();
+    const booking1 = {
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await expect(repos.bookings.insert(booking2)).rejects.toThrow(UniqueConstraintError);
+  });
+
+  it("throws UniqueConstraintError when inserting an active duplicate (waitlisted)", async () => {
+    const ISO = NOW.toISOString();
+    const booking1 = {
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "waitlisted" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "waitlisted" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await expect(repos.bookings.insert(booking2)).rejects.toThrow(UniqueConstraintError);
+  });
+
+  it("throws UniqueConstraintError when inserting an active duplicate (attended)", async () => {
+    const ISO = NOW.toISOString();
+    const booking1 = {
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "attended" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await expect(repos.bookings.insert(booking2)).rejects.toThrow(UniqueConstraintError);
+  });
+
+  it("allows a non-active duplicate (cancelled)", async () => {
+    const ISO = NOW.toISOString();
+    const booking1 = {
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "cancelled" as const,
+      bookedAt: ISO,
+      cancelledAt: ISO,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    const result = await repos.bookings.insert(booking2);
+    expect(result.id).toBe("b2");
+  });
+
+  it("allows a non-active duplicate (no_show)", async () => {
+    const ISO = NOW.toISOString();
+    const booking1 = {
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "no_show" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "waitlisted" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    const result = await repos.bookings.insert(booking2);
+    expect(result.id).toBe("b2");
+  });
+
+  it("allows duplicates for different members on the same session", async () => {
+    const ISO = NOW.toISOString();
+    const booking1 = {
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "cs1",
+      memberId: "m2",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    const result = await repos.bookings.insert(booking2);
+    expect(result.id).toBe("b2");
+  });
+
+  it("allows duplicates for the same member on different sessions", async () => {
+    const ISO = NOW.toISOString();
+    const booking1 = {
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b2",
+      sessionId: "cs2",
+      memberId: "m1",
+      status: "booked" as const,
+      bookedAt: ISO,
+      cancelledAt: null,
+    };
+    const result = await repos.bookings.insert(booking2);
+    expect(result.id).toBe("b2");
   });
 });

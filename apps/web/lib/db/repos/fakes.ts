@@ -9,6 +9,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { UniqueConstraintError } from "./errors";
 import type { Repositories, SessionRange } from "./types";
 
 // In-memory implementation of the repository seam. Used by the test suite
@@ -81,7 +82,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +103,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -157,6 +161,21 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        // Enforce the partial unique constraint from the migration:
+        // one active booking per member per class. Mirrors the index condition:
+        // WHERE status IN ('booked', 'waitlisted', 'attended')
+        const ACTIVE_STATUSES = new Set(["booked", "waitlisted", "attended"]);
+        const duplicate = store.bookings.find(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            ACTIVE_STATUSES.has(row.status),
+        );
+        if (duplicate) {
+          throw new UniqueConstraintError(
+            "Unique constraint violated: one active booking per member per class",
+          );
+        }
         store.bookings.push(clone(booking));
         return clone(booking);
       },
