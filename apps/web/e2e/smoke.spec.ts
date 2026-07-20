@@ -20,7 +20,7 @@ test.describe("unauthenticated", () => {
   test("the public studio page is accessible without login", async ({ page }) => {
     await page.goto("/s/riverbank");
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByText("Riverbank Movement")).toBeVisible();
+    await expect(page.getByText("Riverbank Movement").first()).toBeVisible();
   });
 
   test("the public studio page renders upcoming classes", async ({ page }) => {
