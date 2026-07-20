@@ -35,9 +35,8 @@ export interface BookingContext {
 // This is the source of truth — must match the partial index predicate in migrations.
 export const ACTIVE_BOOKING_STATUSES = ["booked", "waitlisted", "attended"] as const;
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// Any active booking blocks another booking attempt.
+const ACTIVE_MEMBER_BOOKING = new Set(ACTIVE_BOOKING_STATUSES);
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
@@ -47,7 +46,11 @@ export function canBook(context: BookingContext): BookingDecision {
     return { ok: false, reason: "session_started" };
   }
   if (context.memberStatus !== "active") return { ok: false, reason: "member_inactive" };
-  if (context.memberBookings.some((booking) => ACTIVE_MEMBER_BOOKING.has(booking.status))) {
+  if (
+    context.memberBookings.some((booking) =>
+      ACTIVE_MEMBER_BOOKING.has(booking.status as "booked" | "waitlisted" | "attended"),
+    )
+  ) {
     return { ok: false, reason: "already_booked" };
   }
   if (context.occupancy.isFull) {
