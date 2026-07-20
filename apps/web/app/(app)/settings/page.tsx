@@ -50,11 +50,7 @@ export default async function SettingsPage() {
         </div>
 
         <label className="flex items-center gap-3 text-sm">
-          <input
-            type="checkbox"
-            name="waitlistEnabled"
-            defaultChecked={settings.waitlistEnabled}
-          />
+          <input type="checkbox" name="waitlistEnabled" defaultChecked={settings.waitlistEnabled} />
           Enable waitlists when a class is full
         </label>
 
@@ -62,11 +58,7 @@ export default async function SettingsPage() {
           <legend className="sb-label">Send notifications for</legend>
           {NOTIFY_TOGGLES.map((toggle) => (
             <label key={toggle.name} className="flex items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                name={toggle.name}
-                defaultChecked={settings[toggle.name]}
-              />
+              <input type="checkbox" name={toggle.name} defaultChecked={settings[toggle.name]} />
               {toggle.label}
             </label>
           ))}
