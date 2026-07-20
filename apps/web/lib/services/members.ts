@@ -14,6 +14,14 @@ export async function getMember(repos: Repositories, id: string): Promise<Member
   return member;
 }
 
+export async function getMemberByCalendarToken(
+  repos: Repositories,
+  token: string,
+): Promise<Member | null> {
+  if (!token || token.trim() === "") return null;
+  return repos.members.findByCalendarToken(token);
+}
+
 export async function createMember(
   repos: Repositories,
   studioId: string,
@@ -31,6 +39,7 @@ export async function createMember(
     phone: input.phone ?? null,
     status: input.status,
     notificationsOptedOut: false,
+    calendarToken: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   });
 }
