@@ -5,15 +5,15 @@ import { resolveRepositories } from "@/lib/db/repos";
 
 export const dynamic = "force-dynamic";
 
+type RouteContext = { params: Promise<{ token: string }> };
+
 // GET /api/ical/[token] — a private iCalendar feed of upcoming sessions that the
 // token-holder is booked into. No auth: calendar clients can't send cookies, so
 // the secret token itself is the authorization. Unknown or empty tokens return 404.
-export async function GET(
-  _req: Request,
-  { params }: { params: { token: string } },
-): Promise<Response> {
+export async function GET(_req: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
-    const token = params.token?.trim();
+    const { token: rawToken } = await params;
+    const token = rawToken?.trim();
     if (!token) {
       return new Response(null, { status: 404 });
     }
