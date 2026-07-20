@@ -10,6 +10,7 @@ import type {
   StudioSettings,
 } from "../types";
 import type { Repositories, SessionRange } from "./types";
+import { ACTIVE_BOOKING_STATUSES } from "../../domain/booking-rules";
 import { DuplicateActiveBookingError } from "./errors";
 
 // In-memory implementation of the repository seam. Used by the test suite
@@ -162,12 +163,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async insert(booking) {
         // Check for existing active booking for same session+member
-        const ACTIVE_STATUSES = new Set(["booked", "waitlisted", "attended"]);
+        const activeStatuses = new Set(ACTIVE_BOOKING_STATUSES);
         const existing = store.bookings.find(
           (row) =>
             row.sessionId === booking.sessionId &&
             row.memberId === booking.memberId &&
-            ACTIVE_STATUSES.has(row.status),
+            activeStatuses.has(row.status as "booked" | "waitlisted" | "attended"),
         );
         if (existing) {
           throw new DuplicateActiveBookingError(booking.sessionId, booking.memberId);

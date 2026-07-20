@@ -19,7 +19,7 @@ import { DuplicateActiveBookingError } from "./errors";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -154,7 +154,7 @@ export function createSupabaseRepositories(): Repositories {
           .single();
         if (error) {
           // Postgres unique constraint violation code 23505
-          if (error.message.includes("23505")) {
+          if (error.code === "23505") {
             throw new DuplicateActiveBookingError(booking.sessionId, booking.memberId);
           }
           fail("insert into bookings", error);

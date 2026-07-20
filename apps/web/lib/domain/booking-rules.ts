@@ -31,6 +31,10 @@ export interface BookingContext {
   now: string;
 }
 
+// Statuses that count as active bookings for uniqueness constraint purposes.
+// This is the source of truth — must match the partial index predicate in migrations.
+export const ACTIVE_BOOKING_STATUSES = ["booked", "waitlisted", "attended"] as const;
+
 // A confirmed seat (or attendance already recorded) blocks another booking
 // attempt; a waitlist entry holds no seat, so it doesn't count against the member.
 const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
