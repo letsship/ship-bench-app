@@ -18,6 +18,7 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { resolveTracker } from "@/lib/analytics";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -93,12 +94,24 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  const tracker = resolveTracker();
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    await tracker.capture({
+      distinctId: member.id,
+      event: "booking_created",
+      properties: { session_id: session.id },
+    });
+  } else {
+    await tracker.capture({
+      distinctId: member.id,
+      event: "waitlist_joined",
+      properties: { session_id: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -142,8 +155,20 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
+
+  const tracker = resolveTracker();
+  await tracker.capture({
+    distinctId: member.id,
+    event: "booking_cancelled",
+    properties: { session_id: session.id },
+  });
+
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 
