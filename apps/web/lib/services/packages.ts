@@ -66,25 +66,6 @@ export async function refundPackage(repos: Repositories, id: string): Promise<Pa
   return toPackageResponse(refunded);
 }
 
-export async function drawCreditForBooking(repos: Repositories, memberId: string): Promise<void> {
-  const packs = await repos.packages.listByMember(memberId);
-  const { pickDrawablePack } = await import("@/lib/domain/packages");
-  const drawable = pickDrawablePack(packs);
-
-  if (!drawable) {
-    throw new HttpError(402, "pack_exhausted", "No credits available in your packs");
-  }
-
-  await repos.packages.update(drawable.id, {
-    creditsRemaining: drawable.creditsRemaining - 1,
-  });
-}
-
-export async function hasPack(repos: Repositories, memberId: string): Promise<boolean> {
-  const packs = await repos.packages.listByMember(memberId);
-  return packs.length > 0;
-}
-
 function toPackageResponse(pack: ClassPack): PackageResponse {
   return {
     id: pack.id,

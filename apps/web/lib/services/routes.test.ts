@@ -9,7 +9,9 @@ import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
 
-const NOW = new Date("2026-03-15T12:00:00.000Z");
+// Use the actual current time so booking service time checks work correctly
+// (the service uses new Date() internally to check if sessions have started)
+const NOW = new Date();
 
 vi.mock("@/lib/auth/session", () => ({
   requireSession: vi.fn().mockResolvedValue(undefined),
@@ -60,11 +62,13 @@ describe("GET route handlers (against injected fake repositories)", () => {
 describe("Packages API (POST/GET packages and refund endpoints)", () => {
   let repos = createInMemoryRepositories();
   let memberId: string;
+  let seed = buildSeed(NOW);
 
-  beforeEach(() => {
-    const seed = buildSeed(NOW);
+  beforeEach(async () => {
+    seed = buildSeed(NOW);
     repos = createInMemoryRepositories(seed);
     __setTestRepositories(repos);
+    // Use the first seed member for consistency with other tests
     memberId = seed.members[0].id;
   });
 
@@ -150,5 +154,158 @@ describe("Packages API (POST/GET packages and refund endpoints)", () => {
     const refunded = (await refundRes.json()) as Record<string, unknown>;
     expect(refunded.creditsRemaining).toBe(0);
     expect(refunded.status).toBe("refunded");
+  });
+
+  // Service-level tests for pack-integrated booking flow
+  describe("Booking integration with packs (via services)", () => {
+    let testRepos: ReturnType<typeof createInMemoryRepositories>;
+    let testMemberId: string;
+    let testSessionId: string;
+
+    beforeEach(() => {
+      // Create a simple test setup with services
+      const testSeed = {
+        studio: seed.studio,
+        settings: {
+          studioId: seed.studio.id,
+          currency: "EUR",
+          taxRateBps: 900,
+          cancellationWindowHours: 12,
+          waitlistEnabled: true,
+          notifyBookingConfirmations: true,
+          notifyCancellations: true,
+          notifyWaitlistPromotions: true,
+          notifyInvoices: true,
+        },
+        members: [
+          {
+            id: "test-pack-member",
+            studioId: seed.studio.id,
+            name: "Test Member",
+            email: "test@example.com",
+            phone: null,
+            status: "active" as const,
+            notificationsOptedOut: false,
+            createdAt: NOW.toISOString(),
+          },
+        ],
+        classTypes: seed.classTypes.slice(0, 1),
+        sessions: [
+          {
+            id: "test-session-1",
+            studioId: seed.studio.id,
+            classTypeId: seed.classTypes[0].id,
+            instructor: "Test Instructor",
+            startsAt: new Date(NOW.getTime() + 48 * 60 * 60 * 1000).toISOString(),
+            endsAt: new Date(NOW.getTime() + 49 * 60 * 60 * 1000).toISOString(),
+            capacity: 10,
+            priceCents: 1000,
+            status: "scheduled" as const,
+            createdAt: NOW.toISOString(),
+          },
+          {
+            id: "test-session-2",
+            studioId: seed.studio.id,
+            classTypeId: seed.classTypes[0].id,
+            instructor: "Test Instructor",
+            startsAt: new Date(NOW.getTime() + 72 * 60 * 60 * 1000).toISOString(),
+            endsAt: new Date(NOW.getTime() + 73 * 60 * 60 * 1000).toISOString(),
+            capacity: 10,
+            priceCents: 1000,
+            status: "scheduled" as const,
+            createdAt: NOW.toISOString(),
+          },
+        ],
+        bookings: [],
+        invoices: [],
+        lineItems: [],
+        outbox: [],
+        packs: [],
+      };
+      testRepos = createInMemoryRepositories(testSeed);
+      __setTestRepositories(testRepos);
+      testMemberId = "test-pack-member";
+      testSessionId = "test-session-1";
+    });
+
+    it("booking drops pack credits by one when member has an active pack", async () => {
+      const { createPackage } = await import("@/lib/services/packages");
+      const { createBooking } = await import("@/lib/services/bookings");
+      const { createFakeProvider } = await import("@/lib/notifications/fake-provider");
+
+      // Create a pack
+      const pack = await createPackage(testRepos, seed.studio.id, {
+        memberId: testMemberId,
+        credits: 5,
+      });
+      expect(pack.creditsRemaining).toBe(5);
+
+      // Book a class
+      const booking = await createBooking(testRepos, createFakeProvider(), {
+        sessionId: testSessionId,
+        memberId: testMemberId,
+      });
+      expect(booking.status).toBe("booked");
+
+      // Verify pack was decremented
+      const updatedPack = await testRepos.packages.getById(pack.id);
+      expect(updatedPack?.creditsRemaining).toBe(4);
+    });
+
+    it("booking is rejected with 402 pack_exhausted when all packs are empty", async () => {
+      const { createPackage } = await import("@/lib/services/packages");
+      const { createBooking } = await import("@/lib/services/bookings");
+      const { createFakeProvider } = await import("@/lib/notifications/fake-provider");
+
+      // Create a pack with 1 credit
+      await createPackage(testRepos, seed.studio.id, {
+        memberId: testMemberId,
+        credits: 1,
+      });
+
+      // Book the first class (uses the credit)
+      await createBooking(testRepos, createFakeProvider(), {
+        sessionId: testSessionId,
+        memberId: testMemberId,
+      });
+
+      // Try to book another class (no credits left)
+      await expect(
+        createBooking(testRepos, createFakeProvider(), {
+          sessionId: "test-session-2",
+          memberId: testMemberId,
+        }),
+      ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
+    });
+
+    it("duplicate booking is rejected with 409 and spends no extra credit", async () => {
+      const { createPackage } = await import("@/lib/services/packages");
+      const { createBooking } = await import("@/lib/services/bookings");
+      const { createFakeProvider } = await import("@/lib/notifications/fake-provider");
+
+      // Create a pack
+      const pack = await createPackage(testRepos, seed.studio.id, {
+        memberId: testMemberId,
+        credits: 5,
+      });
+
+      // Book once
+      await createBooking(testRepos, createFakeProvider(), {
+        sessionId: testSessionId,
+        memberId: testMemberId,
+      });
+
+      // Try to book again (duplicate)
+      await expect(
+        createBooking(testRepos, createFakeProvider(), {
+          sessionId: testSessionId,
+          memberId: testMemberId,
+        }),
+      ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+
+      // Verify only 1 credit was spent, not 2
+      const updatedPack = await testRepos.packages.getById(pack.id);
+      expect(updatedPack?.creditsRemaining).toBe(4);
+    });
   });
 });

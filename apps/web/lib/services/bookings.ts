@@ -86,9 +86,10 @@ export async function createBooking(
 
   // Check if member has any packs; if so, require a drawable one
   const memberPacks = await repos.packages.listByMember(member.id);
+  let drawablePack = null;
   if (memberPacks.length > 0) {
-    const drawable = pickDrawablePack(memberPacks);
-    if (!drawable) {
+    drawablePack = pickDrawablePack(memberPacks);
+    if (!drawablePack) {
       throw new HttpError(402, "pack_exhausted", "No credits available in your packs");
     }
   }
@@ -103,14 +104,11 @@ export async function createBooking(
     cancelledAt: null,
   });
 
-  // Decrement pack credit if member has packs
-  if (memberPacks.length > 0) {
-    const drawable = pickDrawablePack(memberPacks);
-    if (drawable) {
-      await repos.packages.update(drawable.id, {
-        creditsRemaining: drawable.creditsRemaining - 1,
-      });
-    }
+  // Decrement pack credit only for confirmed bookings
+  if (drawablePack && decision.status === "booked") {
+    await repos.packages.update(drawablePack.id, {
+      creditsRemaining: drawablePack.creditsRemaining - 1,
+    });
   }
 
   if (decision.status === "booked") {

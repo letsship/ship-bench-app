@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
-import { createPackage, listPackages, refundPackage, hasPack } from "./packages";
+import { createPackage, listPackages, refundPackage } from "./packages";
 import { HttpError } from "@/lib/http";
 
 describe("packages service", () => {
@@ -116,23 +116,6 @@ describe("packages service", () => {
 
     it("throws 404 for unknown pack", async () => {
       await expect(refundPackage(repos, "unknown-pack")).rejects.toThrow(HttpError);
-    });
-  });
-
-  describe("hasPack", () => {
-    it("returns false for member with no packs", async () => {
-      const result = await hasPack(repos, memberId);
-      expect(result).toBe(false);
-    });
-
-    it("returns true for member with at least one pack", async () => {
-      await createPackage(repos, studioId, {
-        memberId,
-        credits: 5,
-      });
-
-      const result = await hasPack(repos, memberId);
-      expect(result).toBe(true);
     });
   });
 });
