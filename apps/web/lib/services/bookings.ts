@@ -18,6 +18,7 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { memberHasPurchasedPack, pickPackToDraw } from "@/lib/domain/packs";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -83,6 +84,18 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  const packs = await repos.classPacks.listByMember(member.id);
+  if (memberHasPurchasedPack(packs)) {
+    const drawable = pickPackToDraw(packs);
+    if (!drawable) {
+      throw new HttpError(
+        402,
+        "pack_exhausted",
+        "No class pack credits available. Please purchase another pack.",
+      );
+    }
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +105,15 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  if (memberHasPurchasedPack(packs)) {
+    const drawable = pickPackToDraw(packs);
+    if (drawable) {
+      await repos.classPacks.update(drawable.id, {
+        creditsRemaining: drawable.creditsRemaining - 1,
+      });
+    }
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
@@ -142,7 +164,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
