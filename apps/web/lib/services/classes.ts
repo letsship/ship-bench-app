@@ -115,3 +115,27 @@ export async function createSession(
   });
   return getSessionView(repos, session.id);
 }
+
+// List only the sessions where the member holds a confirmed seat (booked) and the session is in the future.
+export async function listMemberBookedSessions(
+  repos: Repositories,
+  studioId: string,
+  memberId: string,
+  range: SessionRange = {},
+): Promise<SessionView[]> {
+  const from = range.from ?? new Date().toISOString();
+  const sessions = await repos.classSessions.listByStudio(studioId, { ...range, from });
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const allBookings = await repos.bookings.listBySessionIds(sessions.map((s) => s.id));
+  const memberBookings = new Set(
+    allBookings
+      .filter((b) => b.memberId === memberId && b.status === "booked")
+      .map((b) => b.sessionId),
+  );
+  const bookedSessions = sessions.filter((s) => memberBookings.has(s.id));
+  const bySession = groupBookings(allBookings);
+  return bookedSessions.map((session) =>
+    toView(session, typeById.get(session.classTypeId), bySession.get(session.id) ?? []),
+  );
+}
