@@ -91,4 +91,81 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("lists class packs by member sorted newest first", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+
+    await repos.classPacks.insert({
+      id: "pack1",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2024-01-01T10:00:00Z",
+    });
+
+    await repos.classPacks.insert({
+      id: "pack2",
+      studioId,
+      memberId,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10000,
+      status: "active",
+      purchasedAt: "2024-01-02T10:00:00Z",
+    });
+
+    const packs = await repos.classPacks.listByMember(memberId);
+    expect(packs).toHaveLength(2);
+    expect(packs[0].id).toBe("pack2");
+    expect(packs[1].id).toBe("pack1");
+  });
+
+  it("gets a class pack by id", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+
+    await repos.classPacks.insert({
+      id: "pack_test",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+    });
+
+    const pack = await repos.classPacks.getById("pack_test");
+    expect(pack?.id).toBe("pack_test");
+    expect(pack?.creditsTotal).toBe(5);
+  });
+
+  it("updates a class pack", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+
+    await repos.classPacks.insert({
+      id: "pack_update",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+    });
+
+    const updated = await repos.classPacks.update("pack_update", {
+      creditsRemaining: 2,
+      status: "refunded",
+    });
+
+    expect(updated.creditsRemaining).toBe(2);
+    expect(updated.status).toBe("refunded");
+    expect(updated.creditsTotal).toBe(5);
+  });
 });
