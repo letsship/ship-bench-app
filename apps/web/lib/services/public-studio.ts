@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { resolveRepositories } from "@/lib/db/repos";
 import type { Studio } from "@/lib/db/types";
 import { listSessions } from "@/lib/services/classes";
@@ -53,4 +54,57 @@ export async function resolvePublicStudio(slug: string): Promise<PublicStudio | 
 export async function listPublicStudios(): Promise<Studio[]> {
   const repos = await resolveRepositories();
   return repos.studios.listAll();
+}
+
+// Build SEO metadata for a public studio page.
+export function buildStudioMetadata(studio: Studio, baseUrl: string): Metadata {
+  const canonicalUrl = `${baseUrl}/s/${studio.slug}`;
+  const title = studio.name;
+  const description = `Upcoming classes at ${studio.name}. Book your spot today.`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      url: canonicalUrl,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
+
+interface EventLocation {
+  "@type": "Place";
+  name: string;
+}
+
+interface EventJsonLd {
+  "@context": "https://schema.org";
+  "@type": "Event";
+  name: string;
+  startDate: string;
+  location: EventLocation;
+}
+
+// Build JSON-LD structured data for studio events (schema.org Event).
+export function buildEventsJsonLd(studio: Studio, classes: PublicClass[]): EventJsonLd[] {
+  return classes.map((cls) => ({
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: cls.name,
+    startDate: cls.startsAt,
+    location: {
+      "@type": "Place",
+      name: studio.name,
+    },
+  }));
 }

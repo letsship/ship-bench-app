@@ -17,6 +17,29 @@ test.describe("unauthenticated", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test("the public studio page is accessible without login", async ({ page }) => {
+    await page.goto("/s/riverbank");
+    await expect(page).not.toHaveURL(/\/login/);
+    await expect(page.getByText("Riverbank Movement")).toBeVisible();
+  });
+
+  test("the public studio page renders upcoming classes", async ({ page }) => {
+    await page.goto("/s/riverbank");
+    const classes = page.locator("text=with").first();
+    await expect(classes).toBeVisible();
+  });
+
+  test("the public studio page has a descriptive CTA", async ({ page }) => {
+    await page.goto("/s/riverbank");
+    const cta = page.getByRole("link", { name: /Book a class at/ });
+    await expect(cta).toBeVisible();
+  });
+
+  test("an unknown studio slug returns 404", async ({ page }) => {
+    const response = await page.goto("/s/does-not-exist");
+    expect(response?.status()).toBe(404);
+  });
+
   test("the login stub signs the operator in and lands on the dashboard", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("Email").fill("operator@riverbank.studio");
