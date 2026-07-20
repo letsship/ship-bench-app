@@ -44,6 +44,25 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("computes totals for a fully refunded invoice", () => {
+    const totals = computeInvoiceTotals(
+      [{ quantity: 1, unitAmountCents: 9000, refunded: true }],
+      2100,
+    );
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.refundedCents).toBe(9000);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+  });
+
+  it("computes totals for an invoice with no line items", () => {
+    const totals = computeInvoiceTotals([], 2100);
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.refundedCents).toBe(0);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+  });
 });
 
 describe("formatInvoiceNumber", () => {
