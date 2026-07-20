@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
+import { DuplicateActiveBookingError } from "./errors";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -90,5 +91,62 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  it("rejects a second active booking for the same session+member", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+
+    const booking1 = {
+      id: "b_first",
+      sessionId,
+      memberId,
+      status: "waitlisted" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+
+    const booking2 = {
+      id: "b_second",
+      sessionId,
+      memberId,
+      status: "booked" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await expect(repos.bookings.insert(booking2)).rejects.toThrow(DuplicateActiveBookingError);
+  });
+
+  it("allows a rebook after the booking is cancelled", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+
+    const booking1 = {
+      id: "b_first",
+      sessionId,
+      memberId,
+      status: "booked" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(booking1);
+    await repos.bookings.update("b_first", { status: "cancelled", cancelledAt: NOW.toISOString() });
+
+    const booking2 = {
+      id: "b_second",
+      sessionId,
+      memberId,
+      status: "booked" as const,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    // Should not throw after cancellation
+    await repos.bookings.insert(booking2);
+    expect(await repos.bookings.getById("b_second")).not.toBeNull();
   });
 });
