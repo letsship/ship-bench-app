@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
-import type { ClassPack, Member } from "@/lib/db/types";
+import type { ClassPack, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { createBooking } from "./bookings";
 import { createPackage, drawCreditForMember, listPackages, refundPackage } from "./packages";
 
 const NOW = new Date();
 const ISO = NOW.toISOString();
+const FUTURE = new Date(NOW.getTime() + 7 * 86_400_000).toISOString();
+const FUTURE_END = new Date(NOW.getTime() + 7 * 86_400_000 + 3_600_000).toISOString();
 
 function baseSeed(over: Partial<SeedData> = {}): SeedData {
   return {
@@ -41,6 +45,31 @@ const member = (id: string, over: Partial<Member> = {}): Member => ({
   phone: null,
   status: "active",
   notificationsOptedOut: false,
+  createdAt: ISO,
+  ...over,
+});
+
+const classType = (id: string): ClassType => ({
+  id,
+  studioId: "s1",
+  name: "Yoga",
+  description: null,
+  color: "#111111",
+  defaultCapacity: 10,
+  defaultPriceCents: 1000,
+  createdAt: ISO,
+});
+
+const session = (id: string, over: Partial<ClassSession> = {}): ClassSession => ({
+  id,
+  studioId: "s1",
+  classTypeId: "ct1",
+  instructor: "Instructor",
+  startsAt: FUTURE,
+  endsAt: FUTURE_END,
+  capacity: 10,
+  priceCents: 1000,
+  status: "scheduled",
   createdAt: ISO,
   ...over,
 });
@@ -200,6 +229,135 @@ describe("packages", () => {
         expect(error).toHaveProperty("status", 402);
         expect(error).toHaveProperty("code", "pack_exhausted");
       }
+    });
+  });
+
+  describe("booking integration", () => {
+    it("decrements the oldest pack's creditsRemaining by one on booking (criterion 3)", async () => {
+      const m = member("m1");
+      const ct = classType("ct1");
+      const sess = session("s1");
+      const olderPack: ClassPack = {
+        id: "pack1",
+        studioId: "s1",
+        memberId: "m1",
+        creditsTotal: 5,
+        creditsRemaining: 3,
+        priceCents: 5000,
+        status: "active",
+        purchasedAt: "2024-01-01T10:00:00Z",
+      };
+      const newerPack: ClassPack = {
+        id: "pack2",
+        studioId: "s1",
+        memberId: "m1",
+        creditsTotal: 10,
+        creditsRemaining: 5,
+        priceCents: 10000,
+        status: "active",
+        purchasedAt: "2024-01-02T10:00:00Z",
+      };
+      repos = createInMemoryRepositories(
+        baseSeed({
+          members: [m],
+          classTypes: [ct],
+          sessions: [sess],
+          classPacks: [newerPack, olderPack],
+        }),
+      );
+
+      const provider = createFakeProvider();
+      await createBooking(repos, provider, { sessionId: "s1", memberId: "m1" });
+
+      // The oldest pack (pack1) should have creditsRemaining decremented by 1
+      const updatedOldPack = await repos.classPacks.getById("pack1");
+      expect(updatedOldPack?.creditsRemaining).toBe(2);
+      // The newer pack should be untouched
+      const updatedNewPack = await repos.classPacks.getById("pack2");
+      expect(updatedNewPack?.creditsRemaining).toBe(5);
+    });
+
+    it("rejects with 402 pack_exhausted when member's packs are exhausted (criterion 4)", async () => {
+      const m = member("m1");
+      const ct = classType("ct1");
+      const sess = session("s1");
+      const exhaustedPack: ClassPack = {
+        id: "pack1",
+        studioId: "s1",
+        memberId: "m1",
+        creditsTotal: 5,
+        creditsRemaining: 0,
+        priceCents: 5000,
+        status: "active",
+        purchasedAt: ISO,
+      };
+      repos = createInMemoryRepositories(
+        baseSeed({
+          members: [m],
+          classTypes: [ct],
+          sessions: [sess],
+          classPacks: [exhaustedPack],
+        }),
+      );
+
+      const provider = createFakeProvider();
+
+      // Attempt to book should throw 402 pack_exhausted
+      try {
+        await createBooking(repos, provider, { sessionId: "s1", memberId: "m1" });
+        throw new Error("Should have thrown pack_exhausted");
+      } catch (error) {
+        expect(error).toHaveProperty("status", 402);
+        expect(error).toHaveProperty("code", "pack_exhausted");
+      }
+
+      // Verify no booking was inserted
+      const bookings = await repos.bookings.listBySession("s1");
+      expect(bookings).toHaveLength(0);
+    });
+
+    it("rejects repeated same-session booking with 409 before drawing credit (criterion 5)", async () => {
+      const m = member("m1");
+      const ct = classType("ct1");
+      const sess = session("s1");
+      const pack: ClassPack = {
+        id: "pack1",
+        studioId: "s1",
+        memberId: "m1",
+        creditsTotal: 5,
+        creditsRemaining: 5,
+        priceCents: 5000,
+        status: "active",
+        purchasedAt: ISO,
+      };
+      repos = createInMemoryRepositories(
+        baseSeed({
+          members: [m],
+          classTypes: [ct],
+          sessions: [sess],
+          classPacks: [pack],
+        }),
+      );
+
+      const provider = createFakeProvider();
+
+      // First booking succeeds and draws a credit
+      await createBooking(repos, provider, { sessionId: "s1", memberId: "m1" });
+      let packState = await repos.classPacks.getById("pack1");
+      expect(packState?.creditsRemaining).toBe(4);
+
+      // Second booking of same session should fail with 409 and spend no credit
+      try {
+        await createBooking(repos, provider, { sessionId: "s1", memberId: "m1" });
+        throw new Error("Should have thrown already_booked");
+      } catch (error) {
+        expect(error).toHaveProperty("status", 409);
+        expect(error).toHaveProperty("code", "booking_already_booked");
+      }
+
+      // Pack should still have 4 credits (no extra credit drawn)
+      packState = await repos.classPacks.getById("pack1");
+      expect(packState?.creditsRemaining).toBe(4);
     });
   });
 });
