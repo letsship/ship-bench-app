@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { homeMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = homeMetadata;
 
 const FEATURES = [
   {
@@ -27,12 +31,10 @@ export default function LandingPage() {
 
       <section className="mt-20 max-w-2xl">
         <span className="sb-badge sb-badge-clay">For movement studios</span>
-        <h1 className="mt-5 text-5xl leading-tight">
-          Run your studio, not a spreadsheet.
-        </h1>
+        <h1 className="mt-5 text-5xl leading-tight">Run your studio, not a spreadsheet.</h1>
         <p className="mt-5 text-lg text-[var(--color-muted)]">
-          Studiobook keeps your pottery wheels spinning and your yoga mats full — bookings,
-          members, and invoices in one calm workspace.
+          Studiobook keeps your pottery wheels spinning and your yoga mats full — bookings, members,
+          and invoices in one calm workspace.
         </p>
         <div className="mt-8 flex gap-3">
           <Link href="/login" className="sb-btn sb-btn-primary">
