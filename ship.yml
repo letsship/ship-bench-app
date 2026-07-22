@@ -1,54 +1,27 @@
-# SHIP preview-environment manifest for Studiobook.
-#
-# Read by the SHIP orchestrator's deploying stage (at the PR head SHA)
-# after a PR's review is approved. When present, the orchestrator dispatches
-# the `workflow` below to stand up a per-PR preview environment, waits for its
-# `deployment_status` callback, then hands the live preview URL to the QA agent
-# for a smoke test + proof screenshots.
-#
-# Studiobook is a benchmark fixture: apps/web (a Next.js app deployed via
-# @opennextjs/cloudflare) is deployed as an ephemeral *.workers.dev Worker
-# per PR and torn down on PR close. The bench runner overwrites the `agents`
-# block per config epoch when it drives a benchmark task; the block below is
-# the reliable ALL-CLAUDE default used for manual runs and Track A (which
-# varies only the builder). The platform default reviewer is codex/OpenAI —
-# pinned to claude-code here so the default pipeline never depends on OpenAI
-# quota (planner/builder/qa already default to claude).
 version: 1
 
 agents:
+  planner:
+    harness: claude-code
+    model: opus
+  builder:
+    harness: claude-code
+    model: haiku
   reviewer:
+    harness: claude-code
+    model: opus
+  qa:
     harness: claude-code
     model: sonnet
 
 deployments:
-  # The orchestrator reads the `preview` entry specifically.
   preview:
     type: cloudflare-worker
-
-    # GitHub Actions workflow (in .github/workflows/) dispatched via
-    # workflow_dispatch. Handles action=deploy and action=delete
-    # (teardown on PR merge/close). Must live on the default branch for
-    # workflow_dispatch to resolve it.
     workflow: deploy-preview.yml
-
-    # Route-less wrangler config — deploys to *.workers.dev ONLY, never a
-    # custom domain. The per-PR worker name is supplied by the orchestrator
-    # and applied via `wrangler deploy --name`.
     configFile: apps/web/wrangler.preview.jsonc
-
     envName: preview
-
-    # Worker name prefix: the orchestrator mints
-    # `studiobook-pr<N>-<issueId>-<shortSha>` from this.
     appName: studiobook
-
-    # Account workers.dev subdomain — the preview URL is
-    # https://<worker_name>.<accountSubdomain>.workers.dev
     accountSubdomain: ship-ai
-
-    # Skip the preview deploy (→ straight to QA, which still runs) when a PR
-    # changes ONLY these globs — nothing that affects the deployed app.
     skipDeployPaths:
       - "**/*.md"
       - "docs/**"
