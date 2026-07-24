@@ -12,7 +12,7 @@ agents:
     model: opus
   qa:
     harness: claude-code
-    model: sonnet
+    model: opus
 
 deployments:
   preview:
