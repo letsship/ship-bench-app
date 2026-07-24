@@ -1,11 +1,8 @@
-import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { siteMetadata } from "@/lib/seo";
 import "./global.css";
 
-export const metadata: Metadata = {
-  title: "Studiobook — studio class booking",
-  description: "Bookings, members, and invoicing for movement studios.",
-};
+export const metadata = siteMetadata;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
