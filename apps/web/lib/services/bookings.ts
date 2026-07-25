@@ -17,6 +17,8 @@ import {
 } from "@/lib/notifications/messages";
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
+import type { Tracker } from "@/lib/analytics/types";
+import * as analyticsEvents from "@/lib/analytics/events";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
@@ -63,6 +65,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -99,6 +102,19 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    await tracker.capture(
+      analyticsEvents.bookingCreated({
+        memberId: member.id,
+        sessionId: session.id,
+      }),
+    );
+  } else if (decision.status === "waitlisted") {
+    await tracker.capture(
+      analyticsEvents.waitlistJoined({
+        memberId: member.id,
+        sessionId: session.id,
+      }),
+    );
   }
   return { bookingId, status: decision.status };
 }
@@ -111,6 +127,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -133,6 +150,13 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+
+  await tracker.capture(
+    analyticsEvents.bookingCancelled({
+      memberId: booking.memberId,
+      sessionId: booking.sessionId,
+    }),
+  );
 
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
