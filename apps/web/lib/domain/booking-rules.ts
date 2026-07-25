@@ -13,10 +13,12 @@ export type BookingDenyReason =
   | "already_booked"
   | "session_full_no_waitlist";
 
-export type BookingDecision = { ok: true; status: "booked" | "waitlisted" } | {
-  ok: false;
-  reason: BookingDenyReason;
-};
+export type BookingDecision =
+  | { ok: true; status: "booked" | "waitlisted" }
+  | {
+      ok: false;
+      reason: BookingDenyReason;
+    };
 
 export interface BookingContext {
   sessionStatus: string;
@@ -29,9 +31,19 @@ export interface BookingContext {
   now: string;
 }
 
+// A confirmed seat, attendance, or waitlist entry blocks another booking attempt.
+// When a race condition allows two concurrent inserts, the database rejects
+// the second via a unique index on active bookings; the repos layer converts
+// this to a DuplicateActiveBookingError, which the service maps to 409.
+export const ACTIVE_BOOKING_STATUSES = new Set(["booked", "waitlisted", "attended"]);
+
+export function isActiveBookingStatus(status: string): boolean {
+  return ACTIVE_BOOKING_STATUSES.has(status);
+}
+
 // A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// attempt; a waitlist entry also holds a spot (and blocks repeats), so it counts.
+const ACTIVE_MEMBER_BOOKING = ACTIVE_BOOKING_STATUSES;
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
@@ -54,8 +66,7 @@ export function canBook(context: BookingContext): BookingDecision {
 export type CancellationDenyReason = "already_cancelled" | "session_passed";
 
 export type CancellationDecision =
-  | { ok: true; refundEligible: boolean }
-  | { ok: false; reason: CancellationDenyReason };
+  { ok: true; refundEligible: boolean } | { ok: false; reason: CancellationDenyReason };
 
 export interface CancellationContext {
   bookingStatus: string;

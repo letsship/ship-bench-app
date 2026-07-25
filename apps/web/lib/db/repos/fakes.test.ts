@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { DuplicateActiveBookingError } from "./errors";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
@@ -90,5 +91,115 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+});
+
+describe("booking insert guard", () => {
+  let repos: Repositories;
+  let studioId: string;
+
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(buildSeed(NOW));
+    const studio = await repos.studios.getFirst();
+    studioId = studio?.id ?? "";
+  });
+
+  it("allows inserting when no active booking exists for the member+session", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const members = await repos.members.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const memberId = members[0].id;
+
+    const booking = await repos.bookings.insert({
+      id: "test-b1",
+      sessionId,
+      memberId,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    expect(booking.id).toBe("test-b1");
+  });
+
+  it("throws DuplicateActiveBookingError when inserting a second active booking for the same member+session", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const members = await repos.members.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const memberId = members[0].id;
+
+    await repos.bookings.insert({
+      id: "test-b1",
+      sessionId,
+      memberId,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    await expect(
+      repos.bookings.insert({
+        id: "test-b2",
+        sessionId,
+        memberId,
+        status: "waitlisted",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).rejects.toThrow(DuplicateActiveBookingError);
+  });
+
+  it("allows a rebook when the prior booking was cancelled", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const members = await repos.members.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const memberId = members[0].id;
+
+    const _firstBooking = await repos.bookings.insert({
+      id: "test-b1",
+      sessionId,
+      memberId,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    await repos.bookings.update("test-b1", { status: "cancelled", cancelledAt: NOW.toISOString() });
+
+    const rebook = await repos.bookings.insert({
+      id: "test-b2",
+      sessionId,
+      memberId,
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    expect(rebook.id).toBe("test-b2");
+  });
+
+  it("throws when inserting a waitlisted duplicate after a booked entry", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const members = await repos.members.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const memberId = members[0].id;
+
+    await repos.bookings.insert({
+      id: "test-b1",
+      sessionId,
+      memberId,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    await expect(
+      repos.bookings.insert({
+        id: "test-b2",
+        sessionId,
+        memberId,
+        status: "waitlisted",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).rejects.toThrow(DuplicateActiveBookingError);
   });
 });

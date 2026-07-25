@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canBook, canCancel, pickWaitlistPromotion } from "./booking-rules";
+import { canBook, canCancel, isActiveBookingStatus, pickWaitlistPromotion } from "./booking-rules";
 import { computeOccupancy } from "./capacity";
 
 const FUTURE = "2026-06-01T09:00:00Z";
@@ -51,6 +51,13 @@ describe("canBook", () => {
 
   it("rejects a member who already holds a booking", () => {
     expect(canBook(baseContext({ memberBookings: [{ status: "booked" }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
+  it("rejects a member who is already waitlisted for the same session", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "waitlisted" }] }))).toEqual({
       ok: false,
       reason: "already_booked",
     });
@@ -119,6 +126,19 @@ describe("canCancel", () => {
         now: NOW,
       }),
     ).toEqual({ ok: false, reason: "session_passed" });
+  });
+});
+
+describe("isActiveBookingStatus", () => {
+  it("returns true for booked, waitlisted, and attended", () => {
+    expect(isActiveBookingStatus("booked")).toBe(true);
+    expect(isActiveBookingStatus("waitlisted")).toBe(true);
+    expect(isActiveBookingStatus("attended")).toBe(true);
+  });
+
+  it("returns false for cancelled and no_show", () => {
+    expect(isActiveBookingStatus("cancelled")).toBe(false);
+    expect(isActiveBookingStatus("no_show")).toBe(false);
   });
 });
 

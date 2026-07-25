@@ -1,3 +1,4 @@
+import { isActiveBookingStatus } from "@/lib/domain/booking-rules";
 import type {
   Booking,
   ClassSession,
@@ -9,6 +10,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import type { Repositories, SessionRange } from "./types";
 
 // In-memory implementation of the repository seam. Used by the test suite
@@ -81,7 +83,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +104,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -157,6 +162,18 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        // Check for an existing active booking for this member in this session before inserting.
+        // This happens synchronously (no await between check and push) so concurrent calls under
+        // the single-threaded model cannot both pass the check.
+        const existingActive = store.bookings.find(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            isActiveBookingStatus(row.status),
+        );
+        if (existingActive) {
+          throw new DuplicateActiveBookingError();
+        }
         store.bookings.push(clone(booking));
         return clone(booking);
       },
