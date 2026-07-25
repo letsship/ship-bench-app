@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNull, lt, gte, desc, SQL } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, lt, gte, desc, SQL, type Table } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { D1Database } from "@cloudflare/workers-types/experimental";
 import type {
@@ -17,7 +17,7 @@ import type { Repositories } from "./types";
 import { schema } from "./schema";
 
 type D1Result = { success: boolean; results?: Record<string, unknown>[] };
-type DrizzleTable = any;
+type DrizzleTable = Table;
 
 // Production repository implementation over Cloudflare D1 using Drizzle.
 // Mirrors the exact behaviour of the Supabase adapter: members ordered by name,
@@ -302,6 +302,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         );
         const result = (await drizzleDb
           .insert(schema.invoiceLineItemsTable)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .values(snakeItems as any)
           .returning()
           .run()) as D1Result;
