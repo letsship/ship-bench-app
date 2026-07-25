@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as invoiceDetailGet } from "@/app/api/invoices/[id]/route";
+import { GET as memberDetailGet } from "@/app/api/members/[id]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +46,74 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Detail route handlers with cross-studio protection", () => {
+  const NOW = new Date("2026-03-15T12:00:00.000Z");
+  const ISO = NOW.toISOString();
+
+  afterEach(() => {
+    __setTestRepositories(null);
+  });
+
+  it("GET /api/invoices/:id returns 404 for a foreign invoice", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    await repos.members.insert({
+      id: "foreign-member",
+      studioId: "s2",
+      name: "Foreign",
+      email: "foreign@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: ISO,
+    });
+    await repos.invoices.insert({
+      id: "foreign-invoice",
+      studioId: "s2",
+      memberId: "foreign-member",
+      number: "INV-999",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: 900,
+      subtotalCents: 1000,
+      taxCents: 90,
+      totalCents: 1090,
+      issuedAt: ISO,
+      dueAt: ISO,
+      paidAt: null,
+      createdAt: ISO,
+    });
+    __setTestRepositories(repos);
+    const res = await invoiceDetailGet(
+      new NextRequest("http://localhost/api/invoices/foreign-invoice"),
+      {
+        params: Promise.resolve({ id: "foreign-invoice" }),
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /api/members/:id returns 404 for a foreign member", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    await repos.members.insert({
+      id: "foreign-member",
+      studioId: "s2",
+      name: "Foreign",
+      email: "foreign@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: ISO,
+    });
+    __setTestRepositories(repos);
+    const res = await memberDetailGet(
+      new NextRequest("http://localhost/api/members/foreign-member"),
+      {
+        params: Promise.resolve({ id: "foreign-member" }),
+      },
+    );
+    expect(res.status).toBe(404);
   });
 });
