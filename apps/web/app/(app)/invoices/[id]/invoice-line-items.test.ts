@@ -1,18 +1,29 @@
-import { describe, expect, it } from "vitest";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { InvoiceLineItems } from "./invoice-line-items";
+
+// Mock the Money and StatusBadge components to avoid React scope issues in server rendering
+vi.mock("../../_components/ui", async () => {
+  const actual =
+    await vi.importActual<typeof import("../../_components/ui")>("../../_components/ui");
+  return {
+    ...actual,
+    Money: ({ cents, currency }: { cents: number; currency: string }) => {
+      return React.createElement("span", {}, `${currency} ${(cents / 100).toFixed(2)}`);
+    },
+    StatusBadge: ({ status }: { status: string }) => {
+      return React.createElement("span", { className: "badge" }, status);
+    },
+  };
+});
 
 describe("InvoiceLineItems", () => {
-  it("component source does not use dangerouslySetInnerHTML", async () => {
-    // Import the component to ensure it compiles properly
-    const { InvoiceLineItems } = await import("./invoice-line-items");
-    expect(typeof InvoiceLineItems).toBe("function");
-  });
-
-  it("component properly escapes description content via JSX", async () => {
-    const { InvoiceLineItems } = await import("./invoice-line-items");
+  it("escapes HTML markup in description to prevent XSS", () => {
     const lineItems = [
       {
         id: "1",
-        description: "<img src=x onerror=\"alert('xss')\">",
+        description: '<img src=x onerror="alert(document.cookie)">',
         quantity: 1,
         unitAmountCents: 1000,
         amountCents: 1000,
@@ -20,18 +31,44 @@ describe("InvoiceLineItems", () => {
       },
     ];
 
-    // The component accepts lineItems as props
-    // When rendered, React's JSX interpolation {line.description} auto-escapes the content
-    // This means < becomes &lt;, > becomes &gt;, and no HTML is interpreted
-    const component = InvoiceLineItems({ lineItems, currency: "USD" });
+    const element = React.createElement(InvoiceLineItems, {
+      lineItems,
+      currency: "USD",
+    });
+    const html = renderToStaticMarkup(element);
 
-    // Component should be a React element
-    expect(component).toBeDefined();
-    expect(component.type).toBeDefined();
+    // Verify the malicious HTML is escaped as text content (not parsed as an element)
+    expect(html).toContain("&lt;img");
+    // Verify there's no actual <img tag that could execute
+    const hasLiveImgTag = /<img\b/.test(html);
+    expect(hasLiveImgTag).toBe(false);
+    // Verify the escaped markup is visible as readable text
+    expect(html).toContain("src=x onerror=");
   });
 
-  it("component renders multiple line items without issues", async () => {
-    const { InvoiceLineItems } = await import("./invoice-line-items");
+  it("renders ordinary descriptions as readable text", () => {
+    const lineItems = [
+      {
+        id: "1",
+        description: "Studio hire — 2 hours",
+        quantity: 1,
+        unitAmountCents: 5000,
+        amountCents: 5000,
+        refunded: false,
+      },
+    ];
+
+    const element = React.createElement(InvoiceLineItems, {
+      lineItems,
+      currency: "USD",
+    });
+    const html = renderToStaticMarkup(element);
+
+    // Verify ordinary text renders correctly
+    expect(html).toContain("Studio hire — 2 hours");
+  });
+
+  it("escapes special characters in multiple line items", () => {
     const lineItems = [
       {
         id: "1",
@@ -51,7 +88,19 @@ describe("InvoiceLineItems", () => {
       },
     ];
 
-    const component = InvoiceLineItems({ lineItems, currency: "EUR" });
-    expect(component).toBeDefined();
+    const element = React.createElement(InvoiceLineItems, {
+      lineItems,
+      currency: "EUR",
+    });
+    const html = renderToStaticMarkup(element);
+
+    // Verify all special characters are properly escaped
+    expect(html).toContain("First item");
+    expect(html).toContain("Second item with special chars:");
+    expect(html).toContain("&lt;");
+    expect(html).toContain("&gt;");
+    expect(html).toContain("&amp;");
+    // Quotes should not appear unescaped in text content
+    expect(html).not.toContain('><"');
   });
 });
