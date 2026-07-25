@@ -6,17 +6,13 @@ import type {
   ClassSession,
   ClassType,
   Invoice,
-  InvoiceLineItem,
   Member,
   NotificationOutboxRow,
-  Studio,
   StudioSettings,
 } from "../types";
-import { toSnakeRow, toCamelRow } from "./mapping";
 import type { Repositories } from "./types";
 import { schema } from "./schema";
 
-type D1Result = { success: boolean; results?: Record<string, unknown>[] };
 type DrizzleTable = Table;
 
 // Production repository implementation over Cloudflare D1 using Drizzle.
@@ -27,19 +23,21 @@ type DrizzleTable = Table;
 // filtering sent_at IS NULL, .returning() for insert/update, and a count
 // expression for invoices.countByStudio.
 
-function toEntity<T>(row: Record<string, unknown>): T {
-  return toCamelRow<T>(row);
-}
-
 export function createD1Repositories(db: D1Database): Repositories {
   const drizzleDb = drizzle(db, { schema });
 
   async function insertReturning<T>(table: DrizzleTable, row: Record<string, unknown>): Promise<T> {
-    const result = (await drizzleDb.insert(table).values(row).returning().run()) as D1Result;
-    if (!result.success || !result.results?.[0]) {
+    // Drizzle expects camelCase keys matching schema properties; it handles mapping to snake_case columns.
+    const result = await drizzleDb
+      .insert(table)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .values(row as any)
+      .returning()
+      .get();
+    if (!result) {
       throw new Error(`Insert failed for table`);
     }
-    return toEntity<T>(result.results[0] as Record<string, unknown>);
+    return result as T;
   }
 
   async function updateReturning<T>(
@@ -47,37 +45,35 @@ export function createD1Repositories(db: D1Database): Repositories {
     whereCondition: SQL,
     patch: Record<string, unknown>,
   ): Promise<T> {
-    const result = (await drizzleDb
+    // Drizzle expects camelCase keys matching schema properties; it handles mapping to snake_case columns.
+    const result = await drizzleDb
       .update(table)
-      .set(patch)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set(patch as any)
       .where(whereCondition)
       .returning()
-      .run()) as D1Result;
-    if (!result.success || !result.results?.[0]) {
+      .get();
+    if (!result) {
       throw new Error(`Update failed for table`);
     }
-    return toEntity<T>(result.results[0] as Record<string, unknown>);
+    return result as T;
   }
 
   return {
     studios: {
       async getFirst() {
-        const result = await drizzleDb.select().from(schema.studiosTable).limit(1).run();
-        return result.results?.[0]
-          ? toEntity<Studio>(result.results[0] as Record<string, unknown>)
-          : null;
+        const result = await drizzleDb.select().from(schema.studiosTable).limit(1).get();
+        return result ?? null;
       },
     },
     settings: {
       async getByStudioId(studioId) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select()
           .from(schema.studioSettingsTable)
           .where(eq(schema.studioSettingsTable.studioId, studioId))
-          .run()) as D1Result;
-        return result.results?.[0]
-          ? toEntity<StudioSettings>(result.results[0] as Record<string, unknown>)
-          : null;
+          .get();
+        return result ?? null;
       },
       async update(studioId, patch) {
         return updateReturning<StudioSettings>(
@@ -89,76 +85,62 @@ export function createD1Repositories(db: D1Database): Repositories {
     },
     members: {
       async listByStudio(studioId) {
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.membersTable)
           .where(eq(schema.membersTable.studioId, studioId))
           .orderBy(schema.membersTable.name)
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) => toEntity<Member>(row));
+          .all();
       },
       async getById(id) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select()
           .from(schema.membersTable)
           .where(eq(schema.membersTable.id, id))
-          .run()) as D1Result;
-        return result.results?.[0]
-          ? toEntity<Member>(result.results[0] as Record<string, unknown>)
-          : null;
+          .get();
+        return result ?? null;
       },
       async findByEmail(studioId, email) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select()
           .from(schema.membersTable)
           .where(
             and(eq(schema.membersTable.studioId, studioId), eq(schema.membersTable.email, email)),
           )
-          .run()) as D1Result;
-        return result.results?.[0]
-          ? toEntity<Member>(result.results[0] as Record<string, unknown>)
-          : null;
+          .get();
+        return result ?? null;
       },
       async insert(member) {
         return insertReturning<Member>(
           schema.membersTable,
-          toSnakeRow(member as unknown as Record<string, unknown>),
+          member as unknown as Record<string, unknown>,
         );
       },
       async update(id, patch) {
-        return updateReturning<Member>(
-          schema.membersTable,
-          eq(schema.membersTable.id, id),
-          toSnakeRow(patch as unknown as Record<string, unknown>),
-        );
+        return updateReturning<Member>(schema.membersTable, eq(schema.membersTable.id, id), patch);
       },
     },
     classTypes: {
       async listByStudio(studioId) {
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.classTypesTable)
           .where(eq(schema.classTypesTable.studioId, studioId))
           .orderBy(schema.classTypesTable.name)
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) =>
-          toEntity<ClassType>(row),
-        );
+          .all();
       },
       async getById(id) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select()
           .from(schema.classTypesTable)
           .where(eq(schema.classTypesTable.id, id))
-          .run()) as D1Result;
-        return result.results?.[0]
-          ? toEntity<ClassType>(result.results[0] as Record<string, unknown>)
-          : null;
+          .get();
+        return result ?? null;
       },
       async insert(classType) {
         return insertReturning<ClassType>(
           schema.classTypesTable,
-          toSnakeRow(classType as unknown as Record<string, unknown>),
+          classType as unknown as Record<string, unknown>,
         );
       },
     },
@@ -172,170 +154,147 @@ export function createD1Repositories(db: D1Database): Repositories {
           conditions.push(lt(schema.classSessionsTable.startsAt, range.to));
         }
         const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.classSessionsTable)
           .where(whereClause)
           .orderBy(schema.classSessionsTable.startsAt)
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) =>
-          toEntity<ClassSession>(row),
-        );
+          .all();
       },
       async getById(id) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select()
           .from(schema.classSessionsTable)
           .where(eq(schema.classSessionsTable.id, id))
-          .run()) as D1Result;
-        return result.results?.[0]
-          ? toEntity<ClassSession>(result.results[0] as Record<string, unknown>)
-          : null;
+          .get();
+        return result ?? null;
       },
       async insert(session) {
         return insertReturning<ClassSession>(
           schema.classSessionsTable,
-          toSnakeRow(session as unknown as Record<string, unknown>),
+          session as unknown as Record<string, unknown>,
         );
       },
     },
     bookings: {
       async listBySessionIds(sessionIds) {
         if (sessionIds.length === 0) return [];
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.bookingsTable)
           .where(inArray(schema.bookingsTable.sessionId, sessionIds))
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) => toEntity<Booking>(row));
+          .all();
       },
       async listBySession(sessionId) {
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.bookingsTable)
           .where(eq(schema.bookingsTable.sessionId, sessionId))
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) => toEntity<Booking>(row));
+          .all();
       },
       async getById(id) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select()
           .from(schema.bookingsTable)
           .where(eq(schema.bookingsTable.id, id))
-          .run()) as D1Result;
-        return result.results?.[0]
-          ? toEntity<Booking>(result.results[0] as Record<string, unknown>)
-          : null;
+          .get();
+        return result ?? null;
       },
       async insert(booking) {
         return insertReturning<Booking>(
           schema.bookingsTable,
-          toSnakeRow(booking as unknown as Record<string, unknown>),
+          booking as unknown as Record<string, unknown>,
         );
       },
       async update(id, patch) {
         return updateReturning<Booking>(
           schema.bookingsTable,
           eq(schema.bookingsTable.id, id),
-          toSnakeRow(patch as unknown as Record<string, unknown>),
+          patch,
         );
       },
     },
     invoices: {
       async listByStudio(studioId) {
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.invoicesTable)
           .where(eq(schema.invoicesTable.studioId, studioId))
           .orderBy(desc(schema.invoicesTable.issuedAt))
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) => toEntity<Invoice>(row));
+          .all();
       },
       async getById(id) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select()
           .from(schema.invoicesTable)
           .where(eq(schema.invoicesTable.id, id))
-          .run()) as D1Result;
-        return result.results?.[0]
-          ? toEntity<Invoice>(result.results[0] as Record<string, unknown>)
-          : null;
+          .get();
+        return result ?? null;
       },
       async countByStudio(studioId) {
-        const result = (await drizzleDb
+        const result = await drizzleDb
           .select({ count: count() })
           .from(schema.invoicesTable)
           .where(eq(schema.invoicesTable.studioId, studioId))
-          .run()) as D1Result;
-        const row = result.results?.[0] as Record<string, unknown> | undefined;
-        return (row?.count as number) ?? 0;
+          .get();
+        return (result?.count as number) ?? 0;
       },
       async insert(invoice) {
         return insertReturning<Invoice>(
           schema.invoicesTable,
-          toSnakeRow(invoice as unknown as Record<string, unknown>),
+          invoice as unknown as Record<string, unknown>,
         );
       },
       async update(id, patch) {
         return updateReturning<Invoice>(
           schema.invoicesTable,
           eq(schema.invoicesTable.id, id),
-          toSnakeRow(patch as unknown as Record<string, unknown>),
+          patch,
         );
       },
     },
     invoiceLineItems: {
       async listByInvoice(invoiceId) {
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.invoiceLineItemsTable)
           .where(eq(schema.invoiceLineItemsTable.invoiceId, invoiceId))
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) =>
-          toEntity<InvoiceLineItem>(row),
-        );
+          .all();
       },
       async insertMany(items) {
         if (items.length === 0) return [];
-        const snakeItems = items.map((item) =>
-          toSnakeRow(item as unknown as Record<string, unknown>),
-        );
-        const result = (await drizzleDb
+        // Drizzle expects camelCase keys matching schema properties; it handles mapping to snake_case columns.
+        const result = await drizzleDb
           .insert(schema.invoiceLineItemsTable)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .values(snakeItems as any)
+          .values(items as any)
           .returning()
-          .run()) as D1Result;
-        if (!result.success || !result.results) {
+          .all();
+        if (!result || result.length === 0) {
           throw new Error("insertMany failed for invoice_line_items");
         }
-        return (result.results ?? []).map((row: Record<string, unknown>) =>
-          toEntity<InvoiceLineItem>(row),
-        );
+        return result;
       },
     },
     outbox: {
       async insert(row) {
         return insertReturning<NotificationOutboxRow>(
           schema.notificationOutboxTable,
-          toSnakeRow(row as unknown as Record<string, unknown>),
+          row as unknown as Record<string, unknown>,
         );
       },
       async listPending() {
-        const result = (await drizzleDb
+        return await drizzleDb
           .select()
           .from(schema.notificationOutboxTable)
           .where(isNull(schema.notificationOutboxTable.sentAt))
-          .run()) as D1Result;
-        return (result.results ?? []).map((row: Record<string, unknown>) =>
-          toEntity<NotificationOutboxRow>(row),
-        );
+          .all();
       },
       async update(id, patch) {
         return updateReturning<NotificationOutboxRow>(
           schema.notificationOutboxTable,
           eq(schema.notificationOutboxTable.id, id),
-          toSnakeRow(patch as unknown as Record<string, unknown>),
+          patch,
         );
       },
     },
