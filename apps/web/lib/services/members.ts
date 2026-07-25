@@ -1,6 +1,7 @@
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { Member } from "@/lib/db/types";
+import { newCalendarToken } from "@/lib/domain/member-calendar";
 import { HttpError } from "@/lib/http";
 import type { CreateMemberInput, UpdateMemberInput } from "@/lib/validation";
 
@@ -31,6 +32,7 @@ export async function createMember(
     phone: input.phone ?? null,
     status: input.status,
     notificationsOptedOut: false,
+    calendarToken: newCalendarToken(),
     createdAt: new Date().toISOString(),
   });
 }

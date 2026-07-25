@@ -35,6 +35,14 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("finds a member by calendar token", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const found = await repos.members.findByCalendarToken(target.calendarToken);
+    expect(found?.id).toBe(target.id);
+    expect(await repos.members.findByCalendarToken("nonexistent-token")).toBeNull();
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
@@ -51,6 +59,14 @@ describe("in-memory repositories", () => {
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
   });
 
+  it("lists bookings for a specific member", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const memberBookings = await repos.bookings.listByMember(target.id);
+    expect(memberBookings.every((b) => b.memberId === target.id)).toBe(true);
+    expect(memberBookings.length).toBeGreaterThan(0);
+  });
+
   it("inserts then reads back by id", async () => {
     const member = {
       id: "mem_new",
@@ -60,6 +76,7 @@ describe("in-memory repositories", () => {
       phone: null,
       status: "active",
       notificationsOptedOut: false,
+      calendarToken: "test-token-unique",
       createdAt: NOW.toISOString(),
     };
     await repos.members.insert(member);

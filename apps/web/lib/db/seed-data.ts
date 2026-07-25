@@ -86,6 +86,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    calendarToken: `cal-token-${String(index).padStart(2, "0")}`,
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }
