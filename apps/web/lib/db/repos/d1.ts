@@ -2,6 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { drizzle } from "drizzle-orm/d1";
+import type { InferInsertModel } from "drizzle-orm";
 import type {
   Booking,
   ClassSession,
@@ -88,7 +89,7 @@ export function createD1Repositories(
       insert: async (member) => {
         const result = await qb
           .insert(schema.members)
-          .values(member as any)
+          .values(member as InferInsertModel<typeof schema.members>)
           .returning();
         return result[0] as Member;
       },
@@ -128,7 +129,7 @@ export function createD1Repositories(
       insert: async (classType) => {
         const result = await qb
           .insert(schema.classTypes)
-          .values(classType as any)
+          .values(classType as InferInsertModel<typeof schema.classTypes>)
           .returning();
         return result[0] as ClassType;
       },
@@ -159,7 +160,7 @@ export function createD1Repositories(
       insert: async (session) => {
         const result = await qb
           .insert(schema.classSessions)
-          .values(session as any)
+          .values(session as InferInsertModel<typeof schema.classSessions>)
           .returning();
         return result[0] as ClassSession;
       },
@@ -187,7 +188,7 @@ export function createD1Repositories(
       insert: async (booking) => {
         const result = await qb
           .insert(schema.bookings)
-          .values(booking as any)
+          .values(booking as InferInsertModel<typeof schema.bookings>)
           .returning();
         return result[0] as Booking;
       },
@@ -228,7 +229,7 @@ export function createD1Repositories(
       insert: async (invoice) => {
         const result = await qb
           .insert(schema.invoices)
-          .values(invoice as any)
+          .values(invoice as InferInsertModel<typeof schema.invoices>)
           .returning();
         return result[0] as Invoice;
       },
@@ -257,7 +258,7 @@ export function createD1Repositories(
         if (items.length === 0) return [];
         const result = await qb
           .insert(schema.invoiceLineItems)
-          .values(items as any)
+          .values(items as InferInsertModel<typeof schema.invoiceLineItems>[])
           .returning();
         return result as InvoiceLineItem[];
       },
@@ -266,7 +267,7 @@ export function createD1Repositories(
       insert: async (row) => {
         const result = await qb
           .insert(schema.notificationOutbox)
-          .values(row as any)
+          .values(row as InferInsertModel<typeof schema.notificationOutbox>)
           .returning();
         return result[0] as NotificationOutboxRow;
       },
