@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { escapeCsvField, invoicesToCsv, membersToCsv, bookingsToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -70,5 +70,63 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("includes correct headers and columns", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T09:00:00Z",
+        className: "Yoga",
+        memberName: "Alice",
+        memberEmail: "alice@example.com",
+        status: "confirmed",
+      },
+    ]);
+    const [header] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("renders Starts as ISO-8601 UTC timestamp", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T09:00:00Z",
+        className: "Yoga",
+        memberName: "Alice",
+        memberEmail: "alice@example.com",
+        status: "confirmed",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain("2026-06-15T09:00:00.000Z");
+  });
+
+  it("quotes member names with commas as a single column", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T09:00:00Z",
+        className: "Pilates",
+        memberName: "Rossi, Chiara",
+        memberEmail: "chiara@example.com",
+        status: "confirmed",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Rossi, Chiara"');
+  });
+
+  it("doubles embedded quotes", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T09:00:00Z",
+        className: 'Class with "quotes"',
+        memberName: "Bob",
+        memberEmail: "bob@example.com",
+        status: "confirmed",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Class with ""quotes"""');
   });
 });

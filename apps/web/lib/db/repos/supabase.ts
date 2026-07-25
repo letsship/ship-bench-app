@@ -117,7 +117,7 @@ export function createSupabaseRepositories(): Repositories {
       listByStudio: (studioId, range = {}) => {
         let query = db.from("class_sessions").select("*").eq("studio_id", studioId);
         if (range.from) query = query.gte("starts_at", range.from);
-        if (range.to) query = query.lt("starts_at", range.to);
+        if (range.to) query = query.lte("starts_at", range.to);
         return rows<ClassSession>(query.order("starts_at"), "classSessions.listByStudio");
       },
       getById: (id) =>

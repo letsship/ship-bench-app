@@ -35,12 +35,12 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
-  it("filters sessions by an inclusive-from / exclusive-to range", async () => {
+  it("filters sessions by an inclusive-from / inclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
     const to = all[all.length - 2].startsAt;
     const windowed = await repos.classSessions.listByStudio(studioId, { from, to });
-    expect(windowed.every((s) => s.startsAt >= from && s.startsAt < to)).toBe(true);
+    expect(windowed.every((s) => s.startsAt >= from && s.startsAt <= to)).toBe(true);
     expect(windowed.length).toBeLessThan(all.length);
   });
 
