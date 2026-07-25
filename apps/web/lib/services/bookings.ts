@@ -17,6 +17,7 @@ import {
 } from "@/lib/notifications/messages";
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
+import type { AnalyticsTracker } from "@/lib/analytics/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
@@ -63,6 +64,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -94,11 +96,22 @@ export async function createBooking(
   });
 
   if (decision.status === "booked") {
+    tracker.capture({
+      distinctId: member.id,
+      event: "booking_created",
+      properties: { session_id: session.id },
+    });
     await enqueueAndDispatch(
       repos,
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+  } else if (decision.status === "waitlisted") {
+    tracker.capture({
+      distinctId: member.id,
+      event: "waitlist_joined",
+      properties: { session_id: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -111,6 +124,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -134,11 +148,17 @@ export async function cancelBooking(
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
+  const member = await loadMember(repos, booking.memberId);
+  tracker.capture({
+    distinctId: member.id,
+    event: "booking_cancelled",
+    properties: { session_id: session.id },
+  });
+
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
     : null;
 
-  const member = await loadMember(repos, booking.memberId);
   await enqueueAndDispatch(
     repos,
     provider,

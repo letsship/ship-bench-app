@@ -4,6 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { createFakeTracker } from "@/lib/analytics/fake-tracker";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -167,7 +168,11 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, provider, tracker, {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
     expect(result.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind)).toEqual(["booking_confirmation"]);
   });
@@ -182,7 +187,11 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, provider, tracker, {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
     expect(result.status).toBe("waitlisted");
     expect(provider.sent).toHaveLength(0);
   });
@@ -197,7 +206,10 @@ describe("bookings service", () => {
       }),
     );
     await expect(
-      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+      createBooking(repos, createFakeProvider(), createFakeTracker(), {
+        sessionId: "cs1",
+        memberId: "m1",
+      }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
   });
 
@@ -210,7 +222,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), createFakeTracker(), "b1");
     expect(result.refundEligible).toBe(true);
   });
 
@@ -223,7 +235,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), createFakeTracker(), "b1");
     expect(result.refundEligible).toBe(false);
   });
 
@@ -241,13 +253,88 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const tracker = createFakeTracker();
+    const result = await cancelBooking(repos, provider, tracker, "b1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+  });
+
+  it("captures booking_created and NOT waitlist_joined for a confirmed booking", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
+    );
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, createFakeProvider(), tracker, {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("booking_created");
+    expect(tracker.captured[0].distinctId).toBe("m1");
+    expect(tracker.captured[0].properties?.session_id).toBe("cs1");
+  });
+
+  it("captures waitlist_joined and NOT booking_created for a waitlisted booking", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, createFakeProvider(), tracker, {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(result.status).toBe("waitlisted");
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("waitlist_joined");
+    expect(tracker.captured[0].distinctId).toBe("m2");
+    expect(tracker.captured[0].properties?.session_id).toBe("cs1");
+  });
+
+  it("captures booking_cancelled when a booking is cancelled", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const tracker = createFakeTracker();
+    await cancelBooking(repos, createFakeProvider(), tracker, "b1");
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("booking_cancelled");
+    expect(tracker.captured[0].distinctId).toBe("m1");
+    expect(tracker.captured[0].properties?.session_id).toBe("cs1");
+  });
+
+  it("does not include PII in analytics events", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1", { email: "test@example.com", name: "Alice" })],
+      }),
+    );
+    const tracker = createFakeTracker();
+    await createBooking(repos, createFakeProvider(), tracker, { sessionId: "cs1", memberId: "m1" });
+    const event = tracker.captured[0];
+    const eventStr = JSON.stringify(event);
+    expect(eventStr).not.toContain("test@example.com");
+    expect(eventStr).not.toContain("Alice");
   });
 });
 
