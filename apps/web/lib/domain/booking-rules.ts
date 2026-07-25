@@ -13,10 +13,12 @@ export type BookingDenyReason =
   | "already_booked"
   | "session_full_no_waitlist";
 
-export type BookingDecision = { ok: true; status: "booked" | "waitlisted" } | {
-  ok: false;
-  reason: BookingDenyReason;
-};
+export type BookingDecision =
+  | { ok: true; status: "booked" | "waitlisted" }
+  | {
+      ok: false;
+      reason: BookingDenyReason;
+    };
 
 export interface BookingContext {
   sessionStatus: string;
@@ -29,9 +31,15 @@ export interface BookingContext {
   now: string;
 }
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// A confirmed seat, attendance, or waitlist entry blocks another booking attempt.
+// Cancelled and no_show entries do not block, allowing re-booking.
+export const ACTIVE_BOOKING_STATUSES = new Set(["booked", "waitlisted", "attended"]);
+
+export function isActiveBookingStatus(
+  status: string,
+): status is "booked" | "waitlisted" | "attended" {
+  return ACTIVE_BOOKING_STATUSES.has(status);
+}
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
@@ -41,7 +49,7 @@ export function canBook(context: BookingContext): BookingDecision {
     return { ok: false, reason: "session_started" };
   }
   if (context.memberStatus !== "active") return { ok: false, reason: "member_inactive" };
-  if (context.memberBookings.some((booking) => ACTIVE_MEMBER_BOOKING.has(booking.status))) {
+  if (context.memberBookings.some((booking) => ACTIVE_BOOKING_STATUSES.has(booking.status))) {
     return { ok: false, reason: "already_booked" };
   }
   if (context.occupancy.isFull) {
@@ -54,8 +62,7 @@ export function canBook(context: BookingContext): BookingDecision {
 export type CancellationDenyReason = "already_cancelled" | "session_passed";
 
 export type CancellationDecision =
-  | { ok: true; refundEligible: boolean }
-  | { ok: false; reason: CancellationDenyReason };
+  { ok: true; refundEligible: boolean } | { ok: false; reason: CancellationDenyReason };
 
 export interface CancellationContext {
   bookingStatus: string;

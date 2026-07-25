@@ -1,3 +1,5 @@
+import { ACTIVE_BOOKING_STATUSES } from "@/lib/domain/booking-rules";
+import { UniqueViolationError } from "../errors";
 import type {
   Booking,
   ClassSession,
@@ -81,7 +83,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -97,9 +104,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -157,6 +162,17 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        const existingActive = store.bookings.find(
+          (b) =>
+            b.sessionId === booking.sessionId &&
+            b.memberId === booking.memberId &&
+            ACTIVE_BOOKING_STATUSES.has(b.status),
+        );
+        if (existingActive) {
+          throw new UniqueViolationError(
+            `duplicate active booking for member ${booking.memberId} in session ${booking.sessionId}`,
+          );
+        }
         store.bookings.push(clone(booking));
         return clone(booking);
       },
