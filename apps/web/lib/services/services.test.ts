@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +294,23 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("returns all line items via getInvoiceDetail", async () => {
+    const provider = createFakeProvider();
+    const created = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [
+        { description: "Pass", quantity: 1, unitAmountCents: 1000 },
+        { description: "Class", quantity: 2, unitAmountCents: 500 },
+      ],
+    });
+
+    // Get detail and verify all line items are returned
+    const detail = await getInvoiceDetail(repos, created.invoice.id);
+    expect(detail.lineItems).toHaveLength(2);
+    expect(detail.lineItems[0].description).toBe("Pass");
+    expect(detail.lineItems[1].description).toBe("Class");
   });
 });
 
