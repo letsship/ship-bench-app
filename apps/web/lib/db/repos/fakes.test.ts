@@ -91,4 +91,74 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("inserts then reads a class pack by id", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+    const pack = {
+      id: "pack_new",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active" as const,
+      purchasedAt: NOW.toISOString(),
+    };
+    await repos.classPacks.insert(pack);
+    expect(await repos.classPacks.getById("pack_new")).toEqual(pack);
+  });
+
+  it("lists class packs by member, newest first", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+    const p1 = {
+      id: "pack_1",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active" as const,
+      purchasedAt: "2026-01-01T00:00:00Z",
+    };
+    const p2 = {
+      id: "pack_2",
+      studioId,
+      memberId,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10000,
+      status: "active" as const,
+      purchasedAt: "2026-01-05T00:00:00Z",
+    };
+    await repos.classPacks.insert(p1);
+    await repos.classPacks.insert(p2);
+    const listed = await repos.classPacks.listByMember(memberId);
+    expect(listed).toHaveLength(2);
+    expect(listed[0].id).toBe("pack_2");
+    expect(listed[1].id).toBe("pack_1");
+  });
+
+  it("updates a class pack patch", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const memberId = members[0].id;
+    const pack = {
+      id: "pack_upd",
+      studioId,
+      memberId,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active" as const,
+      purchasedAt: NOW.toISOString(),
+    };
+    await repos.classPacks.insert(pack);
+    const updated = await repos.classPacks.update("pack_upd", {
+      creditsRemaining: 2,
+      status: "active",
+    });
+    expect(updated.creditsRemaining).toBe(2);
+    expect(updated.creditsTotal).toBe(5);
+  });
 });
