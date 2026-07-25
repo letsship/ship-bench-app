@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,121 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("fetches bookings with bounded reads regardless of booking count", async () => {
+    // Create a counting proxy to track repository calls
+    const callCounts: Record<string, number> = {
+      "members.listByStudio": 0,
+      "members.getById": 0,
+      "classSessions.listByStudio": 0,
+      "classSessions.getById": 0,
+      "classTypes.listByStudio": 0,
+      "bookings.listBySessionIds": 0,
+    };
+
+    const countingRepos: Repositories = {
+      ...repos,
+      members: {
+        ...repos.members,
+        async listByStudio(studioId) {
+          callCounts["members.listByStudio"]++;
+          return repos.members.listByStudio(studioId);
+        },
+        async getById(id) {
+          callCounts["members.getById"]++;
+          return repos.members.getById(id);
+        },
+        async findByEmail(studioId, email) {
+          return repos.members.findByEmail(studioId, email);
+        },
+        async insert(member) {
+          return repos.members.insert(member);
+        },
+        async update(id, patch) {
+          return repos.members.update(id, patch);
+        },
+      },
+      classSessions: {
+        ...repos.classSessions,
+        async listByStudio(studioId, range) {
+          callCounts["classSessions.listByStudio"]++;
+          return repos.classSessions.listByStudio(studioId, range);
+        },
+        async getById(id) {
+          callCounts["classSessions.getById"]++;
+          return repos.classSessions.getById(id);
+        },
+        async insert(session) {
+          return repos.classSessions.insert(session);
+        },
+      },
+      classTypes: {
+        ...repos.classTypes,
+        async listByStudio(studioId) {
+          callCounts["classTypes.listByStudio"]++;
+          return repos.classTypes.listByStudio(studioId);
+        },
+        async getById(id) {
+          return repos.classTypes.getById(id);
+        },
+        async insert(classType) {
+          return repos.classTypes.insert(classType);
+        },
+      },
+      bookings: {
+        ...repos.bookings,
+        async listBySessionIds(sessionIds) {
+          callCounts["bookings.listBySessionIds"]++;
+          return repos.bookings.listBySessionIds(sessionIds);
+        },
+        async listBySession(sessionId) {
+          return repos.bookings.listBySession(sessionId);
+        },
+        async getById(id) {
+          return repos.bookings.getById(id);
+        },
+        async insert(booking) {
+          return repos.bookings.insert(booking);
+        },
+        async update(id, patch) {
+          return repos.bookings.update(id, patch);
+        },
+      },
+      studios: repos.studios,
+      settings: repos.settings,
+      invoices: repos.invoices,
+      invoiceLineItems: repos.invoiceLineItems,
+      outbox: repos.outbox,
+    };
+
+    // Get the baseline with current bookings
+    Object.keys(callCounts).forEach((key) => {
+      callCounts[key] = 0;
+    });
+    const rowsSmall = await listBookingRows(countingRepos, studioId);
+    const countsSmall = { ...callCounts };
+
+    // Verify that getById was not called (should use listByStudio + map lookups)
+    expect(callCounts["members.getById"]).toBe(0);
+    expect(callCounts["classSessions.getById"]).toBe(0);
+
+    // Verify the output has the expected structure
+    expect(Array.isArray(rowsSmall)).toBe(true);
+    if (rowsSmall.length > 0) {
+      expect(rowsSmall[0]).toHaveProperty("id");
+      expect(rowsSmall[0]).toHaveProperty("memberName");
+      expect(rowsSmall[0]).toHaveProperty("className");
+      expect(rowsSmall[0]).toHaveProperty("classColor");
+      expect(rowsSmall[0]).toHaveProperty("instructor");
+      expect(rowsSmall[0]).toHaveProperty("startsAt");
+      expect(rowsSmall[0]).toHaveProperty("status");
+    }
+
+    // Verify reads are bounded (should be same regardless of booking count)
+    expect(countsSmall["members.listByStudio"]).toBe(1);
+    expect(countsSmall["classSessions.listByStudio"]).toBe(1);
+    expect(countsSmall["classTypes.listByStudio"]).toBe(1);
+    expect(countsSmall["bookings.listBySessionIds"]).toBe(1);
   });
 });
