@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,54 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("does not scale member/class-session reads with booking count", async () => {
+    const members = Array.from({ length: 20 }, (_, i) => member(`m${i}`));
+    const classTypes = [classType("ct1"), classType("ct2")];
+    const sessions = Array.from({ length: 10 }, (_, i) =>
+      session(`cs${i}`, { classTypeId: i % 2 === 0 ? "ct1" : "ct2" }),
+    );
+
+    const fewBookingsSeed = baseSeed({
+      members,
+      classTypes,
+      sessions,
+      bookings: [booking("b1", "m0"), booking("b2", "m1")],
+    });
+
+    const manyBookingsSeed = baseSeed({
+      members,
+      classTypes,
+      sessions,
+      bookings: Array.from({ length: 50 }, (_, i) => booking(`b${i}`, `m${i % 20}`)),
+    });
+
+    const fewRepos = createInMemoryRepositories(fewBookingsSeed);
+    const spyFewMembers = vi.spyOn(fewRepos.members, "listByStudio");
+    const spyFewSessions = vi.spyOn(fewRepos.classSessions, "listByStudio");
+
+    await listBookingRows(fewRepos, "s1");
+    const fewMemberCalls = spyFewMembers.mock.calls.length;
+    const fewSessionCalls = spyFewSessions.mock.calls.length;
+
+    spyFewMembers.mockRestore();
+    spyFewSessions.mockRestore();
+
+    const manyRepos = createInMemoryRepositories(manyBookingsSeed);
+    const spyManyMembers = vi.spyOn(manyRepos.members, "listByStudio");
+    const spyManySessions = vi.spyOn(manyRepos.classSessions, "listByStudio");
+
+    await listBookingRows(manyRepos, "s1");
+    const manyMemberCalls = spyManyMembers.mock.calls.length;
+    const manySessionCalls = spyManySessions.mock.calls.length;
+
+    spyManyMembers.mockRestore();
+    spyManySessions.mockRestore();
+
+    expect(fewMemberCalls).toBe(manyMemberCalls);
+    expect(fewSessionCalls).toBe(manySessionCalls);
+    expect(fewMemberCalls).toBe(1);
+    expect(fewSessionCalls).toBe(1);
   });
 });
