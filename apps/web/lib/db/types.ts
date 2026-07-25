@@ -21,6 +21,7 @@ export interface StudioSettings {
   notifyCancellations: boolean;
   notifyWaitlistPromotions: boolean;
   notifyInvoices: boolean;
+  notifyReminders: boolean;
 }
 
 export interface Member {
@@ -104,4 +105,5 @@ export interface NotificationOutboxRow {
   sentAt: string | null;
   providerMessageId: string | null;
   error: string | null;
+  dedupeKey: string | null;
 }

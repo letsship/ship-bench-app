@@ -75,6 +75,7 @@ export interface InvoiceLineItemsRepo {
 
 export interface NotificationOutboxRepo {
   insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
+  insertIfAbsent(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
   listPending(): Promise<NotificationOutboxRow[]>;
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }

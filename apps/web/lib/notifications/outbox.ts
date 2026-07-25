@@ -8,6 +8,7 @@ const SETTING_FOR_KIND = {
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
+  booking_reminder: "notifyReminders",
 } as const satisfies Record<NotificationKind, string>;
 
 export interface OptOutContext {
@@ -16,6 +17,7 @@ export interface OptOutContext {
   notifyCancellations: boolean;
   notifyWaitlistPromotions: boolean;
   notifyInvoices: boolean;
+  notifyReminders: boolean;
 }
 
 // A member opt-out wins over everything; otherwise the studio-level setting for
@@ -30,9 +32,10 @@ export function shouldSend(kind: NotificationKind, context: OptOutContext): bool
 export async function enqueueNotification(
   repos: Repositories,
   message: NotificationMessage,
+  dedupeKey?: string,
 ): Promise<string> {
   const id = newId();
-  await repos.outbox.insert({
+  const row = {
     id,
     memberId: message.recipient.memberId,
     kind: message.kind,
@@ -43,10 +46,16 @@ export async function enqueueNotification(
       data: message.data,
     }),
     createdAt: new Date().toISOString(),
-    sentAt: null,
-    providerMessageId: null,
-    error: null,
-  });
+    sentAt: null as string | null,
+    providerMessageId: null as string | null,
+    error: null as string | null,
+    dedupeKey: dedupeKey ?? null,
+  };
+  if (dedupeKey) {
+    await repos.outbox.insertIfAbsent(row);
+  } else {
+    await repos.outbox.insert(row);
+  }
   return id;
 }
 

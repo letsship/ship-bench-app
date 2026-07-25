@@ -72,6 +72,7 @@ function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
       notifyCancellations: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
+      notifyReminders: true,
     },
   };
 }
@@ -302,6 +303,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
       sentAt: new Date(now.getTime() - DAY_MS).toISOString(),
       providerMessageId: "re_seededdelivery0001",
       error: null,
+      dedupeKey: null,
     },
     {
       id: newId(),
@@ -316,6 +318,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
       sentAt: null,
       providerMessageId: null,
       error: null,
+      dedupeKey: null,
     },
   ];
 }

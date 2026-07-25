@@ -194,6 +194,21 @@ export function createSupabaseRepositories(): Repositories {
     },
     outbox: {
       insert: (row) => insertReturning("notification_outbox", row),
+      insertIfAbsent: async (row) => {
+        if (row.dedupeKey) {
+          const { data, error } = await db
+            .from("notification_outbox")
+            .upsert(toSnakeRow(row as unknown as Record<string, unknown>), {
+              onConflict: "dedupe_key",
+              ignoreDuplicates: true,
+            })
+            .select()
+            .single();
+          if (error) fail("outbox.insertIfAbsent", error);
+          return toCamelRow<NotificationOutboxRow>(data as Record<string, unknown>);
+        }
+        return insertReturning("notification_outbox", row);
+      },
       listPending: () =>
         rows<NotificationOutboxRow>(
           db.from("notification_outbox").select("*").is("sent_at", null),

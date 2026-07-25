@@ -204,6 +204,14 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         store.outbox.push(clone(row));
         return clone(row);
       },
+      async insertIfAbsent(row) {
+        if (row.dedupeKey) {
+          const existing = store.outbox.find((r) => r.dedupeKey === row.dedupeKey);
+          if (existing) return clone(existing);
+        }
+        store.outbox.push(clone(row));
+        return clone(row);
+      },
       async listPending() {
         return cloneAll(store.outbox.filter((row) => row.sentAt === null));
       },
