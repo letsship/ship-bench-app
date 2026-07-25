@@ -203,9 +203,9 @@ export function createSupabaseRepositories(): Repositories {
               ignoreDuplicates: true,
             })
             .select()
-            .single();
+            .maybeSingle();
           if (error) fail("outbox.insertIfAbsent", error);
-          return toCamelRow<NotificationOutboxRow>(data as Record<string, unknown>);
+          return data ? toCamelRow<NotificationOutboxRow>(data as Record<string, unknown>) : row;
         }
         return insertReturning("notification_outbox", row);
       },

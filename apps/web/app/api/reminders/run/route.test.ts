@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { runReminders } from "@/lib/services/reminders";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { POST } from "./route";
+import { __setTestRepositories } from "@/lib/db/repos";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
+import { createSessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 
-const NOW = new Date("2026-03-15T12:00:00.000Z");
+const NOW = new Date();
 const ISO = NOW.toISOString();
 const IN_12_HOURS = new Date(NOW.getTime() + 12 * 60 * 60 * 1000).toISOString();
 const IN_12_HOURS_END = new Date(NOW.getTime() + 13 * 60 * 60 * 1000).toISOString();
@@ -86,8 +88,23 @@ const booking = (
   ...over,
 });
 
-describe("reminders API route integration", () => {
-  it("runReminders returns a valid summary", async () => {
+let mockSessionToken: string;
+
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({
+    get: (name: string) => {
+      if (name === SESSION_COOKIE) {
+        return { value: mockSessionToken };
+      }
+      return undefined;
+    },
+  })),
+}));
+
+describe("POST /api/reminders/run", () => {
+  beforeEach(async () => {
+    mockSessionToken = await createSessionToken("test@example.com");
+
     const m1 = member("m1");
     const ct1 = classType("ct1");
     const sess1 = session("s1", IN_12_HOURS);
@@ -101,11 +118,21 @@ describe("reminders API route integration", () => {
         bookings: [book1],
       }),
     );
+    __setTestRepositories(repos);
+  });
 
-    const result = await runReminders(repos, NOW);
-    expect(result).toHaveProperty("sessionsProcessed");
-    expect(result).toHaveProperty("notificationsQueued");
-    expect(result.sessionsProcessed).toBe(1);
-    expect(result.notificationsQueued).toBe(1);
+  afterEach(() => {
+    __setTestRepositories(null);
+  });
+
+  it("POST /api/reminders/run returns 200 with a valid summary", async () => {
+    const res = await POST();
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sessionsProcessed: number; notificationsQueued: number };
+    expect(body).toHaveProperty("sessionsProcessed");
+    expect(body).toHaveProperty("notificationsQueued");
+    expect(body.sessionsProcessed).toBe(1);
+    expect(body.notificationsQueued).toBe(1);
   });
 });

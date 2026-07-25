@@ -23,6 +23,7 @@ export async function runReminders(repos: Repositories, now: Date): Promise<RunR
 
   const sessions = await repos.classSessions.listByStudio(studioContext.id, range);
   const pending = await repos.outbox.listPending();
+  const settings = await repos.settings.getByStudioId(studioContext.id);
   let notificationsQueued = 0;
 
   for (const session of sessions) {
@@ -34,7 +35,6 @@ export async function runReminders(repos: Repositories, now: Date): Promise<RunR
       if (!member) continue;
       if (member.notificationsOptedOut) continue;
 
-      const settings = await repos.settings.getByStudioId(studioContext.id);
       if (settings && !settings.notifyReminders) continue;
 
       const dedupeKey = `booking_reminder:${session.id}:${member.id}`;
