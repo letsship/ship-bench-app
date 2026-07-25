@@ -45,7 +45,7 @@ const cloneAll = <T>(rows: T[]): T[] => rows.map(clone);
 
 function inRange(startsAt: string, range: SessionRange): boolean {
   if (range.from && startsAt < range.from) return false;
-  if (range.to && startsAt >= range.to) return false;
+  if (range.to && startsAt > range.to) return false;
   return true;
 }
 
