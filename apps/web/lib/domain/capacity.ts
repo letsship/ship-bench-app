@@ -23,10 +23,7 @@ export function isSeatTaking(status: string): boolean {
   return (SEAT_TAKING_STATUSES as readonly string[]).includes(status);
 }
 
-export function computeOccupancy(
-  capacity: number,
-  bookings: readonly OccupancyInput[],
-): Occupancy {
+export function computeOccupancy(capacity: number, bookings: readonly OccupancyInput[]): Occupancy {
   const booked = bookings.filter((booking) => isSeatTaking(booking.status)).length;
   const waitlisted = bookings.filter((booking) => booking.status === "waitlisted").length;
   const available = Math.max(capacity - booked, 0);
