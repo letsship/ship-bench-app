@@ -101,6 +101,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          exec > >(tee -a /tmp/deploy-err.log) 2>&1
+          echo "::group::reseed schema"
           POOL=12
           PR="${{ inputs.pr_number }}"
           # Deterministic schema per PR from the pre-exposed pool (bench_1..bench_POOL).
@@ -115,13 +117,18 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_SITE_URL: https://${{ inputs.worker_name }}.${{ inputs.account_subdomain }}.workers.dev
-        run: pnpm --filter @studiobook/web build:cf
+        run: |
+          exec > >(tee -a /tmp/deploy-err.log) 2>&1
+          echo "::group::build:cf"
+          pnpm --filter @studiobook/web build:cf
 
       - name: Deploy preview worker
         if: inputs.action == 'deploy'
         id: deploy
         working-directory: apps/web
         run: |
+          exec > >(tee -a /tmp/deploy-err.log) 2>&1
+          echo "::group::wrangler deploy"
           CONFIG="$(basename "${{ inputs.config_file }}")"
           pnpm exec wrangler deploy -c "$CONFIG" --name "${{ inputs.worker_name }}"
           echo "url=https://${{ inputs.worker_name }}.${{ inputs.account_subdomain }}.workers.dev" >> "$GITHUB_OUTPUT"
@@ -163,3 +170,36 @@ jobs:
             -f environment_url="$PREVIEW_URL" \
             -f log_url="$RUN_URL" \
             -f description="Preview deployed"
+
+      # A FAILED preview deploy otherwise signals nothing, so SHIP's deploy stage
+      # waits out its full timeout and escalates the mission on a bare timeout with
+      # no cause. Signal state=error with the captured failure tail so SHIP fast-
+      # fails WITH the actual reason: it surfaces in the deploy retry-reason + the
+      # coding agent's feedback, and is readable via inspect-pipeline. The key error
+      # line goes in `description` (SHIP reads that as the error; GitHub caps it at
+      # ~140 chars), the run link in `log_url`.
+      - name: Signal deployment FAILURE to SHIP
+        if: failure() && inputs.action == 'deploy'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENV_NAME: ${{ inputs.env_name }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          WORKER_NAME: ${{ inputs.worker_name }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          ERRLINE="$(grep -iE 'error|fatal|not found|cannot|failed|refus|✘|exception' /tmp/deploy-err.log 2>/dev/null | grep -viE '^\s*(warn|note)' | tail -1 | tr -s ' ' | head -c 135)"
+          [ -z "$ERRLINE" ] && ERRLINE="$(tail -1 /tmp/deploy-err.log 2>/dev/null | head -c 135)"
+          [ -z "$ERRLINE" ] && ERRLINE="preview deploy failed (no captured output)"
+          SHA="$(git rev-parse HEAD)"
+          DEP_ID="$(jq -n \
+            --arg ref "$SHA" \
+            --arg env "$ENV_NAME" \
+            --arg pr "$PR_NUMBER" \
+            --arg wn "$WORKER_NAME" \
+            '{ref:$ref, environment:$env, auto_merge:false, required_contexts:[], description:"Studiobook preview environment", payload:{pr_number:$pr, workerName:$wn}}' \
+            | gh api "repos/$REPO/deployments" --input - --jq .id)"
+          gh api "repos/$REPO/deployments/$DEP_ID/statuses" \
+            -f state=error \
+            -f log_url="$RUN_URL" \
+            -f description="deploy failed: $ERRLINE"
