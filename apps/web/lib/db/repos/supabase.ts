@@ -196,16 +196,16 @@ export function createSupabaseRepositories(): Repositories {
       insert: (row) => insertReturning("notification_outbox", row),
       insertIfAbsent: async (row) => {
         if (row.dedupeKey) {
-          const { data, error } = await db
+          // Check if a row with this dedupe_key already exists
+          const { data: existing, error: selectError } = await db
             .from("notification_outbox")
-            .upsert(toSnakeRow(row as unknown as Record<string, unknown>), {
-              onConflict: "dedupe_key",
-              ignoreDuplicates: true,
-            })
-            .select()
+            .select("*")
+            .eq("dedupe_key", row.dedupeKey)
             .maybeSingle();
-          if (error) fail("outbox.insertIfAbsent", error);
-          return data ? toCamelRow<NotificationOutboxRow>(data as Record<string, unknown>) : row;
+          if (selectError) fail("outbox.insertIfAbsent (select)", selectError);
+          if (existing) {
+            return toCamelRow<NotificationOutboxRow>(existing as Record<string, unknown>);
+          }
         }
         return insertReturning("notification_outbox", row);
       },
