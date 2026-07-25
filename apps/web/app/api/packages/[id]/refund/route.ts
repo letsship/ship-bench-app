@@ -12,8 +12,8 @@ export async function POST(
 ): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { repos } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const { id } = await params;
-    return ok(await refundPackage(repos, id));
+    return ok(await refundPackage(repos, ctx.studio.id, id));
   });
 }

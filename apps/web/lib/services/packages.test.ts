@@ -136,25 +136,28 @@ describe("packages service", () => {
 
   describe("listPackages", () => {
     it("returns empty list when member has no packs", async () => {
-      const result = await listPackages(repos, "m1");
+      await repos.members.insert(member("m1"));
+      const result = await listPackages(repos, "s1", "m1");
       expect(result).toEqual([]);
     });
 
     it("returns packs newest-first", async () => {
+      await repos.members.insert(member("m1"));
       const oldPack = pack("p1", "m1", { purchasedAt: "2026-07-25T00:00:00Z" });
       const newPack = pack("p2", "m1", { purchasedAt: "2026-07-26T00:00:00Z" });
       await repos.classPacks.insert(oldPack);
       await repos.classPacks.insert(newPack);
 
-      const result = await listPackages(repos, "m1");
+      const result = await listPackages(repos, "s1", "m1");
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe("p2");
       expect(result[1].id).toBe("p1");
     });
 
     it("returns correct DTO shape without studio fields", async () => {
+      await repos.members.insert(member("m1"));
       await repos.classPacks.insert(pack("p1", "m1"));
-      const [result] = await listPackages(repos, "m1");
+      const [result] = await listPackages(repos, "s1", "m1");
       expect(Object.keys(result).sort()).toEqual([
         "creditsRemaining",
         "creditsTotal",
@@ -170,7 +173,7 @@ describe("packages service", () => {
   describe("refundPackage", () => {
     it("sets creditsRemaining to 0 and status to refunded", async () => {
       await repos.classPacks.insert(pack("p1", "m1", { creditsRemaining: 3 }));
-      const result = await refundPackage(repos, "p1");
+      const result = await refundPackage(repos, "s1", "p1");
       expect(result).toMatchObject({
         creditsRemaining: 0,
         status: "refunded",
@@ -178,7 +181,7 @@ describe("packages service", () => {
     });
 
     it("404s for unknown pack", async () => {
-      await expect(refundPackage(repos, "nope")).rejects.toMatchObject({
+      await expect(refundPackage(repos, "s1", "nope")).rejects.toMatchObject({
         status: 404,
         code: "not_found",
       });
@@ -299,7 +302,7 @@ describe("packages service", () => {
         sessionId: "cs1",
       });
 
-      await refundPackage(repos, p.id);
+      await refundPackage(repos, "s1", p.id);
 
       await repos.classSessions.insert(session("cs2"));
       await expect(

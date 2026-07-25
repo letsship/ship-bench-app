@@ -1,7 +1,12 @@
 import { newId } from "@/lib/db/ids";
 import type { ClassPack } from "@/lib/db/types";
 import type { Repositories } from "@/lib/db/repos/types";
-import { drawFromPack, packPriceCents, pickDrawablePack } from "@/lib/domain/packages";
+import {
+  drawFromPack,
+  memberOwnsAnyPack,
+  packPriceCents,
+  pickDrawablePack,
+} from "@/lib/domain/packages";
 import { HttpError } from "@/lib/http";
 import type { CreatePackageInput } from "@/lib/validation";
 
@@ -56,14 +61,31 @@ export async function createPackage(
   return toPackageDto(created);
 }
 
-export async function listPackages(repos: Repositories, memberId: string): Promise<PackageDto[]> {
+export async function listPackages(
+  repos: Repositories,
+  studioId: string,
+  memberId: string,
+): Promise<PackageDto[]> {
+  const member = await repos.members.getById(memberId);
+  if (!member) throw new HttpError(404, "not_found", "Member not found");
+  if (member.studioId !== studioId) {
+    throw new HttpError(403, "forbidden", "Member does not belong to this studio");
+  }
+
   const packs = await repos.classPacks.listByMember(memberId);
   return packs.map(toPackageDto);
 }
 
-export async function refundPackage(repos: Repositories, id: string): Promise<PackageDto> {
+export async function refundPackage(
+  repos: Repositories,
+  studioId: string,
+  id: string,
+): Promise<PackageDto> {
   const pack = await repos.classPacks.getById(id);
   if (!pack) throw new HttpError(404, "not_found", "Package not found");
+  if (pack.studioId !== studioId) {
+    throw new HttpError(403, "forbidden", "Package does not belong to this studio");
+  }
 
   const updated = await repos.classPacks.update(id, {
     creditsRemaining: 0,
@@ -75,7 +97,7 @@ export async function refundPackage(repos: Repositories, id: string): Promise<Pa
 export async function drawCreditForBooking(repos: Repositories, memberId: string): Promise<void> {
   const packs = await repos.classPacks.listByMember(memberId);
 
-  if (packs.length === 0) return;
+  if (!memberOwnsAnyPack(packs)) return;
 
   const drawablePack = pickDrawablePack(packs);
   if (!drawablePack) {
