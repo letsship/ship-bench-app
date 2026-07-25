@@ -8,6 +8,7 @@ import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
+import { getMemberStatement } from "./account-statements";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
@@ -160,7 +161,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +204,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +295,67 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("computes totals via computeInvoiceTotals for AC #3 regression: stored totals match domain function", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [
+        { description: "Billable", quantity: 1, unitAmountCents: 10000 },
+        { description: "Refunded", quantity: 1, unitAmountCents: 5000 },
+      ],
+    });
+    // With the current buildSeed taxRateBps (900 = 9%), and both items in input,
+    // createInvoice computes via computeInvoiceTotals, so all subtotal is taxed.
+    // (At invoice create time, the refunded item is inserted with refunded: false,
+    // so it contributes to the subtotal at creation. This test verifies that
+    // behaviour is preserved.)
+    expect(detail.invoice.subtotalCents).toBe(15000); // 100 + 50
+    expect(detail.invoice.taxCents).toBe(1350); // 9% of 15000
+    expect(detail.invoice.totalCents).toBe(16350); // 15000 + 1350
+  });
+});
+
+describe("account-statements service", () => {
+  let repos: Repositories;
+  let studioId: string;
+  let memberId: string;
+
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(buildSeed(NOW));
+    studioId = (await repos.studios.getFirst())?.id ?? "";
+    memberId = (await repos.members.listByStudio(studioId))[0].id;
+  });
+
+  it("totals exclude refunded lines from taxable subtotal for AC #2", async () => {
+    // Create a new invoice with €100 billable at 9% tax.
+    // Then insert a €50 refunded line item to simulate a partial refund.
+    // The statement should compute tax only on the non-refunded €100 = €109 total.
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Billable", quantity: 1, unitAmountCents: 10000 }],
+    });
+    const invoiceId = detail.invoice.id;
+
+    // Insert a refunded line item (simulating a later refund adjustment).
+    await repos.invoiceLineItems.insertMany([
+      {
+        id: "li-refund",
+        invoiceId,
+        description: "Refunded portion",
+        quantity: 1,
+        unitAmountCents: 5000, // €50
+        amountCents: 5000,
+        refunded: true,
+      },
+    ]);
+
+    const statement = await getMemberStatement(repos, studioId, memberId);
+    const invoiceLine = statement.lines.find((l) => l.invoiceId === invoiceId);
+    // Statement should recompute: €100 billable + €50 refunded, tax on €100 only = €109
+    expect(invoiceLine?.totalCents).toBe(10900);
   });
 });
 

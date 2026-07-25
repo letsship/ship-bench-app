@@ -44,6 +44,23 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("taxes only non-refunded subtotal for €100 billable + €50 refunded @ 9%", () => {
+    // Example from AC: €100 billable, €50 refunded, 9% tax.
+    // Should tax only €100: tax = 100 * 0.09 = €9 = 900 cents
+    // Total = 100 + 9 = €109 = 10900 cents (NOT 16350 cents which would tax all €150)
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 10000 }, // €100
+        { quantity: 1, unitAmountCents: 5000, refunded: true }, // €50 refunded
+      ],
+      900, // 9% = 900 basis points
+    );
+    expect(totals.subtotalCents).toBe(10000); // Only billable €100
+    expect(totals.refundedCents).toBe(5000); // €50 refunded
+    expect(totals.taxCents).toBe(900); // 9% of €100 = €9
+    expect(totals.totalCents).toBe(10900); // €100 + €9 = €109
+  });
 });
 
 describe("formatInvoiceNumber", () => {
