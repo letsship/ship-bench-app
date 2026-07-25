@@ -15,6 +15,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
     notifyCancellations: formData.get("notifyCancellations") === "on",
     notifyWaitlistPromotions: formData.get("notifyWaitlistPromotions") === "on",
     notifyInvoices: formData.get("notifyInvoices") === "on",
+    notifyBookingReminders: formData.get("notifyBookingReminders") === "on",
   });
   revalidatePath("/settings");
 }

@@ -24,7 +24,8 @@ create table public.studio_settings (
   notify_booking_confirmations boolean not null default true,
   notify_cancellations         boolean not null default true,
   notify_waitlist_promotions   boolean not null default true,
-  notify_invoices              boolean not null default true
+  notify_invoices              boolean not null default true,
+  notify_booking_reminders     boolean not null default true
 );
 
 -- =============================================================

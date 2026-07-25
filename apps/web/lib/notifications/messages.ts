@@ -73,3 +73,17 @@ export function invoiceIssued(
     data: { number: invoice.number, totalCents: invoice.totalCents },
   };
 }
+
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title}`,
+    body: `Hi ${recipient.name}, just a friendly reminder that you're booked in for ${session.title} with ${session.instructor} on ${session.startsAt}. See you on the mat!`,
+    data: { title: session.title, startsAt: session.startsAt, bookingId },
+  };
+}
