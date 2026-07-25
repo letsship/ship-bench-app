@@ -19,6 +19,7 @@ import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
+import { drawCreditForBooking } from "./packages";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -92,6 +93,8 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  await drawCreditForBooking(repos, member.id);
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
