@@ -252,4 +252,21 @@ describe("POST /api/webhooks/stripe (against injected fake repositories)", () =>
     if (!unchanged) throw new Error("Invoice not found");
     expect(unchanged.status).toBe("open");
   });
+
+  it("returns 200 and changes nothing for an event without metadata", async () => {
+    const body = JSON.stringify({
+      id: "evt_balance_1",
+      type: "balance.available",
+      data: { object: { id: "balance_1" } },
+    });
+
+    const signature = await signStripeBody(body, testSecret, Date.now());
+    const req = new NextRequest("http://localhost/api/webhooks/stripe", {
+      method: "POST",
+      body,
+      headers: { "stripe-signature": signature },
+    });
+    const res = await stripeWebhookPost(req);
+    expect(res.status).toBe(200);
+  });
 });

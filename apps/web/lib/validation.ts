@@ -78,11 +78,13 @@ export const stripeWebhookEventSchema = z.object({
     .object({
       object: z
         .object({
-          metadata: z.object({ invoice_id: z.string() }).partial().passthrough(),
+          metadata: z.object({ invoice_id: z.string() }).partial().passthrough().optional(),
         })
-        .passthrough(),
+        .passthrough()
+        .optional(),
     })
-    .passthrough(),
+    .passthrough()
+    .optional(),
 });
 
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;

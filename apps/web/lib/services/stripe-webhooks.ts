@@ -13,7 +13,7 @@ export async function processStripeEvent(
     return { handled: false };
   }
 
-  const invoiceId = event.data.object.metadata?.invoice_id;
+  const invoiceId = event.data?.object?.metadata?.invoice_id;
   if (!invoiceId) {
     return { handled: false };
   }
