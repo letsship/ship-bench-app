@@ -217,10 +217,15 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     },
     packs: {
       async listByMember(memberId) {
+        // store.packs is append-only, so its index doubles as insertion
+        // order — used to break ties when two packs share a purchasedAt
+        // millisecond (e.g. bought back-to-back in the same request/test).
         return cloneAll(
           store.packs
-            .filter((row) => row.memberId === memberId)
-            .sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)),
+            .map((row, index) => ({ row, index }))
+            .filter(({ row }) => row.memberId === memberId)
+            .sort((a, b) => b.row.purchasedAt.localeCompare(a.row.purchasedAt) || b.index - a.index)
+            .map(({ row }) => row),
         );
       },
       async getById(id) {
