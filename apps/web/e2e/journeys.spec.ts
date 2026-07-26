@@ -17,7 +17,9 @@ test.describe("operator journeys (fake backends)", () => {
     const form = page.getByRole("form", { name: "New booking" });
     await expect(form).toBeVisible();
 
-    const member = ((await form.getByLabel("Member").locator("option:checked").textContent()) ?? "").trim();
+    const member = (
+      (await form.getByLabel("Member").locator("option:checked").textContent()) ?? ""
+    ).trim();
     await form.getByRole("button", { name: "Book" }).click();
 
     // Order-independent + retry-safe: whether the click books, waitlists, or the
@@ -41,6 +43,35 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("opens the fully-refunded invoice and renders zero totals without erroring", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await page.goto("/invoices");
+    const table = page.getByTestId("invoices-table");
+    await expect(table).toBeVisible();
+
+    // Femke Jansen's "Pottery intensive" invoice has every line item refunded,
+    // leaving zero billable lines — the case that used to throw on render.
+    const row = table.getByRole("row", { name: /Femke Jansen/ });
+    await row.getByRole("link").click();
+
+    await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    const lineRow = page.getByRole("row", { name: /Pottery intensive/ });
+    await expect(lineRow).toBeVisible();
+    await expect(lineRow.getByText("refunded")).toBeVisible();
+
+    await expect(page.getByText("Subtotal")).toContainText("€0.00");
+    await expect(page.getByText(/^Tax \(/)).toContainText("€0.00");
+    await expect(page.getByText(/^Total €/)).toContainText("€0.00");
+
+    expect(errors).toEqual([]);
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
@@ -51,7 +82,9 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByTestId("revenue-table")).toBeVisible();
   });
 
-  test("every authenticated page loads, holds the session, and logs zero console errors", async ({ page }) => {
+  test("every authenticated page loads, holds the session, and logs zero console errors", async ({
+    page,
+  }) => {
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
