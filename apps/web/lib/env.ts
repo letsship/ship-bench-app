@@ -10,6 +10,9 @@ const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+  // Optional Sentry DSN. Unset in tests, dev, and any environment that hasn't
+  // opted into error reporting — the Sentry SDK no-ops without it.
+  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 });
 
 const serverSchema = clientSchema.extend({
@@ -20,6 +23,7 @@ const serverSchema = clientSchema.extend({
   // deployment when a single database hosts several isolated copies of the app
   // (e.g. one schema per preview environment).
   SUPABASE_SCHEMA: z.string().min(1).default("public"),
+  SENTRY_DSN: z.string().url().optional(),
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;
@@ -32,6 +36,7 @@ const getClientVars = () => ({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
 });
 
 const getServerVars = () => ({
@@ -40,6 +45,7 @@ const getServerVars = () => ({
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   STUDIOBOOK_FROM_EMAIL: process.env.STUDIOBOOK_FROM_EMAIL,
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
+  SENTRY_DSN: process.env.SENTRY_DSN,
 });
 
 export const clientEnv = (): ClientEnv => {
