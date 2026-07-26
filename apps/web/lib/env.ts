@@ -51,3 +51,9 @@ export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
 };
+
+// Read directly from `process.env`, NOT via `serverEnv()`: the Stripe webhook
+// route must not force full (Supabase) server env parsing, so fake-backends
+// mode and tests keep working without Supabase secrets configured. A missing
+// secret means the route treats every request as unverified (400), not a crash.
+export const stripeWebhookSecret = (): string | undefined => process.env.STRIPE_WEBHOOK_SECRET;
