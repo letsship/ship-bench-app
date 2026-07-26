@@ -138,6 +138,16 @@ describe("listBookingsForExport", () => {
     ]);
   });
 
+  it("includes exact-boundary matches even when the stored timestamp and the query bound use different ISO offset notations", async () => {
+    // D1 stores startsAt in offset form ("+00:00"); callers may pass "Z".
+    // A naive string compare never treats these as equal at the boundary.
+    const rows = await listBookingsForExport(repos, STUDIO_ID, {
+      from: "2026-06-01T00:00:00Z",
+      to: "2026-06-01T00:00:00+00:00",
+    });
+    expect(rows.map((r) => r.startsAt)).toEqual(["2026-06-01T00:00:00.000Z"]);
+  });
+
   it("carries the joined member email alongside the name", async () => {
     const rows = await listBookingsForExport(repos, STUDIO_ID, {
       from: "2026-06-15T09:00:00.000Z",
