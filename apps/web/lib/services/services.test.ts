@@ -4,6 +4,8 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
+import { getMemberStatement } from "./account-statements";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -160,7 +162,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +205,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +296,71 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("account statements service", () => {
+  it("excludes a refunded line from the taxable subtotal, matching the invoice total", async () => {
+    const lineItems = [
+      { quantity: 1, unitAmountCents: 10_000, refunded: false },
+      { quantity: 1, unitAmountCents: 5_000, refunded: true },
+    ];
+    const canonical = computeInvoiceTotals(lineItems, 900);
+    expect(canonical.totalCents).toBe(10_900);
+
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [
+          {
+            id: "inv1",
+            studioId: "s1",
+            memberId: "m1",
+            number: "INV-2026-0001",
+            status: "open",
+            currency: "EUR",
+            taxRateBps: 900,
+            subtotalCents: canonical.subtotalCents,
+            taxCents: canonical.taxCents,
+            totalCents: canonical.totalCents,
+            issuedAt: ISO,
+            dueAt: null,
+            paidAt: null,
+            createdAt: ISO,
+          },
+        ],
+        lineItems: [
+          {
+            id: "li1",
+            invoiceId: "inv1",
+            description: "Billable",
+            quantity: 1,
+            unitAmountCents: 10_000,
+            amountCents: 10_000,
+            refunded: false,
+            bookingId: null,
+          },
+          {
+            id: "li2",
+            invoiceId: "inv1",
+            description: "Refunded",
+            quantity: 1,
+            unitAmountCents: 5_000,
+            amountCents: 5_000,
+            refunded: true,
+            bookingId: null,
+          },
+        ],
+      }),
+    );
+
+    const statement = await getMemberStatement(repos, "s1", "m1");
+    expect(statement.lines).toHaveLength(1);
+    expect(statement.lines[0].totalCents).toBe(10_900);
+    expect(statement.lines[0].totalCents).toBe(canonical.totalCents);
+
+    const invoice = await repos.invoices.getById("inv1");
+    expect(statement.lines[0].totalCents).toBe(invoice?.totalCents);
   });
 });
 
