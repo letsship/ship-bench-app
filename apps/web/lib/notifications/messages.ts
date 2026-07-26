@@ -53,6 +53,20 @@ export function waitlistPromotion(
   };
 }
 
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} is tomorrow`,
+    body: `Hi ${recipient.name}, this is a reminder that you're booked into ${session.title} with ${session.instructor} on ${session.startsAt}. See you there!`,
+    data: { title: session.title, startsAt: session.startsAt, bookingId },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;
