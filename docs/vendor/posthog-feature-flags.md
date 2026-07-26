@@ -11,11 +11,11 @@ Web
 PostHog AI
 
 ```javascript
-const result = posthog.getFeatureFlagResult('flag-key')
+const result = posthog.getFeatureFlagResult("flag-key");
 if (result?.enabled) {
-    // Do something differently for this user
-    // Optional: fetch the payload from the same evaluation result
-    const matchedFlagPayload = result?.payload
+  // Do something differently for this user
+  // Optional: fetch the payload from the same evaluation result
+  const matchedFlagPayload = result?.payload;
 }
 ```
 
@@ -26,11 +26,12 @@ Web
 PostHog AI
 
 ```javascript
-const result = posthog.getFeatureFlagResult('flag-key')
-if (result?.variant == 'variant-key') { // replace 'variant-key' with the key of your variant
-    // Do something differently for this user
-    // Optional: fetch the payload from the same evaluation result
-    const matchedFlagPayload = result?.payload
+const result = posthog.getFeatureFlagResult("flag-key");
+if (result?.variant == "variant-key") {
+  // replace 'variant-key' with the key of your variant
+  // Do something differently for this user
+  // Optional: fetch the payload from the same evaluation result
+  const matchedFlagPayload = result?.payload;
 }
 ```
 
@@ -44,7 +45,7 @@ PostHog AI
 
 ```javascript
 for (const flag of posthog.getAllFeatureFlags()) {
-    console.log(flag.key, flag.enabled, flag.variant, flag.payload)
+  console.log(flag.key, flag.enabled, flag.variant, flag.payload);
 }
 ```
 
@@ -62,22 +63,22 @@ PostHog AI
 
 ```javascript
 posthog.onFeatureFlags(function (flags, flagVariants, { errorsLoading }) {
-    // feature flags are guaranteed to be available at this point
-    if (posthog.isFeatureEnabled('flag-key')) {
-        // do something
-    }
-})
+  // feature flags are guaranteed to be available at this point
+  if (posthog.isFeatureEnabled("flag-key")) {
+    // do something
+  }
+});
 ```
 
 #### Callback parameters
 
 The `onFeatureFlags` callback receives the following parameters:
 
--   `flags: string[]`: An object containing the feature flags that apply to the user.
+- `flags: string[]`: An object containing the feature flags that apply to the user.
 
--   `flagVariants: Record<string, string | boolean>`: An object containing the variants that apply to the user.
+- `flagVariants: Record<string, string | boolean>`: An object containing the variants that apply to the user.
 
--   `{ errorsLoading }: { errorsLoading?: boolean }`: An object containing a boolean indicating if an error occurred during the request to load the feature flags. This is `true` if the request timed out or if there was an error. It will be `false` or `undefined` if the request was successful.
+- `{ errorsLoading }: { errorsLoading?: boolean }`: An object containing a boolean indicating if an error occurred during the request to load the feature flags. This is `true` if the request timed out or if there was an error. It will be `false` or `undefined` if the request was successful.
 
 You won't usually need to use these, but they are useful if you want to be extra careful about feature flags not being loaded yet because of a network error and/or a network timeout (see `feature_flag_request_timeout_ms`).
 
@@ -90,11 +91,11 @@ Web
 PostHog AI
 
 ```javascript
-posthog.init('<ph_project_token>', {
-  api_host: 'https://us.i.posthog.com',
-  defaults: '2026-05-30',
-  flag_keys: ['checkout-flow', 'new-dashboard'],
-})
+posthog.init("<ph_project_token>", {
+  api_host: "https://us.i.posthog.com",
+  defaults: "2026-05-30",
+  flag_keys: ["checkout-flow", "new-dashboard"],
+});
 ```
 
 PostHog scopes evaluation and the response to those keys for this SDK instance. Dependency flags required to evaluate requested flags may also be evaluated and returned. Leave `flag_keys` unset to evaluate all eligible flags.
@@ -108,7 +109,7 @@ Web
 PostHog AI
 
 ```javascript
-posthog.reloadFeatureFlags()
+posthog.reloadFeatureFlags();
 ```
 
 ### Overriding server properties
@@ -120,7 +121,7 @@ Web
 PostHog AI
 
 ```javascript
-posthog.setPersonPropertiesForFlags({'property1': 'value', property2: 'value2'})
+posthog.setPersonPropertiesForFlags({ property1: "value", property2: "value2" });
 ```
 
 > **Note:** These are set for the entire session. Successive calls are additive: all properties you set are combined together and sent for flag evaluation.
@@ -132,7 +133,7 @@ Web
 PostHog AI
 
 ```javascript
-posthog.setPersonPropertiesForFlags({'property1': 'value', property2: 'value2'}, false)
+posthog.setPersonPropertiesForFlags({ property1: "value", property2: "value2" }, false);
 ```
 
 At any point, you can reset these properties by calling `resetPersonPropertiesForFlags`:
@@ -142,7 +143,7 @@ Web
 PostHog AI
 
 ```javascript
-posthog.resetPersonPropertiesForFlags()
+posthog.resetPersonPropertiesForFlags();
 ```
 
 The same holds for [group](/manual/group-analytics.md) properties:
@@ -153,11 +154,11 @@ PostHog AI
 
 ```javascript
 // set properties for a group
-posthog.setGroupPropertiesForFlags({'company': {'property1': 'value', property2: 'value2'}})
+posthog.setGroupPropertiesForFlags({ company: { property1: "value", property2: "value2" } });
 // reset properties for a given group:
-posthog.resetGroupPropertiesForFlags('company')
+posthog.resetGroupPropertiesForFlags("company");
 // reset properties for all groups:
-posthog.resetGroupPropertiesForFlags()
+posthog.resetGroupPropertiesForFlags();
 ```
 
 > **Note:** You don't need to add the group names here, since these properties are automatically attached to the current group (set via `posthog.group()`). When you change the group, these properties are reset.
@@ -191,11 +192,11 @@ JavaScript
 PostHog AI
 
 ```javascript
-posthog.init('<ph_project_token>', {
-  api_host: 'https://us.i.posthog.com',
-  defaults: '2026-05-30',
-  feature_flag_request_timeout_ms: 3000 // Time in milliseconds. Default is 3000 (3 seconds).
-})
+posthog.init("<ph_project_token>", {
+  api_host: "https://us.i.posthog.com",
+  defaults: "2026-05-30",
+  feature_flag_request_timeout_ms: 3000, // Time in milliseconds. Default is 3000 (3 seconds).
+});
 ```
 
 ### Feature flag error handling
@@ -210,7 +211,9 @@ PostHog AI
 function handleFeatureFlag(client, flagKey, distinctId) {
   try {
     const isEnabled = client.isFeatureEnabled(flagKey, distinctId);
-    console.log(`Feature flag '${flagKey}' for user '${distinctId}' is ${isEnabled ? 'enabled' : 'disabled'}`);
+    console.log(
+      `Feature flag '${flagKey}' for user '${distinctId}' is ${isEnabled ? "enabled" : "disabled"}`,
+    );
     return isEnabled;
   } catch (error) {
     console.error(`Error fetching feature flag '${flagKey}': ${error.message}`);
@@ -221,7 +224,7 @@ function handleFeatureFlag(client, flagKey, distinctId) {
 }
 // Usage example
 try {
-  const flagEnabled = handleFeatureFlag(client, 'new-feature', 'user-123');
+  const flagEnabled = handleFeatureFlag(client, "new-feature", "user-123");
   if (flagEnabled) {
     // Implement new feature logic
   } else {
@@ -229,7 +232,7 @@ try {
   }
 } catch (error) {
   // Handle the error at a higher level
-  console.error('Feature flag check failed, using default behavior');
+  console.error("Feature flag check failed, using default behavior");
   // Implement fallback logic
 }
 ```
@@ -245,12 +248,12 @@ There are two ways to implement feature flags in React:
 
 PostHog provides several hooks to make it easy to use feature flags in your React app.
 
-| Hook | Description |
-| --- | --- |
-| useFeatureFlagEnabled | Returns whether the feature flag is enabled. This sends a $feature_flag_called event. Without a default value, it returns boolean \\\| undefined while flags are loading or absent. Pass an optional default value to return that value instead and narrow the return type to boolean. |
-| useFeatureFlagVariantKey | Returns the variant key of the feature flag. This sends a $feature_flag_called event. |
-| useActiveFeatureFlags | Returns an array of active feature flags. This does not send a $feature_flag_called event. |
-| useFeatureFlagPayload | Returns the payload of the feature flag. This does not send a $feature_flag_called event. Always use this with useFeatureFlagEnabled or useFeatureFlagVariantKey. |
+| Hook                     | Description                                                                                                                                                                                                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| useFeatureFlagEnabled    | Returns whether the feature flag is enabled. This sends a $feature_flag_called event. Without a default value, it returns boolean \\\| undefined while flags are loading or absent. Pass an optional default value to return that value instead and narrow the return type to boolean. |
+| useFeatureFlagVariantKey | Returns the variant key of the feature flag. This sends a $feature_flag_called event.                                                                                                                                                                                                  |
+| useActiveFeatureFlags    | Returns an array of active feature flags. This does not send a $feature_flag_called event.                                                                                                                                                                                             |
+| useFeatureFlagPayload    | Returns the payload of the feature flag. This does not send a $feature_flag_called event. Always use this with useFeatureFlagEnabled or useFeatureFlagVariantKey.                                                                                                                      |
 
 #### Example 1: Using a boolean feature flag
 
@@ -259,25 +262,23 @@ React
 PostHog AI
 
 ```jsx
-import { useFeatureFlagEnabled, useFeatureFlagPayload } from '@posthog/react'
+import { useFeatureFlagEnabled, useFeatureFlagPayload } from "@posthog/react";
 function App() {
-  const showWelcomeMessage = useFeatureFlagEnabled('flag-key')
-  const payload = useFeatureFlagPayload('flag-key')
+  const showWelcomeMessage = useFeatureFlagEnabled("flag-key");
+  const payload = useFeatureFlagPayload("flag-key");
   return (
     <div className="App">
-      {
-        showWelcomeMessage ? (
-          <div>
-            <h1>Welcome!</h1>
-            <p>Thanks for trying out our feature flags.</p>
-          </div>
-        ) : (
-          <div>
-            <h2>No welcome message</h2>
-            <p>Because the feature flag evaluated to false.</p>
-          </div>
-        )
-      }
+      {showWelcomeMessage ? (
+        <div>
+          <h1>Welcome!</h1>
+          <p>Thanks for trying out our feature flags.</p>
+        </div>
+      ) : (
+        <div>
+          <h2>No welcome message</h2>
+          <p>Because the feature flag evaluated to false.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -291,7 +292,7 @@ React
 PostHog AI
 
 ```jsx
-const showWelcomeMessage = useFeatureFlagEnabled('flag-key', false)
+const showWelcomeMessage = useFeatureFlagEnabled("flag-key", false);
 ```
 
 #### Example 2: Using a multivariate feature flag
@@ -301,30 +302,28 @@ React
 PostHog AI
 
 ```jsx
-import { useFeatureFlagVariantKey } from '@posthog/react'
+import { useFeatureFlagVariantKey } from "@posthog/react";
 function App() {
-  const variantKey = useFeatureFlagVariantKey('show-welcome-message')
-  let welcomeMessage = ''
-  if (variantKey === 'variant-a') {
-    welcomeMessage = 'Welcome to the Alpha!'
-  } else if (variantKey === 'variant-b') {
-    welcomeMessage = 'Welcome to the Beta!'
+  const variantKey = useFeatureFlagVariantKey("show-welcome-message");
+  let welcomeMessage = "";
+  if (variantKey === "variant-a") {
+    welcomeMessage = "Welcome to the Alpha!";
+  } else if (variantKey === "variant-b") {
+    welcomeMessage = "Welcome to the Beta!";
   }
   return (
     <div className="App">
-      {
-        welcomeMessage ? (
-          <div>
-            <h1>{welcomeMessage}</h1>
-            <p>Thanks for trying out our feature flags.</p>
-          </div>
-        ) : (
-          <div>
-            <h2>No welcome message</h2>
-            <p>Because the feature flag evaluated to false.</p>
-          </div>
-        )
-      }
+      {welcomeMessage ? (
+        <div>
+          <h1>{welcomeMessage}</h1>
+          <p>Thanks for trying out our feature flags.</p>
+        </div>
+      ) : (
+        <div>
+          <h2>No welcome message</h2>
+          <p>Because the feature flag evaluated to false.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -335,32 +334,32 @@ export default App;
 
 **Payload hook**
 
-The `useFeatureFlagPayload` hook does *not* send a [`$feature_flag_called`](https://posthog.com/docs/experiments/new-experimentation-engine#experiment-exposure) event, which is required for the experiment to be tracked. To ensure the exposure event is sent, you should **always** use the `useFeatureFlagPayload` hook with either the `useFeatureFlagEnabled` or `useFeatureFlagVariantKey` hook.
+The `useFeatureFlagPayload` hook does _not_ send a [`$feature_flag_called`](https://posthog.com/docs/experiments/new-experimentation-engine#experiment-exposure) event, which is required for the experiment to be tracked. To ensure the exposure event is sent, you should **always** use the `useFeatureFlagPayload` hook with either the `useFeatureFlagEnabled` or `useFeatureFlagVariantKey` hook.
 
 React
 
 PostHog AI
 
 ```jsx
-import { useFeatureFlagEnabled, useFeatureFlagPayload } from '@posthog/react'
+import { useFeatureFlagEnabled, useFeatureFlagPayload } from "@posthog/react";
 function App() {
-  const variant = useFeatureFlagEnabled('show-welcome-message')
-  const payload = useFeatureFlagPayload('show-welcome-message')
-    return (
-                <>
-                {
-                    variant ? (
-                        <div className="welcome-message">
-                            <h2>{payload?.welcomeTitle}</h2>
-                            <p>{payload?.welcomeMessage}</p>
-                        </div>
-                    ) : <div>
-                        <h2>No custom welcome message</h2>
-                        <p>Because the feature flag evaluated to false.</p>
-                    </div>
-                }
-        </>
-    )
+  const variant = useFeatureFlagEnabled("show-welcome-message");
+  const payload = useFeatureFlagPayload("show-welcome-message");
+  return (
+    <>
+      {variant ? (
+        <div className="welcome-message">
+          <h2>{payload?.welcomeTitle}</h2>
+          <p>{payload?.welcomeMessage}</p>
+        </div>
+      ) : (
+        <div>
+          <h2>No custom welcome message</h2>
+          <p>Because the feature flag evaluated to false.</p>
+        </div>
+      )}
+    </>
+  );
 }
 ```
 
@@ -379,22 +378,22 @@ React
 PostHog AI
 
 ```jsx
-import { PostHogFeature } from '@posthog/react'
+import { PostHogFeature } from "@posthog/react";
 function App() {
-    return (
-        <PostHogFeature flag='show-welcome-message' match={true}>
-            <div>
-                <h1>Hello</h1>
-                <p>Thanks for trying out our feature flags.</p>
-            </div>
-        </PostHogFeature>
-    )
+  return (
+    <PostHogFeature flag="show-welcome-message" match={true}>
+      <div>
+        <h1>Hello</h1>
+        <p>Thanks for trying out our feature flags.</p>
+      </div>
+    </PostHogFeature>
+  );
 }
 ```
 
--   The `match` on the component can be either `true`, or the variant key, to match on a specific variant.
+- The `match` on the component can be either `true`, or the variant key, to match on a specific variant.
 
--   If you also want to show a default message, you can pass these in the `fallback` attribute.
+- If you also want to show a default message, you can pass these in the `fallback` attribute.
 
 If you wish to customise logic around when the component is considered visible, you can pass in `visibilityObserverOptions` to the feature. These take the same options as the [IntersectionObserver API](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API). By default, we use a threshold of 0.1.
 
@@ -407,20 +406,20 @@ React
 PostHog AI
 
 ```jsx
-import { PostHogFeature } from '@posthog/react'
+import { PostHogFeature } from "@posthog/react";
 function App() {
-    return (
-        <PostHogFeature flag='show-welcome-message' match={true}>
-           {(payload) => {
-                return (
-                    <div>
-                        <h1>{payload.welcomeMessage}</h1>
-                        <p>Thanks for trying out our feature flags.</p>
-                    </div>
-                )
-           }}
-        </PostHogFeature>
-    )
+  return (
+    <PostHogFeature flag="show-welcome-message" match={true}>
+      {(payload) => {
+        return (
+          <div>
+            <h1>{payload.welcomeMessage}</h1>
+            <p>Thanks for trying out our feature flags.</p>
+          </div>
+        );
+      }}
+    </PostHogFeature>
+  );
 }
 ```
 
@@ -433,12 +432,11 @@ JavaScript
 PostHog AI
 
 ```javascript
-posthog.init('<ph_project_token>', {
-  api_host: 'https://us.i.posthog.com',
-  defaults: '2026-05-30',
-  feature_flag_request_timeout_ms: 3000 // Time in milliseconds. Default is 3000 (3 seconds).
-}
-)
+posthog.init("<ph_project_token>", {
+  api_host: "https://us.i.posthog.com",
+  defaults: "2026-05-30",
+  feature_flag_request_timeout_ms: 3000, // Time in milliseconds. Default is 3000 (3 seconds).
+});
 ```
 
 ### Error handling
@@ -451,29 +449,31 @@ PostHog AI
 
 ```javascript
 function handleFeatureFlag(client, flagKey, distinctId) {
-    try {
-        const isEnabled = client.isFeatureEnabled(flagKey, distinctId);
-        console.log(`Feature flag '${flagKey}' for user '${distinctId}' is ${isEnabled ? 'enabled' : 'disabled'}`);
-        return isEnabled;
-    } catch (error) {
-        console.error(`Error fetching feature flag '${flagKey}': ${error.message}`);
-        // Optionally, you can return a default value or throw the error
-        // return false; // Default to disabled
-        throw error;
-    }
+  try {
+    const isEnabled = client.isFeatureEnabled(flagKey, distinctId);
+    console.log(
+      `Feature flag '${flagKey}' for user '${distinctId}' is ${isEnabled ? "enabled" : "disabled"}`,
+    );
+    return isEnabled;
+  } catch (error) {
+    console.error(`Error fetching feature flag '${flagKey}': ${error.message}`);
+    // Optionally, you can return a default value or throw the error
+    // return false; // Default to disabled
+    throw error;
+  }
 }
 // Usage example
 try {
-    const flagEnabled = handleFeatureFlag(client, 'new-feature', 'user-123');
-    if (flagEnabled) {
-        // Implement new feature logic
-    } else {
-        // Implement old feature logic
-    }
+  const flagEnabled = handleFeatureFlag(client, "new-feature", "user-123");
+  if (flagEnabled) {
+    // Implement new feature logic
+  } else {
+    // Implement old feature logic
+  }
 } catch (error) {
-    // Handle the error at a higher level
-    console.error('Feature flag check failed, using default behavior');
-    // Implement fallback logic
+  // Handle the error at a higher level
+  console.error("Feature flag check failed, using default behavior");
+  // Implement fallback logic
 }
 ```
 
@@ -492,11 +492,11 @@ Node.js
 PostHog AI
 
 ```javascript
-const flags = await client.evaluateFlags('distinct_id_of_your_user')
-if (flags.isEnabled('flag-key')) {
-    // Do something differently for this user
-    // Optional: fetch the payload
-    const matchedFlagPayload = flags.getFlagPayload('flag-key')
+const flags = await client.evaluateFlags("distinct_id_of_your_user");
+if (flags.isEnabled("flag-key")) {
+  // Do something differently for this user
+  // Optional: fetch the payload
+  const matchedFlagPayload = flags.getFlagPayload("flag-key");
 }
 ```
 
@@ -507,12 +507,13 @@ Node.js
 PostHog AI
 
 ```javascript
-const flags = await client.evaluateFlags('distinct_id_of_your_user')
-const enabledVariant = flags.getFlag('flag-key')
-if (enabledVariant === 'variant-key') { // replace 'variant-key' with the key of your variant
-    // Do something differently for this user
-    // Optional: fetch the payload
-    const matchedFlagPayload = flags.getFlagPayload('flag-key')
+const flags = await client.evaluateFlags("distinct_id_of_your_user");
+const enabledVariant = flags.getFlag("flag-key");
+if (enabledVariant === "variant-key") {
+  // replace 'variant-key' with the key of your variant
+  // Do something differently for this user
+  // Optional: fetch the payload
+  const matchedFlagPayload = flags.getFlagPayload("flag-key");
 }
 ```
 
@@ -537,15 +538,15 @@ Node.js
 PostHog AI
 
 ```javascript
-const flags = await client.evaluateFlags('distinct_id_of_your_user')
-if (flags.isEnabled('flag-key')) {
-    // Do something differently for this user
+const flags = await client.evaluateFlags("distinct_id_of_your_user");
+if (flags.isEnabled("flag-key")) {
+  // Do something differently for this user
 }
 client.capture({
-    distinctId: 'distinct_id_of_your_user',
-    event: 'event_name',
-    flags,
-})
+  distinctId: "distinct_id_of_your_user",
+  event: "event_name",
+  flags,
+});
 ```
 
 By default, this attaches every flag in the snapshot using `$feature/<flag-key>` properties and `$active_feature_flags`.
@@ -559,16 +560,16 @@ PostHog AI
 ```javascript
 // Attach only flags accessed with isEnabled() or getFlag() before this call
 client.capture({
-    distinctId: 'distinct_id_of_your_user',
-    event: 'event_name',
-    flags: flags.onlyAccessed(),
-})
+  distinctId: "distinct_id_of_your_user",
+  event: "event_name",
+  flags: flags.onlyAccessed(),
+});
 // Attach only specific flags
 client.capture({
-    distinctId: 'distinct_id_of_your_user',
-    event: 'event_name',
-    flags: flags.only(['checkout-flow', 'new-dashboard']),
-})
+  distinctId: "distinct_id_of_your_user",
+  event: "event_name",
+  flags: flags.only(["checkout-flow", "new-dashboard"]),
+});
 ```
 
 `onlyAccessed()` is order-dependent. If you call it before accessing any flags with `isEnabled()` or `getFlag()`, no feature flag properties are attached.
@@ -583,13 +584,13 @@ PostHog AI
 
 ```javascript
 client.capture({
-    distinctId: 'distinct_id_of_your_user',
-    event: 'event_name',
-    properties: {
-        // Replace feature-flag-key with your flag key and 'variant-key' with the key of your variant
-        '$feature/feature-flag-key': 'variant-key',
-    },
-})
+  distinctId: "distinct_id_of_your_user",
+  event: "event_name",
+  properties: {
+    // Replace feature-flag-key with your flag key and 'variant-key' with the key of your variant
+    "$feature/feature-flag-key": "variant-key",
+  },
+});
 ```
 
 ### Evaluating only specific flags
@@ -601,9 +602,9 @@ Node.js
 PostHog AI
 
 ```javascript
-const flags = await client.evaluateFlags('distinct_id_of_your_user', {
-    flagKeys: ['checkout-flow', 'new-dashboard'],
-})
+const flags = await client.evaluateFlags("distinct_id_of_your_user", {
+  flagKeys: ["checkout-flow", "new-dashboard"],
+});
 ```
 
 ### Sending `$feature_flag_called` events
@@ -627,25 +628,25 @@ Node.js
 PostHog AI
 
 ```javascript
-const flags = await client.evaluateFlags('distinct_id_of_the_user', {
-    personProperties: {
-        property_name: 'value',
+const flags = await client.evaluateFlags("distinct_id_of_the_user", {
+  personProperties: {
+    property_name: "value",
+  },
+  groups: {
+    your_group_type: "your_group_id",
+    another_group_type: "your_group_id",
+  },
+  groupProperties: {
+    your_group_type: {
+      group_property_name: "value",
     },
-    groups: {
-        your_group_type: 'your_group_id',
-        another_group_type: 'your_group_id',
+    another_group_type: {
+      group_property_name: "value",
     },
-    groupProperties: {
-        your_group_type: {
-            group_property_name: 'value',
-        },
-        another_group_type: {
-            group_property_name: 'value',
-        },
-    },
-})
-if (flags.isEnabled('flag-key')) {
-    // Do something differently for this user
+  },
+});
+if (flags.isEnabled("flag-key")) {
+  // Do something differently for this user
 }
 ```
 
@@ -657,22 +658,22 @@ You can override GeoIP properties by including them in the `person_properties` p
 
 The following GeoIP properties can be overridden:
 
--   `$geoip_country_code`
--   `$geoip_country_name`
--   `$geoip_city_name`
--   `$geoip_city_confidence`
--   `$geoip_continent_code`
--   `$geoip_continent_name`
--   `$geoip_latitude`
--   `$geoip_longitude`
--   `$geoip_postal_code`
--   `$geoip_subdivision_1_code`
--   `$geoip_subdivision_1_name`
--   `$geoip_subdivision_2_code`
--   `$geoip_subdivision_2_name`
--   `$geoip_subdivision_3_code`
--   `$geoip_subdivision_3_name`
--   `$geoip_time_zone`
+- `$geoip_country_code`
+- `$geoip_country_name`
+- `$geoip_city_name`
+- `$geoip_city_confidence`
+- `$geoip_continent_code`
+- `$geoip_continent_name`
+- `$geoip_latitude`
+- `$geoip_longitude`
+- `$geoip_postal_code`
+- `$geoip_subdivision_1_code`
+- `$geoip_subdivision_1_name`
+- `$geoip_subdivision_2_code`
+- `$geoip_subdivision_2_name`
+- `$geoip_subdivision_3_code`
+- `$geoip_subdivision_3_name`
+- `$geoip_time_zone`
 
 Simply include any of these properties in the `person_properties` parameter alongside your other person properties when calling feature flags.
 
@@ -685,10 +686,10 @@ JavaScript
 PostHog AI
 
 ```javascript
-const client = new PostHog('<ph_project_token>', {
-    host: 'https://us.i.posthog.com',
-    featureFlagsRequestTimeoutMs: 3000, // Time in milliseconds. Defaults to 3000 (3 seconds).
-})
+const client = new PostHog("<ph_project_token>", {
+  host: "https://us.i.posthog.com",
+  featureFlagsRequestTimeoutMs: 3000, // Time in milliseconds. Defaults to 3000 (3 seconds).
+});
 ```
 
 ## Python
@@ -864,22 +865,22 @@ You can override GeoIP properties by including them in the `person_properties` p
 
 The following GeoIP properties can be overridden:
 
--   `$geoip_country_code`
--   `$geoip_country_name`
--   `$geoip_city_name`
--   `$geoip_city_confidence`
--   `$geoip_continent_code`
--   `$geoip_continent_name`
--   `$geoip_latitude`
--   `$geoip_longitude`
--   `$geoip_postal_code`
--   `$geoip_subdivision_1_code`
--   `$geoip_subdivision_1_name`
--   `$geoip_subdivision_2_code`
--   `$geoip_subdivision_2_name`
--   `$geoip_subdivision_3_code`
--   `$geoip_subdivision_3_name`
--   `$geoip_time_zone`
+- `$geoip_country_code`
+- `$geoip_country_name`
+- `$geoip_city_name`
+- `$geoip_city_confidence`
+- `$geoip_continent_code`
+- `$geoip_continent_name`
+- `$geoip_latitude`
+- `$geoip_longitude`
+- `$geoip_postal_code`
+- `$geoip_subdivision_1_code`
+- `$geoip_subdivision_1_name`
+- `$geoip_subdivision_2_code`
+- `$geoip_subdivision_2_name`
+- `$geoip_subdivision_3_code`
+- `$geoip_subdivision_3_name`
+- `$geoip_time_zone`
 
 Simply include any of these properties in the `person_properties` parameter alongside your other person properties when calling feature flags.
 
@@ -1097,22 +1098,22 @@ You can override GeoIP properties by including them in the `person_properties` p
 
 The following GeoIP properties can be overridden:
 
--   `$geoip_country_code`
--   `$geoip_country_name`
--   `$geoip_city_name`
--   `$geoip_city_confidence`
--   `$geoip_continent_code`
--   `$geoip_continent_name`
--   `$geoip_latitude`
--   `$geoip_longitude`
--   `$geoip_postal_code`
--   `$geoip_subdivision_1_code`
--   `$geoip_subdivision_1_name`
--   `$geoip_subdivision_2_code`
--   `$geoip_subdivision_2_name`
--   `$geoip_subdivision_3_code`
--   `$geoip_subdivision_3_name`
--   `$geoip_time_zone`
+- `$geoip_country_code`
+- `$geoip_country_name`
+- `$geoip_city_name`
+- `$geoip_city_confidence`
+- `$geoip_continent_code`
+- `$geoip_continent_name`
+- `$geoip_latitude`
+- `$geoip_longitude`
+- `$geoip_postal_code`
+- `$geoip_subdivision_1_code`
+- `$geoip_subdivision_1_name`
+- `$geoip_subdivision_2_code`
+- `$geoip_subdivision_2_name`
+- `$geoip_subdivision_3_code`
+- `$geoip_subdivision_3_name`
+- `$geoip_time_zone`
 
 Simply include any of these properties in the `person_properties` parameter alongside your other person properties when calling feature flags.
 
@@ -1345,22 +1346,22 @@ You can override GeoIP properties by including them in the `person_properties` p
 
 The following GeoIP properties can be overridden:
 
--   `$geoip_country_code`
--   `$geoip_country_name`
--   `$geoip_city_name`
--   `$geoip_city_confidence`
--   `$geoip_continent_code`
--   `$geoip_continent_name`
--   `$geoip_latitude`
--   `$geoip_longitude`
--   `$geoip_postal_code`
--   `$geoip_subdivision_1_code`
--   `$geoip_subdivision_1_name`
--   `$geoip_subdivision_2_code`
--   `$geoip_subdivision_2_name`
--   `$geoip_subdivision_3_code`
--   `$geoip_subdivision_3_name`
--   `$geoip_time_zone`
+- `$geoip_country_code`
+- `$geoip_country_name`
+- `$geoip_city_name`
+- `$geoip_city_confidence`
+- `$geoip_continent_code`
+- `$geoip_continent_name`
+- `$geoip_latitude`
+- `$geoip_longitude`
+- `$geoip_postal_code`
+- `$geoip_subdivision_1_code`
+- `$geoip_subdivision_1_name`
+- `$geoip_subdivision_2_code`
+- `$geoip_subdivision_2_name`
+- `$geoip_subdivision_3_code`
+- `$geoip_subdivision_3_name`
+- `$geoip_time_zone`
 
 Simply include any of these properties in the `person_properties` parameter alongside your other person properties when calling feature flags.
 
@@ -1573,22 +1574,22 @@ You can override GeoIP properties by including them in the `person_properties` p
 
 The following GeoIP properties can be overridden:
 
--   `$geoip_country_code`
--   `$geoip_country_name`
--   `$geoip_city_name`
--   `$geoip_city_confidence`
--   `$geoip_continent_code`
--   `$geoip_continent_name`
--   `$geoip_latitude`
--   `$geoip_longitude`
--   `$geoip_postal_code`
--   `$geoip_subdivision_1_code`
--   `$geoip_subdivision_1_name`
--   `$geoip_subdivision_2_code`
--   `$geoip_subdivision_2_name`
--   `$geoip_subdivision_3_code`
--   `$geoip_subdivision_3_name`
--   `$geoip_time_zone`
+- `$geoip_country_code`
+- `$geoip_country_name`
+- `$geoip_city_name`
+- `$geoip_city_confidence`
+- `$geoip_continent_code`
+- `$geoip_continent_name`
+- `$geoip_latitude`
+- `$geoip_longitude`
+- `$geoip_postal_code`
+- `$geoip_subdivision_1_code`
+- `$geoip_subdivision_1_name`
+- `$geoip_subdivision_2_code`
+- `$geoip_subdivision_2_name`
+- `$geoip_subdivision_3_code`
+- `$geoip_subdivision_3_name`
+- `$geoip_time_zone`
 
 Simply include any of these properties in the `person_properties` parameter alongside your other person properties when calling feature flags.
 
@@ -1628,16 +1629,16 @@ React Native
 PostHog AI
 
 ```jsx
-import { useFeatureFlag } from 'posthog-react-native'
+import { useFeatureFlag } from "posthog-react-native";
 const MyComponent = () => {
-    const booleanFlag = useFeatureFlag('key-for-your-boolean-flag')
-    if (booleanFlag === undefined) {
-        // the response is undefined if the flags are being loaded
-        return null
-    }
-    // Optional use the 'useFeatureFlagWithPayload' hook for fetching the feature flag payload
-    return booleanFlag ? <Text>Testing feature 😄</Text> : <Text>Not Testing feature 😢</Text>
-}
+  const booleanFlag = useFeatureFlag("key-for-your-boolean-flag");
+  if (booleanFlag === undefined) {
+    // the response is undefined if the flags are being loaded
+    return null;
+  }
+  // Optional use the 'useFeatureFlagWithPayload' hook for fetching the feature flag payload
+  return booleanFlag ? <Text>Testing feature 😄</Text> : <Text>Not Testing feature 😢</Text>;
+};
 ```
 
 #### Example 2: Multivariate feature flags
@@ -1647,18 +1648,19 @@ React Native
 PostHog AI
 
 ```jsx
-import { useFeatureFlag } from 'posthog-react-native'
+import { useFeatureFlag } from "posthog-react-native";
 const MyComponent = () => {
-    const multiVariantFeature = useFeatureFlag('key-for-your-multivariate-flag')
-    if (multiVariantFeature === undefined) {
-        // the response is undefined if the flags are being loaded
-        return null
-    } else if (multiVariantFeature === 'variant-name') { // replace 'variant-name' with the name of your variant
-      // Do something
-    }
-    // Optional use the 'useFeatureFlagWithPayload' hook for fetching the feature flag payload
-    return <div/>
-}
+  const multiVariantFeature = useFeatureFlag("key-for-your-multivariate-flag");
+  if (multiVariantFeature === undefined) {
+    // the response is undefined if the flags are being loaded
+    return null;
+  } else if (multiVariantFeature === "variant-name") {
+    // replace 'variant-name' with the name of your variant
+    // Do something
+  }
+  // Optional use the 'useFeatureFlagWithPayload' hook for fetching the feature flag payload
+  return <div />;
+};
 ```
 
 ### Method 2: Loading the flag directly
@@ -1669,13 +1671,13 @@ PostHog AI
 
 ```jsx
 // Defaults to undefined if not loaded yet or if there was a problem loading
-posthog.isFeatureEnabled('key-for-your-boolean-flag')
+posthog.isFeatureEnabled("key-for-your-boolean-flag");
 // Defaults to undefined if not loaded yet or if there was a problem loading
-posthog.getFeatureFlag('key-for-your-boolean-flag')
+posthog.getFeatureFlag("key-for-your-boolean-flag");
 // Multivariant feature flags are returned as a string
-posthog.getFeatureFlag('key-for-your-multivariate-flag')
+posthog.getFeatureFlag("key-for-your-multivariate-flag");
 // Optional: fetch the payload (returns 'JsonType' or undefined if not loaded yet or if there was a problem loading)
-posthog.getFeatureFlagResult('key-for-your-multivariate-flag')?.payload
+posthog.getFeatureFlagResult("key-for-your-multivariate-flag")?.payload;
 ```
 
 ### Inspecting all feature flags
@@ -1688,7 +1690,7 @@ PostHog AI
 
 ```jsx
 for (const flag of posthog.getAllFeatureFlags()) {
-    console.log(flag.key, flag.enabled, flag.variant, flag.payload)
+  console.log(flag.key, flag.enabled, flag.variant, flag.payload);
 }
 ```
 
@@ -1707,10 +1709,10 @@ PostHog AI
 ```jsx
 posthog.onFeatureFlags((flags) => {
   // feature flags are guaranteed to be available at this point
-  if (posthog.isFeatureEnabled('flag-key')) {
+  if (posthog.isFeatureEnabled("flag-key")) {
     // do something
   }
-})
+});
 ```
 
 ### Reloading flags
@@ -1724,7 +1726,7 @@ React Native
 PostHog AI
 
 ```jsx
-posthog.reloadFeatureFlagsAsync().then((refreshedFlags) => console.log(refreshedFlags))
+posthog.reloadFeatureFlagsAsync().then((refreshedFlags) => console.log(refreshedFlags));
 ```
 
 Or when you want to trigger the reload, but don't care about the result:
@@ -1734,7 +1736,7 @@ React Native
 PostHog AI
 
 ```jsx
-posthog.reloadFeatureFlags()
+posthog.reloadFeatureFlags();
 ```
 
 ### Feature flag caching
@@ -1751,7 +1753,7 @@ PostHog AI
 
 ```jsx
 // Force refresh on app start
-await posthog.reloadFeatureFlagsAsync()
+await posthog.reloadFeatureFlagsAsync();
 ```
 
 Or clear cached values for inactive users:
@@ -1762,7 +1764,7 @@ PostHog AI
 
 ```jsx
 if (lastActiveDate < migrationDate) {
-  posthog.reset() // Clears all cached data
+  posthog.reset(); // Clears all cached data
 }
 ```
 
@@ -1775,11 +1777,11 @@ React Native
 PostHog AI
 
 ```jsx
-export const posthog = new PostHog('<ph_project_token>', {
+export const posthog = new PostHog("<ph_project_token>", {
   // usually 'https://us.i.posthog.com' or 'https://eu.i.posthog.com'
-  host: 'https://us.i.posthog.com',
-  featureFlagsRequestTimeoutMs: 10000 // Time in milliseconds. Default is 10000 (10 seconds).
-})
+  host: "https://us.i.posthog.com",
+  featureFlagsRequestTimeoutMs: 10000, // Time in milliseconds. Default is 10000 (10 seconds).
+});
 ```
 
 ### Error handling
@@ -1792,29 +1794,31 @@ PostHog AI
 
 ```jsx
 function handleFeatureFlag(client, flagKey, distinctId) {
-    try {
-        const isEnabled = client.isFeatureEnabled(flagKey, distinctId);
-        console.log(`Feature flag '${flagKey}' for user '${distinctId}' is ${isEnabled ? 'enabled' : 'disabled'}`);
-        return isEnabled;
-    } catch (error) {
-        console.error(`Error fetching feature flag '${flagKey}': ${error.message}`);
-        // Optionally, you can return a default value or throw the error
-        // return false; // Default to disabled
-        throw error;
-    }
+  try {
+    const isEnabled = client.isFeatureEnabled(flagKey, distinctId);
+    console.log(
+      `Feature flag '${flagKey}' for user '${distinctId}' is ${isEnabled ? "enabled" : "disabled"}`,
+    );
+    return isEnabled;
+  } catch (error) {
+    console.error(`Error fetching feature flag '${flagKey}': ${error.message}`);
+    // Optionally, you can return a default value or throw the error
+    // return false; // Default to disabled
+    throw error;
+  }
 }
 // Usage example
 try {
-    const flagEnabled = handleFeatureFlag(client, 'new-feature', 'user-123');
-    if (flagEnabled) {
-        // Implement new feature logic
-    } else {
-        // Implement old feature logic
-    }
+  const flagEnabled = handleFeatureFlag(client, "new-feature", "user-123");
+  if (flagEnabled) {
+    // Implement new feature logic
+  } else {
+    // Implement old feature logic
+  }
 } catch (error) {
-    // Handle the error at a higher level
-    console.error('Feature flag check failed, using default behavior');
-    // Implement fallback logic
+  // Handle the error at a higher level
+  console.error("Feature flag check failed, using default behavior");
+  // Implement fallback logic
 }
 ```
 
@@ -1827,7 +1831,7 @@ React Native
 PostHog AI
 
 ```jsx
-posthog.setPersonPropertiesForFlags({'property1': 'value', property2: 'value2'})
+posthog.setPersonPropertiesForFlags({ property1: "value", property2: "value2" });
 ```
 
 Note that these are set for the entire session. Successive calls are additive: all properties you set are combined together and sent for flag evaluation.
@@ -1839,7 +1843,7 @@ React Native
 PostHog AI
 
 ```jsx
-posthog.setPersonPropertiesForFlags({'property1': 'value', property2: 'value2'}, false)
+posthog.setPersonPropertiesForFlags({ property1: "value", property2: "value2" }, false);
 ```
 
 At any point, you can reset these properties by calling `resetPersonPropertiesForFlags`:
@@ -1849,7 +1853,7 @@ React Native
 PostHog AI
 
 ```jsx
-posthog.resetPersonPropertiesForFlags()
+posthog.resetPersonPropertiesForFlags();
 ```
 
 The same holds for [group](/docs/product-analytics/group-analytics.md) properties:
@@ -1860,9 +1864,9 @@ PostHog AI
 
 ```jsx
 // set properties for a group
-posthog.setGroupPropertiesForFlags({'company': {'property1': 'value', property2: 'value2'}})
+posthog.setGroupPropertiesForFlags({ company: { property1: "value", property2: "value2" } });
 // reset properties for all groups:
-posthog.resetGroupPropertiesForFlags()
+posthog.resetGroupPropertiesForFlags();
 ```
 
 > **Note:** You don't need to add the group names here, since these properties are automatically attached to the current group (set via `posthog.group()`). When you change the group, these properties are reset.
@@ -2386,22 +2390,22 @@ You can override GeoIP properties by including them in the `person_properties` p
 
 The following GeoIP properties can be overridden:
 
--   `$geoip_country_code`
--   `$geoip_country_name`
--   `$geoip_city_name`
--   `$geoip_city_confidence`
--   `$geoip_continent_code`
--   `$geoip_continent_name`
--   `$geoip_latitude`
--   `$geoip_longitude`
--   `$geoip_postal_code`
--   `$geoip_subdivision_1_code`
--   `$geoip_subdivision_1_name`
--   `$geoip_subdivision_2_code`
--   `$geoip_subdivision_2_name`
--   `$geoip_subdivision_3_code`
--   `$geoip_subdivision_3_name`
--   `$geoip_time_zone`
+- `$geoip_country_code`
+- `$geoip_country_name`
+- `$geoip_city_name`
+- `$geoip_city_confidence`
+- `$geoip_continent_code`
+- `$geoip_continent_name`
+- `$geoip_latitude`
+- `$geoip_longitude`
+- `$geoip_postal_code`
+- `$geoip_subdivision_1_code`
+- `$geoip_subdivision_1_name`
+- `$geoip_subdivision_2_code`
+- `$geoip_subdivision_2_name`
+- `$geoip_subdivision_3_code`
+- `$geoip_subdivision_3_name`
+- `$geoip_time_zone`
 
 Simply include any of these properties in the `person_properties` parameter alongside your other person properties when calling feature flags.
 
@@ -2895,22 +2899,22 @@ You can override GeoIP properties by including them in the `person_properties` p
 
 The following GeoIP properties can be overridden:
 
--   `$geoip_country_code`
--   `$geoip_country_name`
--   `$geoip_city_name`
--   `$geoip_city_confidence`
--   `$geoip_continent_code`
--   `$geoip_continent_name`
--   `$geoip_latitude`
--   `$geoip_longitude`
--   `$geoip_postal_code`
--   `$geoip_subdivision_1_code`
--   `$geoip_subdivision_1_name`
--   `$geoip_subdivision_2_code`
--   `$geoip_subdivision_2_name`
--   `$geoip_subdivision_3_code`
--   `$geoip_subdivision_3_name`
--   `$geoip_time_zone`
+- `$geoip_country_code`
+- `$geoip_country_name`
+- `$geoip_city_name`
+- `$geoip_city_confidence`
+- `$geoip_continent_code`
+- `$geoip_continent_name`
+- `$geoip_latitude`
+- `$geoip_longitude`
+- `$geoip_postal_code`
+- `$geoip_subdivision_1_code`
+- `$geoip_subdivision_1_name`
+- `$geoip_subdivision_2_code`
+- `$geoip_subdivision_2_name`
+- `$geoip_subdivision_3_code`
+- `$geoip_subdivision_3_name`
+- `$geoip_time_zone`
 
 Simply include any of these properties in the `person_properties` parameter alongside your other person properties when calling feature flags.
 
@@ -2977,34 +2981,34 @@ print(response_with_config.json())
 ```javascript
 import fetch from "node-fetch";
 async function sendFlagsRequest() {
-    const headers = {
-        "Content-Type": "application/json",
-    };
-    const payload = {
-        api_key: "<ph_project_token>",
-        distinct_id: "user distinct id",
-        groups: {
-            group_type: "group_id",
-        },
-    };
-    // Basic request (flags only)
-    const url = "https://us.i.posthog.com/flags?v=2";
-    const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    console.log(data);
-    // With configuration (flags + PostHog config)
-    const urlWithConfig = "https://us.i.posthog.com/flags?v=2&config=true";
-    const responseWithConfig = await fetch(urlWithConfig, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-    });
-    const dataWithConfig = await responseWithConfig.json();
-    console.log(dataWithConfig);
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  const payload = {
+    api_key: "<ph_project_token>",
+    distinct_id: "user distinct id",
+    groups: {
+      group_type: "group_id",
+    },
+  };
+  // Basic request (flags only)
+  const url = "https://us.i.posthog.com/flags?v=2";
+  const response = await fetch(url, {
+    method: "POST",
+    headers: headers,
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  console.log(data);
+  // With configuration (flags + PostHog config)
+  const urlWithConfig = "https://us.i.posthog.com/flags?v=2&config=true";
+  const responseWithConfig = await fetch(urlWithConfig, {
+    method: "POST",
+    headers: headers,
+    body: JSON.stringify(payload),
+  });
+  const dataWithConfig = await responseWithConfig.json();
+  console.log(dataWithConfig);
 }
 sendFlagsRequest();
 ```
@@ -3055,25 +3059,25 @@ print(response.json())
 
 ```javascript
 const response = await fetch("https://us.i.posthog.com/flags?v=2", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-        api_key: "<ph_project_token>",
-        distinct_id: "user-distinct-id",
-        evaluation_contexts: ["production", "web"]
-    }),
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    api_key: "<ph_project_token>",
+    distinct_id: "user-distinct-id",
+    evaluation_contexts: ["production", "web"],
+  }),
 });
 const data = await response.json();
 ```
 
 Only flags where at least one evaluation tag matches (or flags with no tags at all) will be returned. For example:
 
--   Flag with evaluation context tags `["production", "api", "backend"]` + request with `["production", "web"]` = ✅ Flag evaluates ("production" matches)
--   Flag with evaluation context tags `["staging", "api"]` + request with `["production", "web"]` = ❌ Flag doesn't evaluate (no tags match)
--   Flag with evaluation context tags `["web", "mobile"]` + request with `["production", "web"]` = ✅ Flag evaluates ("web" matches)
--   Flag with no evaluation context tags = ✅ Always evaluates (backward compatibility)
+- Flag with evaluation context tags `["production", "api", "backend"]` + request with `["production", "web"]` = ✅ Flag evaluates ("production" matches)
+- Flag with evaluation context tags `["staging", "api"]` + request with `["production", "web"]` = ❌ Flag doesn't evaluate (no tags match)
+- Flag with evaluation context tags `["web", "mobile"]` + request with `["production", "web"]` = ✅ Flag evaluates ("web" matches)
+- Flag with no evaluation context tags = ✅ Always evaluates (backward compatibility)
 
 ##### Runtime detection
 
@@ -3083,14 +3087,16 @@ Evaluation runtime (server vs. client) is automatically detected based on your r
 
 1.  **User-Agent patterns** - The system analyzes the User-Agent header:
 
-    -   **Client-side patterns**: `Mozilla/`, `Chrome/`, `Safari/`, `Firefox/`, `Edge/` (browsers), or mobile SDKs like `posthog-android/`, `posthog-ios/`, `posthog-react-native/`, `posthog-flutter/`
-    -   **Server-side patterns**: `posthog-python/`, `posthog-ruby/`, `posthog-php/`, `posthog-java/`, `posthog-go/`, `posthog-node/`, `posthog-dotnet/`, `posthog-elixir/`, `python-requests/`, `curl/`
+    - **Client-side patterns**: `Mozilla/`, `Chrome/`, `Safari/`, `Firefox/`, `Edge/` (browsers), or mobile SDKs like `posthog-android/`, `posthog-ios/`, `posthog-react-native/`, `posthog-flutter/`
+    - **Server-side patterns**: `posthog-python/`, `posthog-ruby/`, `posthog-php/`, `posthog-java/`, `posthog-go/`, `posthog-node/`, `posthog-dotnet/`, `posthog-elixir/`, `python-requests/`, `curl/`
+
 2.  **Browser-specific headers** - Presence of these headers indicates client-side:
 
-    -   `Origin` header
-    -   `Referer` header
-    -   `Sec-Fetch-Mode` header
-    -   `Sec-Fetch-Site` header
+    - `Origin` header
+    - `Referer` header
+    - `Sec-Fetch-Mode` header
+    - `Sec-Fetch-Site` header
+
 3.  **Default behavior** - If runtime can't be determined, the system includes flags with no runtime requirement and those set to "all"
 
 **Examples of runtime detection:**
@@ -3104,15 +3110,15 @@ PostHog AI
 // Will receive: client-only flags + "all" flags
 // Won't receive: server-only flags
 const response = await fetch("https://us.i.posthog.com/flags?v=2", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-        // Browser automatically adds Origin, Referer, Sec-Fetch-* headers
-    },
-    body: JSON.stringify({
-        api_key: "<ph_project_token>",
-        distinct_id: "user-id"
-    })
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    // Browser automatically adds Origin, Referer, Sec-Fetch-* headers
+  },
+  body: JSON.stringify({
+    api_key: "<ph_project_token>",
+    distinct_id: "user-id",
+  }),
 });
 ```
 
@@ -3157,15 +3163,15 @@ PostHog AI
 ```javascript
 // Node.js with custom User-Agent - Control runtime detection
 const response = await fetch("https://us.i.posthog.com/flags?v=2", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "posthog-node/3.0.0"  // Explicitly indicates server-side
-    },
-    body: JSON.stringify({
-        api_key: "<ph_project_token>",
-        distinct_id: "user-id"
-    })
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "User-Agent": "posthog-node/3.0.0", // Explicitly indicates server-side
+  },
+  body: JSON.stringify({
+    api_key: "<ph_project_token>",
+    distinct_id: "user-id",
+  }),
 });
 ```
 
@@ -3180,16 +3186,16 @@ PostHog AI
 ```javascript
 // Example: Production web client
 const response = await fetch("https://us.i.posthog.com/flags?v=2", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-        // Browser headers will trigger client runtime detection
-    },
-    body: JSON.stringify({
-        api_key: "<ph_project_token>",
-        distinct_id: "user-id",
-        evaluation_contexts: ["production", "web"]
-    })
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    // Browser headers will trigger client runtime detection
+  },
+  body: JSON.stringify({
+    api_key: "<ph_project_token>",
+    distinct_id: "user-id",
+    evaluation_contexts: ["production", "web"],
+  }),
 });
 // This request will only receive flags that:
 // 1. Have runtime set to "client" OR "all" (due to browser headers)
@@ -3231,8 +3237,8 @@ PostHog AI
         "payload": "{\"example\": \"json\", \"payload\": \"value\"}"
       }
     },
-    "my-multivariate-flag" :{
-      "key":"my-multivariate-flag",
+    "my-multivariate-flag": {
+      "key": "my-multivariate-flag",
       "enabled": true,
       "variant": "some-string-value",
       "reason": {
@@ -3242,7 +3248,7 @@ PostHog AI
       },
       "metadata": {
         "id": 2,
-        "version": 42,
+        "version": 42
       }
     },
     "flag-thats-not-on": {
@@ -3281,10 +3287,7 @@ PostHog AI
   "errorsWhileComputingFlags": false,
   "isAuthenticated": false,
   "requestId": "550e8400-e29b-41d4-a716-446655440000",
-  "supportedCompression": [
-    "gzip",
-    "lz64"
-  ],
+  "supportedCompression": ["gzip", "lz64"],
   "flags": {
     "my-awesome-flag": {
       "key": "my-awesome-flag",
@@ -3300,8 +3303,8 @@ PostHog AI
         "payload": "{\"example\": \"json\", \"payload\": \"value\"}"
       }
     },
-    "my-multivariate-flag" :{
-      "key":"my-multivariate-flag",
+    "my-multivariate-flag": {
+      "key": "my-multivariate-flag",
       "enabled": true,
       "variant": "some-string-value",
       "reason": {
@@ -3311,7 +3314,7 @@ PostHog AI
       },
       "metadata": {
         "id": 2,
-        "version": 42,
+        "version": 42
       }
     },
     "flag-thats-not-on": {
@@ -3367,10 +3370,7 @@ PostHog AI
   },
   "toolbarParams": {},
   "isAuthenticated": false,
-  "supportedCompression": [
-    "gzip",
-    "lz64"
-  ],
+  "supportedCompression": ["gzip", "lz64"],
   "flags": {},
   "errorsWhileComputingFlags": false,
   "quotaLimited": ["feature_flags"],

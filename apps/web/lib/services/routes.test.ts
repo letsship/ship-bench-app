@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
+import { GET as invoiceGet } from "@/app/api/invoices/[id]/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
+import { GET as memberGet } from "@/app/api/members/[id]/route";
 import { GET as membersGet } from "@/app/api/members/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
@@ -10,8 +12,10 @@ import { buildSeed } from "@/lib/db/seed-data";
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
 describe("GET route handlers (against injected fake repositories)", () => {
+  const seed = buildSeed(NOW);
+
   beforeEach(() => {
-    __setTestRepositories(createInMemoryRepositories(buildSeed(NOW)));
+    __setTestRepositories(createInMemoryRepositories(seed));
   });
   afterEach(() => {
     __setTestRepositories(null);
@@ -44,5 +48,39 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/invoices/:id awaits params and returns the matching invoice", async () => {
+    const invoiceId = seed.invoices[0].id;
+    const res = await invoiceGet(new NextRequest(`http://localhost/api/invoices/${invoiceId}`), {
+      params: Promise.resolve({ id: invoiceId }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { invoice: { id: string } };
+    expect(body.invoice.id).toBe(invoiceId);
+  });
+
+  it("GET /api/invoices/:id returns 404 for an unknown id", async () => {
+    const res = await invoiceGet(new NextRequest("http://localhost/api/invoices/missing"), {
+      params: Promise.resolve({ id: "missing" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /api/members/:id awaits params and returns the matching member", async () => {
+    const memberId = seed.members[0].id;
+    const res = await memberGet(new NextRequest(`http://localhost/api/members/${memberId}`), {
+      params: Promise.resolve({ id: memberId }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string };
+    expect(body.id).toBe(memberId);
+  });
+
+  it("GET /api/members/:id returns 404 for an unknown id", async () => {
+    const res = await memberGet(new NextRequest("http://localhost/api/members/missing"), {
+      params: Promise.resolve({ id: "missing" }),
+    });
+    expect(res.status).toBe(404);
   });
 });
