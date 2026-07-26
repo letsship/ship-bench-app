@@ -1,11 +1,14 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { buildSeed } from "../seed-data";
+import { createD1Repositories } from "./d1";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
-// Resolve the request's repositories. Production uses the Supabase-backed
-// implementation; `USE_FAKE_BACKENDS=1` (local dev, `next start` for e2e) uses a
-// seeded in-memory set; tests inject their own via __setTestRepositories. This
-// is the single seam that a Supabase→other-database migration replaces.
+// Resolve the request's repositories. Production uses the Drizzle/D1-backed
+// implementation over the Worker's `DB` binding; `USE_FAKE_BACKENDS=1` (local
+// dev, `next start` for e2e) uses a seeded in-memory set; tests inject their
+// own via __setTestRepositories. This is the single seam that a
+// database-vendor migration replaces.
 
 let testRepositories: Repositories | null = null;
 
@@ -30,13 +33,13 @@ export async function resolveRepositories(): Promise<Repositories> {
     }
     return globalForFakes.__studiobookFakeRepos;
   }
-  const { createSupabaseRepositories } = await import("./supabase");
-  return createSupabaseRepositories();
+  const { env } = getCloudflareContext();
+  return createD1Repositories(env.DB);
 }
 
 // Test-only: re-seed the in-memory store to a clean, known dataset so e2e specs
 // can isolate per test (via the /api/test-reset endpoint). No-op unless fake
-// backends are enabled — the real Supabase path is never touched.
+// backends are enabled — the real D1 path is never touched.
 export function resetFakeBackends(): void {
   if (!fakeBackendsEnabled()) return;
   globalForFakes.__studiobookFakeRepos = createInMemoryRepositories(buildSeed());

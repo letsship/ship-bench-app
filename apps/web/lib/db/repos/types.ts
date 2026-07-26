@@ -11,12 +11,12 @@ import type {
 } from "../types";
 
 // The repository seam. Route handlers, services, and the outbox depend ONLY on
-// these interfaces — never on supabase-js (or any driver) directly. Two
-// implementations exist: `supabase/` (the production Postgres impl) and
-// `fakes.ts` (in-memory, for hermetic tests + the local fake-backends mode).
-// Swapping the persistence layer means writing a new set of these; nothing
-// upstream changes. Services build full rows (ids + timestamps set app-side)
-// so both implementations behave identically.
+// these interfaces — never on a database driver directly. Two implementations
+// exist: `d1.ts` (the production Drizzle/D1 impl) and `fakes.ts` (in-memory,
+// for hermetic tests + the local fake-backends mode). Swapping the persistence
+// layer means writing a new set of these; nothing upstream changes. Services
+// build full rows (ids + timestamps set app-side) so both implementations
+// behave identically.
 
 export interface SessionRange {
   from?: string;
