@@ -35,6 +35,7 @@ const sections: [string, readonly object[]][] = [
   ["invoices", seed.invoices],
   ["invoice_line_items", seed.lineItems],
   ["notification_outbox", seed.outbox],
+  ["packages", seed.packages],
 ];
 
 const lines: string[] = [

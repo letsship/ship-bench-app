@@ -328,5 +328,16 @@ export function buildSeed(now: Date = new Date()): SeedData {
   const bookings = buildBookings(now, members, sessions);
   const { invoices, lineItems } = buildInvoices(now, studio.id, members, settings.taxRateBps);
   const outbox = buildOutbox(now, members);
-  return { studio, settings, members, classTypes, sessions, bookings, invoices, lineItems, outbox };
+  return {
+    studio,
+    settings,
+    members,
+    classTypes,
+    sessions,
+    bookings,
+    invoices,
+    lineItems,
+    outbox,
+    packages: [],
+  };
 }

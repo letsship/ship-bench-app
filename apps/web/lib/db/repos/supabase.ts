@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type {
   Booking,
+  ClassPack,
   ClassSession,
   ClassType,
   Invoice,
@@ -201,6 +202,20 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+    },
+    packages: {
+      listByMember: (memberId) =>
+        rows<ClassPack>(
+          db.from("packages").select("*").eq("member_id", memberId),
+          "packages.listByMember",
+        ),
+      getById: (id) =>
+        maybeOne<ClassPack>(
+          db.from("packages").select("*").eq("id", id).maybeSingle(),
+          "packages.getById",
+        ),
+      insert: (pack) => insertReturning("packages", pack),
+      update: (id, patch) => updateReturning<ClassPack>("packages", "id", id, patch),
     },
   };
 }

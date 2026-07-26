@@ -91,4 +91,34 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("packages: inserts, lists by member, reads by id, and updates", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const [memberA, memberB] = members;
+    const pack = {
+      id: "pkg_new",
+      studioId,
+      memberId: memberA.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+      createdAt: NOW.toISOString(),
+    };
+    await repos.packages.insert(pack);
+    await repos.packages.insert({ ...pack, id: "pkg_other", memberId: memberB.id });
+
+    expect(await repos.packages.getById("pkg_new")).toEqual(pack);
+    expect((await repos.packages.listByMember(memberA.id)).map((row) => row.id)).toEqual([
+      "pkg_new",
+    ]);
+
+    const updated = await repos.packages.update("pkg_new", {
+      creditsRemaining: 0,
+      status: "refunded",
+    });
+    expect(updated.creditsRemaining).toBe(0);
+    expect(updated.status).toBe("refunded");
+  });
 });
