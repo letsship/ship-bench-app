@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -70,5 +70,64 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits the header row in the required order", () => {
+    const csv = bookingsToCsv([]);
+    expect(csv).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("keeps a comma-containing name as a single quoted column", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T09:00:00.000Z",
+        className: "Vinyasa Flow",
+        memberName: "Rossi, Chiara",
+        memberEmail: "chiara@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toBe(
+      '2026-06-15T09:00:00.000Z,Vinyasa Flow,"Rossi, Chiara",chiara@example.com,booked',
+    );
+  });
+
+  it("escapes embedded quotes and newlines", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T09:00:00.000Z",
+        className: 'Wheel "Advanced"',
+        memberName: "Line1\nLine2",
+        memberEmail: "a@example.com",
+        status: "attended",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toBe(
+      '2026-06-15T09:00:00.000Z,"Wheel ""Advanced""","Line1\nLine2",a@example.com,attended',
+    );
+  });
+
+  it("joins multiple rows with CRLF", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00.000Z",
+        className: "Vinyasa Flow",
+        memberName: "Amara",
+        memberEmail: "amara@example.com",
+        status: "booked",
+      },
+      {
+        startsAt: "2026-06-02T08:00:00.000Z",
+        className: "Yin & Restore",
+        memberName: "Bram",
+        memberEmail: "bram@example.com",
+        status: "attended",
+      },
+    ]);
+    expect(csv.split("\r\n")).toHaveLength(3);
   });
 });
