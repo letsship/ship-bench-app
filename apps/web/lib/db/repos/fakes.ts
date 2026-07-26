@@ -81,7 +81,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async update(studioId, patch) {
-        return patched(store.settings, (row) => row.studioId === studioId, patch, "Studio settings");
+        return patched(
+          store.settings,
+          (row) => row.studioId === studioId,
+          patch,
+          "Studio settings",
+        );
       },
     },
     members: {
@@ -96,10 +101,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         const found = store.members.find((row) => row.id === id);
         return found ? clone(found) : null;
       },
+      async findByIds(ids) {
+        const idSet = new Set(ids);
+        return cloneAll(store.members.filter((row) => idSet.has(row.id)));
+      },
       async findByEmail(studioId, email) {
-        const found = store.members.find(
-          (row) => row.studioId === studioId && row.email === email,
-        );
+        const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
       async insert(member) {
@@ -138,6 +145,10 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       async getById(id) {
         const found = store.classSessions.find((row) => row.id === id);
         return found ? clone(found) : null;
+      },
+      async findByIds(ids) {
+        const idSet = new Set(ids);
+        return cloneAll(store.classSessions.filter((row) => idSet.has(row.id)));
       },
       async insert(session) {
         store.classSessions.push(clone(session));

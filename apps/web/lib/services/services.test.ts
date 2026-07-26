@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,75 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("keeps member + class-session reads bounded regardless of booking count (N+1 regression)", async () => {
+    function seedWithBookings(n: number): SeedData {
+      return baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: Array.from({ length: n }, (_, i) => member(`m${i}`)),
+        bookings: Array.from({ length: n }, (_, i) =>
+          booking(`b${i}`, `m${i}`, { sessionId: "cs1" }),
+        ),
+      });
+    }
+
+    function withReadCounts(base: Repositories): {
+      repos: Repositories;
+      counts: Record<string, number>;
+    } {
+      const counts = { members: 0, classSessions: 0 };
+      return {
+        counts,
+        repos: {
+          ...base,
+          members: {
+            ...base.members,
+            getById: (id: string) => {
+              counts.members++;
+              return base.members.getById(id);
+            },
+            findByIds: (ids: string[]) => {
+              counts.members++;
+              return base.members.findByIds(ids);
+            },
+          },
+          classSessions: {
+            ...base.classSessions,
+            getById: (id: string) => {
+              counts.classSessions++;
+              return base.classSessions.getById(id);
+            },
+            findByIds: (ids: string[]) => {
+              counts.classSessions++;
+              return base.classSessions.findByIds(ids);
+            },
+          },
+        },
+      };
+    }
+
+    const small = withReadCounts(createInMemoryRepositories(seedWithBookings(3)));
+    const large = withReadCounts(createInMemoryRepositories(seedWithBookings(200)));
+
+    const smallRows = await listBookingRows(small.repos, "s1");
+    const largeRows = await listBookingRows(large.repos, "s1");
+
+    expect(smallRows).toHaveLength(3);
+    expect(largeRows).toHaveLength(200);
+
+    // Read counts must be bounded and identical no matter how many bookings are listed.
+    expect(small.counts.members).toBe(large.counts.members);
+    expect(small.counts.classSessions).toBe(large.counts.classSessions);
+    expect(small.counts.members).toBeLessThanOrEqual(2);
+    expect(small.counts.classSessions).toBeLessThanOrEqual(2);
+
+    // Output shape/order stays the same as before the batching change.
+    for (const row of smallRows) {
+      expect(row).toMatchObject({ className: "Yoga", classColor: "#111111", instructor: "I" });
+    }
+    const startsAts = largeRows.map((row) => row.startsAt);
+    expect(startsAts).toEqual([...startsAts].sort((a, b) => a.localeCompare(b)));
   });
 });

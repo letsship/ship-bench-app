@@ -35,6 +35,7 @@ export interface StudioSettingsRepo {
 export interface MembersRepo {
   listByStudio(studioId: string): Promise<Member[]>;
   getById(id: string): Promise<Member | null>;
+  findByIds(ids: string[]): Promise<Member[]>;
   findByEmail(studioId: string, email: string): Promise<Member | null>;
   insert(member: Member): Promise<Member>;
   update(id: string, patch: Partial<Member>): Promise<Member>;
@@ -49,6 +50,7 @@ export interface ClassTypesRepo {
 export interface ClassSessionsRepo {
   listByStudio(studioId: string, range?: SessionRange): Promise<ClassSession[]>;
   getById(id: string): Promise<ClassSession | null>;
+  findByIds(ids: string[]): Promise<ClassSession[]>;
   insert(session: ClassSession): Promise<ClassSession>;
 }
 

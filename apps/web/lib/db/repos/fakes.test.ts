@@ -51,6 +51,25 @@ describe("in-memory repositories", () => {
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
   });
 
+  it("finds members by a batch of ids, ignoring unknown ids", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const ids = members.slice(0, 2).map((m) => m.id);
+    const found = await repos.members.findByIds([...ids, "nope"]);
+    expect(found.map((m) => m.id).sort()).toEqual([...ids].sort());
+  });
+
+  it("findByIds returns [] for an empty id list", async () => {
+    expect(await repos.members.findByIds([])).toEqual([]);
+    expect(await repos.classSessions.findByIds([])).toEqual([]);
+  });
+
+  it("finds class sessions by a batch of ids, ignoring unknown ids", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const ids = sessions.slice(0, 2).map((s) => s.id);
+    const found = await repos.classSessions.findByIds([...ids, "nope"]);
+    expect(found.map((s) => s.id).sort()).toEqual([...ids].sort());
+  });
+
   it("inserts then reads back by id", async () => {
     const member = {
       id: "mem_new",
