@@ -180,6 +180,12 @@ jobs:
       # ~140 chars), the run link in `log_url`.
       - name: Signal deployment FAILURE to SHIP
         if: failure() && inputs.action == 'deploy'
+        # `set +e`: GitHub's default `bash -e` aborts the step the moment a
+        # command in a `$(...)` returns non-zero — e.g. a `grep` that finds no
+        # match — BEFORE the fallbacks run, so the step failed and SHIP never got
+        # the callback (it then stalled the full deploy timeout). Never abort here:
+        # this step MUST always post the error status.
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           ENV_NAME: ${{ inputs.env_name }}
@@ -188,9 +194,10 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          ERRLINE="$(grep -iE 'error|fatal|not found|cannot|failed|refus|✘|exception' /tmp/deploy-err.log 2>/dev/null | grep -viE '^\s*(warn|note)' | tail -1 | tr -s ' ' | head -c 135)"
-          [ -z "$ERRLINE" ] && ERRLINE="$(tail -1 /tmp/deploy-err.log 2>/dev/null | head -c 135)"
-          [ -z "$ERRLINE" ] && ERRLINE="preview deploy failed (no captured output)"
+          set +e
+          ERRLINE="$(grep -iE 'error|fatal|not found|cannot|failed|refus|exception|10021' /tmp/deploy-err.log 2>/dev/null | grep -viE '^\s*(warn|note)' | tail -1 | tr -s ' ' | head -c 135)"
+          [ -z "$ERRLINE" ] && ERRLINE="$(tail -3 /tmp/deploy-err.log 2>/dev/null | tr '\n' ' ' | tr -s ' ' | head -c 135)"
+          [ -z "$ERRLINE" ] && ERRLINE="preview deploy failed (see run log)"
           SHA="$(git rev-parse HEAD)"
           DEP_ID="$(jq -n \
             --arg ref "$SHA" \
