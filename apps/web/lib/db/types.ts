@@ -105,3 +105,11 @@ export interface NotificationOutboxRow {
   providerMessageId: string | null;
   error: string | null;
 }
+
+// A processed Stripe webhook event id, kept to make delivery idempotent —
+// Stripe retries webhooks, so we record every event id we've already handled.
+export interface WebhookEvent {
+  id: string;
+  type: string;
+  receivedAt: string;
+}
