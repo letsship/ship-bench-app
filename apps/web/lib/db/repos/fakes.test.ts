@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
-import type { Repositories } from "./types";
+import { DuplicateBookingError, type Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -84,6 +84,101 @@ describe("in-memory repositories", () => {
   it("listPending returns only unsent outbox rows", async () => {
     const pending = await repos.outbox.listPending();
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
+  });
+
+  it("bookings.insert rejects a second active row for the same session + member", async () => {
+    const classTypes = await repos.classTypes.listByStudio(studioId);
+    const newSession = await repos.classSessions.insert({
+      id: "cs_fresh_1",
+      studioId,
+      classTypeId: classTypes[0].id,
+      instructor: "I",
+      startsAt: NOW.toISOString(),
+      endsAt: NOW.toISOString(),
+      capacity: 5,
+      priceCents: 1000,
+      status: "scheduled",
+      createdAt: NOW.toISOString(),
+    });
+    const newMember = await repos.members.insert({
+      id: "mem_fresh_1",
+      studioId,
+      name: "Fresh Member",
+      email: "fresh1@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: NOW.toISOString(),
+    });
+    const sessionId = newSession.id;
+    const memberId = newMember.id;
+
+    await repos.bookings.insert({
+      id: "book_first",
+      sessionId,
+      memberId,
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    await expect(
+      repos.bookings.insert({
+        id: "book_second",
+        sessionId,
+        memberId,
+        status: "waitlisted",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).rejects.toBeInstanceOf(DuplicateBookingError);
+  });
+
+  it("bookings.insert allows a new row once the prior one is cancelled", async () => {
+    const classTypes = await repos.classTypes.listByStudio(studioId);
+    const newSession = await repos.classSessions.insert({
+      id: "cs_fresh_2",
+      studioId,
+      classTypeId: classTypes[0].id,
+      instructor: "I",
+      startsAt: NOW.toISOString(),
+      endsAt: NOW.toISOString(),
+      capacity: 5,
+      priceCents: 1000,
+      status: "scheduled",
+      createdAt: NOW.toISOString(),
+    });
+    const newMember = await repos.members.insert({
+      id: "mem_fresh_2",
+      studioId,
+      name: "Fresh Member 2",
+      email: "fresh2@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: NOW.toISOString(),
+    });
+    const sessionId = newSession.id;
+    const memberId = newMember.id;
+
+    await repos.bookings.insert({
+      id: "book_cancelled",
+      sessionId,
+      memberId,
+      status: "cancelled",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: NOW.toISOString(),
+    });
+
+    const rebooked = await repos.bookings.insert({
+      id: "book_rebooked",
+      sessionId,
+      memberId,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    expect(rebooked.status).toBe("booked");
   });
 
   it("empty repositories return nulls / empty lists", async () => {

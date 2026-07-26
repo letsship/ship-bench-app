@@ -23,6 +23,18 @@ export interface SessionRange {
   to?: string;
 }
 
+// Thrown by BookingsRepo.insert when an active (non-cancelled) booking
+// already exists for the same (sessionId, memberId) — the write-time half of
+// the "already has a booking" guard, backed by a partial unique index in
+// Postgres and mirrored in the in-memory fake so both implementations reject
+// a repeat submit identically, even for a waitlisted (not just confirmed) row.
+export class DuplicateBookingError extends Error {
+  constructor(sessionId: string, memberId: string) {
+    super(`Booking already exists for session ${sessionId} and member ${memberId}`);
+    this.name = "DuplicateBookingError";
+  }
+}
+
 export interface StudioRepo {
   getFirst(): Promise<Studio | null>;
 }
