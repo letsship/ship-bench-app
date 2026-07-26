@@ -2,8 +2,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type {
+  Booking,
+  ClassSession,
+  ClassType,
+  Invoice,
+  InvoiceLineItem,
+  Member,
+} from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { getMemberStatement } from "./account-statements";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -160,7 +169,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +212,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -285,6 +303,67 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("account statements service", () => {
+  it("excludes a refunded line from the taxable subtotal, matching computeInvoiceTotals and the stored invoice total", async () => {
+    // €100 billable + €50 refunded @ 9% tax => €109.00 (10900 cents), never the
+    // over-taxed €163.50 (16350 cents) you'd get by taxing the refunded line too.
+    const taxRateBps = 900;
+    const lines: Omit<InvoiceLineItem, "invoiceId">[] = [
+      {
+        id: "li1",
+        description: "Billable",
+        quantity: 1,
+        unitAmountCents: 10000,
+        amountCents: 10000,
+        refunded: false,
+        bookingId: null,
+      },
+      {
+        id: "li2",
+        description: "Refunded",
+        quantity: 1,
+        unitAmountCents: 5000,
+        amountCents: 5000,
+        refunded: true,
+        bookingId: null,
+      },
+    ];
+    const expected = computeInvoiceTotals(lines, taxRateBps);
+    expect(expected.totalCents).toBe(10900);
+
+    const invoice: Invoice = {
+      id: "inv1",
+      studioId: "s1",
+      memberId: "m1",
+      number: "INV-2026-0001",
+      status: "open",
+      currency: "EUR",
+      taxRateBps,
+      subtotalCents: expected.subtotalCents,
+      taxCents: expected.taxCents,
+      totalCents: expected.totalCents,
+      issuedAt: ISO,
+      dueAt: null,
+      paidAt: null,
+      createdAt: ISO,
+    };
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [invoice],
+        lineItems: lines.map((line) => ({ ...line, invoiceId: invoice.id })),
+      }),
+    );
+
+    const statement = await getMemberStatement(repos, "s1", "m1");
+    expect(statement.lines).toHaveLength(1);
+    expect(statement.lines[0].totalCents).toBe(10900);
+    expect(statement.lines[0].totalCents).toBe(expected.totalCents);
+    expect(statement.lines[0].totalCents).toBe(invoice.totalCents);
+    expect(statement.lines[0].totalCents).not.toBe(16350);
   });
 });
 
