@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
-import type { Repositories } from "./types";
+import { DuplicateActiveBookingError, type Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -84,6 +84,51 @@ describe("in-memory repositories", () => {
   it("listPending returns only unsent outbox rows", async () => {
     const pending = await repos.outbox.listPending();
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
+  });
+
+  it("insert throws DuplicateActiveBookingError for a second active booking on the same session+member", async () => {
+    await repos.bookings.insert({
+      id: "bk_first",
+      sessionId: "sess_dup",
+      memberId: "mem_dup",
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    await expect(
+      repos.bookings.insert({
+        id: "bk_second",
+        sessionId: "sess_dup",
+        memberId: "mem_dup",
+        status: "waitlisted",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).rejects.toThrow(DuplicateActiveBookingError);
+  });
+
+  it("insert allows a new active booking once the prior one for that session+member is cancelled", async () => {
+    await repos.bookings.insert({
+      id: "bk_cancelled",
+      sessionId: "sess_dup2",
+      memberId: "mem_dup2",
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    await repos.bookings.update("bk_cancelled", {
+      status: "cancelled",
+      cancelledAt: NOW.toISOString(),
+    });
+    const rebooked = await repos.bookings.insert({
+      id: "bk_rebooked",
+      sessionId: "sess_dup2",
+      memberId: "mem_dup2",
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    expect(rebooked.status).toBe("booked");
   });
 
   it("empty repositories return nulls / empty lists", async () => {

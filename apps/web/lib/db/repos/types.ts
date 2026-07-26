@@ -52,10 +52,32 @@ export interface ClassSessionsRepo {
   insert(session: ClassSession): Promise<ClassSession>;
 }
 
+// A booking in one of these statuses holds a seat or a waitlist place for a
+// session; only one such row may exist per (sessionId, memberId) pair.
+export const ACTIVE_BOOKING_STATUSES: ReadonlySet<string> = new Set([
+  "booked",
+  "waitlisted",
+  "attended",
+]);
+
+// Thrown by `BookingsRepo.insert` when the (sessionId, memberId) pair already
+// has an active booking (see `ACTIVE_BOOKING_STATUSES`). Both repository
+// implementations enforce this atomically at the insert call so two
+// interleaved booking attempts for the same member + session can't both land
+// a row (e.g. a double-submit on a full class's waitlist).
+export class DuplicateActiveBookingError extends Error {
+  constructor(sessionId: string, memberId: string) {
+    super(`Member ${memberId} already has an active booking for session ${sessionId}`);
+    this.name = "DuplicateActiveBookingError";
+  }
+}
+
 export interface BookingsRepo {
   listBySessionIds(sessionIds: string[]): Promise<Booking[]>;
   listBySession(sessionId: string): Promise<Booking[]>;
   getById(id: string): Promise<Booking | null>;
+  // Throws DuplicateActiveBookingError if the session+member pair already has
+  // an active booking (booked, waitlisted, or attended).
   insert(booking: Booking): Promise<Booking>;
   update(id: string, patch: Partial<Booking>): Promise<Booking>;
 }
