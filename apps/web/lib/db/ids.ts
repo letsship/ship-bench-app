@@ -5,3 +5,13 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// A secret, unguessable per-member calendar subscription token (CSPRNG, 256
+// bits — Web Crypto so it works on both Node and the Cloudflare Workers
+// runtime). This is the SOLE authorization for GET /api/ical/[token], so it
+// must never be predictable.
+export function newCalendarToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}

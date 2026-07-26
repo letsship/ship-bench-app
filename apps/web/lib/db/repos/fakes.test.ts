@@ -61,6 +61,7 @@ describe("in-memory repositories", () => {
       status: "active",
       notificationsOptedOut: false,
       createdAt: NOW.toISOString(),
+      calendarToken: "tok_new",
     };
     await repos.members.insert(member);
     expect(await repos.members.getById("mem_new")).toEqual(member);
