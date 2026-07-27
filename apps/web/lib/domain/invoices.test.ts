@@ -44,6 +44,43 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("does not throw and is zero across the board when every line is refunded", () => {
+    expect(() =>
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 9000, refunded: true },
+          { quantity: 2, unitAmountCents: 1500, refunded: true },
+        ],
+        2100,
+      ),
+    ).not.toThrow();
+
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 9000, refunded: true },
+          { quantity: 2, unitAmountCents: 1500, refunded: true },
+        ],
+        2100,
+      ),
+    ).toEqual({
+      subtotalCents: 0,
+      refundedCents: 12000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("does not throw and is zero across the board when there are no line items at all", () => {
+    expect(() => computeInvoiceTotals([], 2100)).not.toThrow();
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
 });
 
 describe("formatInvoiceNumber", () => {
