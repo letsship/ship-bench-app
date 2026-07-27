@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toSnakeKey } from "@/lib/db/repos/mapping";
-import { buildSeed } from "@/lib/db/seed-data";
+import { buildSeed, SEED_NOW } from "@/lib/db/seed-data";
 
 // Render the demo dataset as Postgres INSERT statements for supabase/seed.sql
 // (applied by `supabase db reset`). The entity objects are the single source, so
@@ -24,7 +24,7 @@ function insertStatements(table: string, records: readonly object[]): string[] {
   });
 }
 
-const seed = buildSeed();
+const seed = buildSeed(SEED_NOW);
 const sections: [string, readonly object[]][] = [
   ["studios", [seed.studio]],
   ["studio_settings", [seed.settings]],
