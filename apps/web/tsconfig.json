@@ -2,6 +2,7 @@
   "extends": "@studiobook/config-typescript/nextjs.json",
   "compilerOptions": {
     "baseUrl": ".",
+    "types": ["@cloudflare/workers-types"],
     "paths": {
       "@/*": ["./*"]
     }
