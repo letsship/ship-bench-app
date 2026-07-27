@@ -16,6 +16,8 @@
   "d1_databases": [
     {
       "binding": "DB",
+      // database_id must be set to a real D1 instance ID via `wrangler d1 create studiobook`
+      // The migration at migrations/0001_init.sql will be applied automatically on first deploy.
       "database_id": "REPLACE_ME",
       "database_name": "studiobook",
       "migrations_dir": "migrations",
