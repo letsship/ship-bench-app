@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,27 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+export interface BookingExportRange {
+  from?: string;
+  to?: string;
+}
+
+// Export needs an inclusive-both-ends [from, to] window on session start,
+// unlike the repo's SessionRange (startsAt >= to, half-open) used elsewhere,
+// so the filter is applied here rather than pushed down to the repo.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: BookingExportRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  const { from, to } = range;
+  const fromMs = from ? new Date(from).getTime() : undefined;
+  const toMs = to ? new Date(to).getTime() : undefined;
+  return rows.filter((row) => {
+    const startMs = new Date(row.startsAt).getTime();
+    return (fromMs === undefined || startMs >= fromMs) && (toMs === undefined || startMs <= toMs);
+  });
 }
