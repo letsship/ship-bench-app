@@ -105,3 +105,9 @@ export interface NotificationOutboxRow {
   providerMessageId: string | null;
   error: string | null;
 }
+
+export interface StripeWebhookEvent {
+  id: string;
+  eventId: string;
+  processedAt: string;
+}

@@ -202,5 +202,18 @@ export function createSupabaseRepositories(): Repositories {
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
     },
+    webhookEvents: {
+      async has(eventId) {
+        const found = await maybeOne<{ eventId: string }>(
+          db.from("stripe_webhook_events").select("event_id").eq("event_id", eventId).maybeSingle(),
+          "webhookEvents.has",
+        );
+        return found !== null;
+      },
+      async record(eventId) {
+        const { error } = await db.from("stripe_webhook_events").insert({ event_id: eventId });
+        if (error) fail("webhookEvents.record", error);
+      },
+    },
   };
 }

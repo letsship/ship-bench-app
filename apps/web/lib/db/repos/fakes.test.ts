@@ -91,4 +91,15 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("webhookEvents.record then has round-trips true", async () => {
+    const eventId = "evt_test_123";
+    expect(await repos.webhookEvents.has(eventId)).toBe(false);
+    await repos.webhookEvents.record(eventId);
+    expect(await repos.webhookEvents.has(eventId)).toBe(true);
+  });
+
+  it("webhookEvents.has returns false for unrecorded id", async () => {
+    expect(await repos.webhookEvents.has("evt_nonexistent")).toBe(false);
+  });
 });
