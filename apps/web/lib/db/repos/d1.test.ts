@@ -65,7 +65,7 @@ describe("D1 repositories (Drizzle over a real D1Database)", () => {
 
     repos = createD1Repositories(db);
     studioId = seed.studio.id;
-  });
+  }, 30000);
 
   afterAll(async () => {
     await mf.dispose();

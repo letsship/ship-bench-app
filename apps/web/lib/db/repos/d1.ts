@@ -9,6 +9,18 @@ import type { Repositories } from "./types";
 // mapping layer needed on this path. This is the ONE file a Supabase -> D1
 // migration adds — nothing above the repository interface changes.
 
+// D1 caps bound parameters at 100 per statement. Invoice line items bind 8
+// columns each, so chunk batched inserts well under that ceiling.
+const INSERT_MANY_CHUNK_SIZE = 10;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function createD1Repositories(db: D1Database): Repositories {
   const drz = drizzle(db, { schema });
 
@@ -39,11 +51,14 @@ export function createD1Repositories(db: D1Database): Repositories {
     },
     members: {
       async listByStudio(studioId) {
-        return drz
+        // SQLite's ORDER BY uses byte-order (BINARY) collation, which diverges
+        // from the fakes' String.localeCompare on non-ASCII names. Sort in JS
+        // after fetching so both adapters produce the same order.
+        const rows = await drz
           .select()
           .from(schema.members)
-          .where(eq(schema.members.studioId, studioId))
-          .orderBy(asc(schema.members.name));
+          .where(eq(schema.members.studioId, studioId));
+        return rows.sort((a, b) => a.name.localeCompare(b.name));
       },
       async getById(id) {
         const [row] = await drz.select().from(schema.members).where(eq(schema.members.id, id));
@@ -72,11 +87,13 @@ export function createD1Repositories(db: D1Database): Repositories {
     },
     classTypes: {
       async listByStudio(studioId) {
-        return drz
+        // Sort in JS to match the fakes' String.localeCompare ordering — see
+        // the members.listByStudio comment above for why.
+        const rows = await drz
           .select()
           .from(schema.classTypes)
-          .where(eq(schema.classTypes.studioId, studioId))
-          .orderBy(asc(schema.classTypes.name));
+          .where(eq(schema.classTypes.studioId, studioId));
+        return rows.sort((a, b) => a.name.localeCompare(b.name));
       },
       async getById(id) {
         const [row] = await drz
@@ -184,7 +201,11 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
       async insertMany(items) {
         if (items.length === 0) return [];
-        return drz.insert(schema.invoiceLineItems).values(items).returning();
+        const inserted: typeof items = [];
+        for (const batch of chunk(items, INSERT_MANY_CHUNK_SIZE)) {
+          inserted.push(...(await drz.insert(schema.invoiceLineItems).values(batch).returning()));
+        }
+        return inserted;
       },
     },
     outbox: {
