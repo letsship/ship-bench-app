@@ -105,6 +105,11 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
+      async findByCalendarToken(token) {
+        if (!token) return null;
+        const found = store.members.find((row) => row.calendarToken === token);
+        return found ? clone(found) : null;
+      },
       async insert(member) {
         store.members.push(clone(member));
         return clone(member);

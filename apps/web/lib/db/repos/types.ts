@@ -36,6 +36,9 @@ export interface MembersRepo {
   listByStudio(studioId: string): Promise<Member[]>;
   getById(id: string): Promise<Member | null>;
   findByEmail(studioId: string, email: string): Promise<Member | null>;
+  // Resolves a private calendar subscription token to its owner. An unknown
+  // token returns null, which the calendar feed turns into a 404.
+  findByCalendarToken(token: string): Promise<Member | null>;
   insert(member: Member): Promise<Member>;
   update(id: string, patch: Partial<Member>): Promise<Member>;
 }

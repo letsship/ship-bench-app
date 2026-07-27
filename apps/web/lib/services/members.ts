@@ -1,8 +1,17 @@
-import { newId } from "@/lib/db/ids";
+import { newCalendarToken, newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { Member } from "@/lib/db/types";
 import { HttpError } from "@/lib/http";
 import type { CreateMemberInput, UpdateMemberInput } from "@/lib/validation";
+
+// A member's `calendarToken` is the secret that authorizes their private
+// calendar feed, so it must never be serialized to an API client. Strip it at
+// the boundary; server-rendered pages keep using the full row.
+export type PublicMember = Omit<Member, "calendarToken">;
+
+export function toPublicMember({ calendarToken: _calendarToken, ...member }: Member): PublicMember {
+  return member;
+}
 
 export async function listMembers(repos: Repositories, studioId: string): Promise<Member[]> {
   return repos.members.listByStudio(studioId);
@@ -31,6 +40,7 @@ export async function createMember(
     phone: input.phone ?? null,
     status: input.status,
     notificationsOptedOut: false,
+    calendarToken: newCalendarToken(),
     createdAt: new Date().toISOString(),
   });
 }
