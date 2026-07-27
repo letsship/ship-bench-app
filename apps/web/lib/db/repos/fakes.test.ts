@@ -61,9 +61,26 @@ describe("in-memory repositories", () => {
       status: "active",
       notificationsOptedOut: false,
       createdAt: NOW.toISOString(),
+      calendarToken: "mem_new-cal-token",
     };
     await repos.members.insert(member);
     expect(await repos.members.getById("mem_new")).toEqual(member);
+  });
+
+  it("finds a member by calendar token", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const found = await repos.members.getByCalendarToken(target.calendarToken);
+    expect(found?.id).toBe(target.id);
+    expect(await repos.members.getByCalendarToken("nope")).toBeNull();
+  });
+
+  it("lists bookings for a single member", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const bookings = await repos.bookings.listByMember(target.id);
+    expect(bookings.every((b) => b.memberId === target.id)).toBe(true);
+    expect(bookings.length).toBeGreaterThan(0);
   });
 
   it("update returns an isolated clone (store not mutated by reference)", async () => {

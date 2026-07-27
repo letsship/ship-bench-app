@@ -5,3 +5,11 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Opaque, URL-safe, high-entropy secret for a member's private calendar
+// subscription link. Deliberately a different shape than the uuid primary key
+// so a member's schedule can't be reached by guessing their id.
+export function newCalendarToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
