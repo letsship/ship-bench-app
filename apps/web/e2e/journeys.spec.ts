@@ -43,6 +43,31 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("opens the fully-refunded invoice detail page and sees zero totals with refunded badge", async ({
+    page,
+  }) => {
+    await page.goto("/invoices");
+    const table = page.getByTestId("invoices-table");
+    await expect(table).toBeVisible();
+
+    // Click the INV-2026-0005 invoice (Femke's fully-refunded Pottery intensive).
+    await table.getByRole("link", { name: "INV-2026-0005" }).click();
+    await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+
+    // The detail renders cleanly: heading, line table, and zero totals.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Description" })).toBeVisible();
+
+    // Verify the subtotal, tax, and total are all €0.00 (no error screen).
+    await expect(page.getByText("Subtotal €0.00")).toBeVisible();
+    await expect(page.getByText("Tax (9.0%) €0.00")).toBeVisible();
+    await expect(page.getByText("Total €0.00")).toBeVisible();
+
+    // The refunded line is listed and badged as refunded.
+    await expect(page.getByText("Pottery intensive")).toBeVisible();
+    await expect(page.locator(".sb-badge").filter({ hasText: "refunded" })).toBeVisible();
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
