@@ -9,6 +9,7 @@ const NOTIFY_TOGGLES = [
   { name: "notifyCancellations", label: "Cancellations" },
   { name: "notifyWaitlistPromotions", label: "Waitlist promotions" },
   { name: "notifyInvoices", label: "Invoices" },
+  { name: "notifyBookingReminders", label: "Class reminders" },
 ] as const;
 
 export default async function SettingsPage() {

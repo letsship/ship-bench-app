@@ -37,6 +37,7 @@ export interface UpdateSettingsInput {
   notifyCancellations?: boolean;
   notifyWaitlistPromotions?: boolean;
   notifyInvoices?: boolean;
+  notifyBookingReminders?: boolean;
 }
 
 export async function updateSettings(

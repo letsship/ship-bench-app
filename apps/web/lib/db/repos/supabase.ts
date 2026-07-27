@@ -201,6 +201,15 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+      existsByDedupeKey: async (dedupeKey) => {
+        const { data, error } = await db
+          .from("notification_outbox")
+          .select("id")
+          .eq("dedupe_key", dedupeKey)
+          .limit(1);
+        if (error) fail("outbox.existsByDedupeKey", error);
+        return (data ?? []).length > 0;
+      },
     },
   };
 }

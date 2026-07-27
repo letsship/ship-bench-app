@@ -210,6 +210,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
       },
+      async existsByDedupeKey(dedupeKey) {
+        return store.outbox.some((row) => row.dedupeKey === dedupeKey);
+      },
     },
   };
 }

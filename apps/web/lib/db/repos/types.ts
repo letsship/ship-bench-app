@@ -77,6 +77,9 @@ export interface NotificationOutboxRepo {
   insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
   listPending(): Promise<NotificationOutboxRow[]>;
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
+  // Scans regardless of sentAt, so an already-dispatched reminder still blocks
+  // a re-queue on the next run.
+  existsByDedupeKey(dedupeKey: string): Promise<boolean>;
 }
 
 export interface Repositories {

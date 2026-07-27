@@ -25,6 +25,7 @@ function seedWith(
       notifyCancellations: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
+      notifyBookingReminders: true,
       ...settingsOverrides,
     },
     members: [
@@ -68,6 +69,7 @@ describe("shouldSend", () => {
     notifyCancellations: false,
     notifyWaitlistPromotions: true,
     notifyInvoices: false,
+    notifyBookingReminders: true,
   };
 
   it("respects the per-kind studio setting", () => {
@@ -75,6 +77,7 @@ describe("shouldSend", () => {
     expect(shouldSend("booking_cancellation", base)).toBe(false);
     expect(shouldSend("waitlist_promotion", base)).toBe(true);
     expect(shouldSend("invoice_issued", base)).toBe(false);
+    expect(shouldSend("booking_reminder", base)).toBe(true);
   });
 
   it("member opt-out wins over every setting", () => {
