@@ -10,6 +10,7 @@ import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
+import { getMemberStatement } from "./account-statements";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
 
@@ -294,6 +295,72 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("account statement for invoice with refunded line excludes refund from taxable subtotal", async () => {
+    const invoiceId = "inv-refund-test";
+    const customRepos = createInMemoryRepositories(
+      baseSeed({
+        members: [member(memberId)],
+        invoices: [
+          {
+            id: invoiceId,
+            studioId: "s1",
+            memberId: memberId,
+            number: "INV-2026-0001",
+            status: "open",
+            currency: "EUR",
+            taxRateBps: 900,
+            subtotalCents: 15000,
+            taxCents: 1350,
+            totalCents: 16350,
+            issuedAt: ISO,
+            dueAt: ISO,
+            paidAt: null,
+            createdAt: ISO,
+          },
+        ],
+        lineItems: [
+          {
+            id: "line-billable",
+            invoiceId: invoiceId,
+            description: "Billable",
+            quantity: 1,
+            unitAmountCents: 10000,
+            amountCents: 10000,
+            refunded: false,
+            bookingId: null,
+          },
+          {
+            id: "line-refunded",
+            invoiceId: invoiceId,
+            description: "Refunded",
+            quantity: 1,
+            unitAmountCents: 5000,
+            amountCents: 5000,
+            refunded: true,
+            bookingId: null,
+          },
+        ],
+      }),
+    );
+    const statement = await getMemberStatement(customRepos, "s1", memberId);
+    const invoiceLine = statement.lines.find((line) => line.invoiceId === invoiceId);
+    expect(invoiceLine?.totalCents).toBe(10900);
+  });
+
+  it("invoice creation without refunded lines stores subtotal/tax/total correctly", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [
+        { description: "Pass", quantity: 2, unitAmountCents: 1000 },
+        { description: "Class", quantity: 1, unitAmountCents: 5000 },
+      ],
+    });
+    expect(detail.invoice.subtotalCents).toBe(7000);
+    expect(detail.invoice.taxCents).toBe(630);
+    expect(detail.invoice.totalCents).toBe(7630);
   });
 });
 
