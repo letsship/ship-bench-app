@@ -35,14 +35,14 @@ export const createSessionSchema = z
 
 export const createMemberSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  email: z.string().trim().toLowerCase().email(),
+  email: z.string().trim().toLowerCase().pipe(z.email()),
   phone: z.string().trim().max(40).optional(),
   status: z.enum(["active", "paused", "cancelled"]).default("active"),
 });
 
 export const updateMemberSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  email: z.string().trim().toLowerCase().email().optional(),
+  email: z.string().trim().toLowerCase().pipe(z.email()).optional(),
   phone: z.string().trim().max(40).nullable().optional(),
   status: z.enum(["active", "paused", "cancelled"]).optional(),
   notificationsOptedOut: z.boolean().optional(),
