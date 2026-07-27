@@ -5,3 +5,8 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Opaque random token for per-member calendar subscriptions.
+export function newCalendarToken(): string {
+  return crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+}
