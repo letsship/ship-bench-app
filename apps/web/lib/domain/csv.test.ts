@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -70,5 +70,60 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("has the correct header columns in order", () => {
+    const csv = bookingsToCsv([]);
+    const header = csv.split("\r\n")[0];
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("keeps a member name with a comma as a single quoted column", () => {
+    const csv = bookingsToCsv([
+      {
+        starts: "2026-06-15T10:00:00Z",
+        className: "Yoga",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [, row] = csv.split("\r\n");
+    expect(row).toContain('"Rossi, Chiara"');
+  });
+
+  it("doubles embedded double quotes", () => {
+    const csv = bookingsToCsv([
+      {
+        starts: "2026-06-15T10:00:00Z",
+        className: 'Yoga "Advanced"',
+        memberName: "Alice",
+        email: "alice@example.com",
+        status: "booked",
+      },
+    ]);
+    const [, row] = csv.split("\r\n");
+    expect(row).toContain('"Yoga ""Advanced"""');
+  });
+
+  it("normalizes starts to ISO-8601 UTC", () => {
+    const csv = bookingsToCsv([
+      {
+        starts: "2026-06-15T10:00:00Z",
+        className: "Yoga",
+        memberName: "Bob",
+        email: "bob@example.com",
+        status: "booked",
+      },
+    ]);
+    const [, row] = csv.split("\r\n");
+    expect(row).toContain("2026-06-15T10:00:00.000Z");
+  });
+
+  it("returns just the header for empty rows", () => {
+    const csv = bookingsToCsv([]);
+    expect(csv).toBe("Starts,Class,Member,Email,Status");
   });
 });
