@@ -31,16 +31,6 @@ function toCamel(row: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
-function toSnake(row: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(row)) {
-    // Convert camelCase to snake_case
-    const snakeKey = key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
-    result[snakeKey] = value;
-  }
-  return result;
-}
-
 export function createD1Repositories(db: D1Database): Repositories {
   const drizzleDb = drizzle(db, { schema });
 
@@ -66,11 +56,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       async update(studioId, patch) {
         await drizzleDb
           .update(schema.studioSettings)
-          .set(
-            toSnake(patch as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.studioSettings
-            >,
-          )
+          .set(patch as unknown as InferInsertModel<typeof schema.studioSettings>)
           .where(eq(schema.studioSettings.studioId, studioId));
         const result = await drizzleDb
           .select()
@@ -109,21 +95,13 @@ export function createD1Repositories(db: D1Database): Repositories {
       async insert(member) {
         await drizzleDb
           .insert(schema.members)
-          .values(
-            toSnake(member as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.members
-            >,
-          );
+          .values(member as unknown as InferInsertModel<typeof schema.members>);
         return member;
       },
       async update(id, patch) {
         await drizzleDb
           .update(schema.members)
-          .set(
-            toSnake(patch as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.members
-            >,
-          )
+          .set(patch as unknown as InferInsertModel<typeof schema.members>)
           .where(eq(schema.members.id, id));
         const result = await drizzleDb
           .select()
@@ -153,11 +131,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       async insert(classType) {
         await drizzleDb
           .insert(schema.classTypes)
-          .values(
-            toSnake(classType as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.classTypes
-            >,
-          );
+          .values(classType as unknown as InferInsertModel<typeof schema.classTypes>);
         return classType;
       },
     },
@@ -188,11 +162,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       async insert(session) {
         await drizzleDb
           .insert(schema.classSessions)
-          .values(
-            toSnake(session as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.classSessions
-            >,
-          );
+          .values(session as unknown as InferInsertModel<typeof schema.classSessions>);
         return session;
       },
     },
@@ -224,21 +194,13 @@ export function createD1Repositories(db: D1Database): Repositories {
       async insert(booking) {
         await drizzleDb
           .insert(schema.bookings)
-          .values(
-            toSnake(booking as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.bookings
-            >,
-          );
+          .values(booking as unknown as InferInsertModel<typeof schema.bookings>);
         return booking;
       },
       async update(id, patch) {
         await drizzleDb
           .update(schema.bookings)
-          .set(
-            toSnake(patch as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.bookings
-            >,
-          )
+          .set(patch as unknown as InferInsertModel<typeof schema.bookings>)
           .where(eq(schema.bookings.id, id));
         const result = await drizzleDb
           .select()
@@ -275,21 +237,13 @@ export function createD1Repositories(db: D1Database): Repositories {
       async insert(invoice) {
         await drizzleDb
           .insert(schema.invoices)
-          .values(
-            toSnake(invoice as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.invoices
-            >,
-          );
+          .values(invoice as unknown as InferInsertModel<typeof schema.invoices>);
         return invoice;
       },
       async update(id, patch) {
         await drizzleDb
           .update(schema.invoices)
-          .set(
-            toSnake(patch as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.invoices
-            >,
-          )
+          .set(patch as unknown as InferInsertModel<typeof schema.invoices>)
           .where(eq(schema.invoices.id, id));
         const result = await drizzleDb
           .select()
@@ -312,11 +266,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         if (items.length === 0) return [];
         await drizzleDb
           .insert(schema.invoiceLineItems)
-          .values(
-            items.map((item) =>
-              toSnake(item as unknown as Record<string, unknown>),
-            ) as unknown as InferInsertModel<typeof schema.invoiceLineItems>[],
-          );
+          .values(items as unknown as InferInsertModel<typeof schema.invoiceLineItems>[]);
         return items;
       },
     },
@@ -324,11 +274,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       async insert(row) {
         await drizzleDb
           .insert(schema.notificationOutbox)
-          .values(
-            toSnake(row as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.notificationOutbox
-            >,
-          );
+          .values(row as unknown as InferInsertModel<typeof schema.notificationOutbox>);
         return row;
       },
       async listPending() {
@@ -343,11 +289,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       async update(id, patch) {
         await drizzleDb
           .update(schema.notificationOutbox)
-          .set(
-            toSnake(patch as unknown as Record<string, unknown>) as unknown as InferInsertModel<
-              typeof schema.notificationOutbox
-            >,
-          )
+          .set(patch as unknown as InferInsertModel<typeof schema.notificationOutbox>)
           .where(eq(schema.notificationOutbox.id, id));
         const result = await drizzleDb
           .select()
