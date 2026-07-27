@@ -5,3 +5,12 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// High-entropy secret token for per-member calendar subscriptions. 16 random
+// bytes (32 hex chars) is collision-resistant and unguessable.
+export function newCalendarToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
