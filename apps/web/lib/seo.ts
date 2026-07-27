@@ -39,7 +39,19 @@ export const homeMetadata: Metadata = {
   title: "Studiobook — studio class booking",
   description:
     "Run your studio, not a spreadsheet. Studiobook keeps your pottery wheels spinning and your yoga mats full — bookings, members, and invoices in one calm workspace.",
+  robots: {
+    index: true,
+    follow: true,
+  },
   alternates: {
     canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Studiobook",
+    title: "Studiobook — studio class booking",
+    description:
+      "Run your studio, not a spreadsheet. Studiobook keeps your pottery wheels spinning and your yoga mats full — bookings, members, and invoices in one calm workspace.",
   },
 };

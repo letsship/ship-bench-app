@@ -51,5 +51,20 @@ describe("seo metadata", () => {
     it("sets canonical to root /", () => {
       expect(homeMetadata.alternates?.canonical).toBe("/");
     });
+
+    it("marks the home page as indexable (robots: index/follow)", () => {
+      expect(homeMetadata.robots).toBeDefined();
+      expect(homeMetadata.robots?.index).toBe(true);
+      expect(homeMetadata.robots?.follow).toBe(true);
+    });
+
+    it("includes page-scoped openGraph metadata", () => {
+      expect(homeMetadata.openGraph).toBeDefined();
+      expect(homeMetadata.openGraph?.type).toBe("website");
+      expect(homeMetadata.openGraph?.url).toBe("/");
+      expect(homeMetadata.openGraph?.siteName).toBe("Studiobook");
+      expect(homeMetadata.openGraph?.title).toBeTruthy();
+      expect(homeMetadata.openGraph?.description).toBeTruthy();
+    });
   });
 });
