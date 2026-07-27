@@ -130,11 +130,14 @@ export async function createInvoice(
 
 export async function updateInvoiceStatus(
   repos: Repositories,
+  studioId: string,
   id: string,
   status: InvoiceStatus,
 ): Promise<Invoice> {
   const invoice = await repos.invoices.getById(id);
-  if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
+  if (!invoice || invoice.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Invoice not found");
+  }
   if (!canTransitionInvoice(invoice.status as InvoiceStatus, status)) {
     throw new HttpError(
       409,

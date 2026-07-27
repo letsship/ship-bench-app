@@ -319,9 +319,11 @@ describe("invoices service", () => {
       memberId,
       lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
     });
-    const paid = await updateInvoiceStatus(repos, detail.invoice.id, "paid");
+    const paid = await updateInvoiceStatus(repos, studioId, detail.invoice.id, "paid");
     expect(paid.status).toBe("paid");
-    await expect(updateInvoiceStatus(repos, detail.invoice.id, "open")).rejects.toMatchObject({
+    await expect(
+      updateInvoiceStatus(repos, studioId, detail.invoice.id, "open"),
+    ).rejects.toMatchObject({
       status: 409,
       code: "invalid_transition",
     });
@@ -340,6 +342,21 @@ describe("invoices service", () => {
       status: 404,
       code: "not_found",
     });
+  });
+
+  it("updateInvoiceStatus 404s for an invoice belonging to another studio and leaves it unmodified", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
+    });
+    await expect(
+      updateInvoiceStatus(repos, "other-studio", detail.invoice.id, "paid"),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    expect((await repos.invoices.getById(detail.invoice.id))?.status).toBe("open");
   });
 });
 
