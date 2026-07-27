@@ -324,4 +324,77 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
   });
+
+  it("lists booking rows with bounded reads (no N+1 per booking)", async () => {
+    // Create a seed with many bookings
+    const memberCount = 50;
+    const bookingPerMember = 2;
+    const members = Array.from({ length: memberCount }, (_, i) =>
+      member(`m${i}`, { name: `Member ${i}` }),
+    );
+    const classTypes = [classType("ct1"), classType("ct2")];
+    const sessions = [
+      session("cs1", { classTypeId: "ct1" }),
+      session("cs2", { classTypeId: "ct2" }),
+    ];
+    const bookings = Array.from({ length: memberCount * bookingPerMember }, (_, i) => ({
+      ...booking(`b${i}`, `m${i % memberCount}`),
+      sessionId: i % 2 === 0 ? "cs1" : "cs2",
+    }));
+
+    const seed = baseSeed({
+      members,
+      classTypes,
+      sessions,
+      bookings,
+    });
+
+    // Create a call-counting proxy around the repositories
+    const baseRepos = createInMemoryRepositories(seed);
+    const callCounts = {
+      membersGetById: 0,
+      membersListByStudio: 0,
+      classSessionsGetById: 0,
+      classSessionsListByStudio: 0,
+    };
+
+    const countingRepos: Repositories = {
+      ...baseRepos,
+      members: {
+        ...baseRepos.members,
+        getById: async (...args) => {
+          callCounts.membersGetById++;
+          return baseRepos.members.getById(...args);
+        },
+        listByStudio: async (...args) => {
+          callCounts.membersListByStudio++;
+          return baseRepos.members.listByStudio(...args);
+        },
+      },
+      classSessions: {
+        ...baseRepos.classSessions,
+        getById: async (...args) => {
+          callCounts.classSessionsGetById++;
+          return baseRepos.classSessions.getById(...args);
+        },
+        listByStudio: async (...args) => {
+          callCounts.classSessionsListByStudio++;
+          return baseRepos.classSessions.listByStudio(...args);
+        },
+      },
+    };
+
+    const rows = await listBookingRows(countingRepos, "s1");
+
+    // Verify we got all the bookings
+    expect(rows.length).toBe(bookings.length);
+
+    // Verify bounded reads: no per-booking getById calls
+    expect(callCounts.membersGetById).toBe(0);
+    expect(callCounts.classSessionsGetById).toBe(0);
+
+    // Verify batch reads were made (but count doesn't scale with N)
+    expect(callCounts.membersListByStudio).toBe(1);
+    expect(callCounts.classSessionsListByStudio).toBe(1);
+  });
 });
