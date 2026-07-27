@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "studiobook_session",
+      "value": "eyJlbWFpbCI6Im9wZXJhdG9yQHJpdmVyYmFuay5zdHVkaW8iLCJpc3N1ZWRBdCI6MTc4MzYwMTU4Mjc5MX0.LG3333bv3OYGk88kehQbEMCTfe03v1C4cF3h_6HMNjo",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1786193582.819922,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}
