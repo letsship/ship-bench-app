@@ -9,6 +9,7 @@ import {
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
 import { HttpError } from "@/lib/http";
+import { spendPackCredit } from "@/lib/services/class-packs";
 import {
   bookingCancellation,
   bookingConfirmation,
@@ -81,6 +82,10 @@ export async function createBooking(
   });
   if (!decision.ok) {
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
+  }
+
+  if (decision.status === "booked") {
+    await spendPackCredit(repos, member.id);
   }
 
   const bookingId = newId();

@@ -259,3 +259,4 @@ insert into public.invoice_line_items (id, invoice_id, description, quantity, un
 insert into public.notification_outbox (id, member_id, kind, payload, created_at, sent_at, provider_message_id, error) values ('00000000-0000-4000-8000-0000000000f7', '00000000-0000-4000-8000-000000000002', 'booking_confirmation', '{"subject":"You''re booked","body":"See you soon!","data":{}}', '2026-06-29T12:00:00.000Z', '2026-06-30T12:00:00.000Z', 're_seededdelivery0001', NULL);
 insert into public.notification_outbox (id, member_id, kind, payload, created_at, sent_at, provider_message_id, error) values ('00000000-0000-4000-8000-0000000000f8', '00000000-0000-4000-8000-000000000003', 'invoice_issued', '{"subject":"Invoice ready","body":"Your invoice is ready.","data":{}}', '2026-06-29T12:00:00.000Z', NULL, NULL, NULL);
 
+
