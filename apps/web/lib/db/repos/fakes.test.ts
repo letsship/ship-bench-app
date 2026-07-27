@@ -91,4 +91,58 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("packages: listByMember returns only that member's packs newest-first", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const member = members[0];
+    await repos.packages.insert({
+      id: "pkg1",
+      studioId,
+      memberId: member.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active",
+      purchasedAt: "2026-03-01T10:00:00Z",
+      createdAt: "2026-03-01T10:00:00Z",
+    });
+    await repos.packages.insert({
+      id: "pkg2",
+      studioId,
+      memberId: member.id,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10000,
+      status: "active",
+      purchasedAt: "2026-03-02T10:00:00Z",
+      createdAt: "2026-03-02T10:00:00Z",
+    });
+    const list = await repos.packages.listByMember(member.id);
+    expect(list.map((p) => p.id)).toEqual(["pkg2", "pkg1"]);
+  });
+
+  it("packages: update patches creditsRemaining and status", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const member = members[0];
+    const pkg = await repos.packages.insert({
+      id: "pkg-update",
+      studioId,
+      memberId: member.id,
+      creditsTotal: 10,
+      creditsRemaining: 10,
+      priceCents: 10000,
+      status: "active",
+      purchasedAt: NOW.toISOString(),
+      createdAt: NOW.toISOString(),
+    });
+    const updated = await repos.packages.update(pkg.id, {
+      creditsRemaining: 5,
+      status: "refunded",
+    });
+    expect(updated.creditsRemaining).toBe(5);
+    expect(updated.status).toBe("refunded");
+    const refetched = await repos.packages.getById(pkg.id);
+    expect(refetched?.creditsRemaining).toBe(5);
+    expect(refetched?.status).toBe("refunded");
+  });
 });
