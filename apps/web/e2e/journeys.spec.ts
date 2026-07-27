@@ -61,11 +61,11 @@ test.describe("operator journeys (fake backends)", () => {
     // Verify the subtotal, tax, and total are all €0.00 (no error screen).
     await expect(page.getByText("Subtotal €0.00")).toBeVisible();
     await expect(page.getByText("Tax (9.0%) €0.00")).toBeVisible();
-    await expect(page.getByText("Total €0.00")).toBeVisible();
+    await expect(page.getByText("Total €0.00", { exact: true })).toBeVisible();
 
     // The refunded line is listed and badged as refunded.
     await expect(page.getByText("Pottery intensive")).toBeVisible();
-    await expect(page.locator(".sb-badge").filter({ hasText: "refunded" })).toBeVisible();
+    await expect(page.locator(".sb-badge").filter({ hasText: "refunded" }).first()).toBeVisible();
   });
 
   test("browses the members roster and the revenue report", async ({ page }) => {
