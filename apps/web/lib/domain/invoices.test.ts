@@ -29,6 +29,26 @@ describe("computeInvoiceTotals", () => {
     expect(totals.totalCents).toBe(1090);
   });
 
+  // Regression for the statement/invoice drift: tax applies to the EUR100
+  // billable line only, never the full EUR150, so the total is EUR109.00 and
+  // not the over-taxed EUR163.50.
+  it("taxes only the billable line when a line is refunded", () => {
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 10_000 },
+          { quantity: 1, unitAmountCents: 5_000, refunded: true },
+        ],
+        900,
+      ),
+    ).toEqual({
+      subtotalCents: 10_000,
+      refundedCents: 5_000,
+      taxCents: 900,
+      totalCents: 10_900,
+    });
+  });
+
   it("rounds tax half-up", () => {
     // 1000 * 5 / 10000 = 0.5 -> rounds to 1
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 5).taxCents).toBe(1);
