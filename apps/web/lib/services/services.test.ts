@@ -114,12 +114,48 @@ describe("members service", () => {
       email: "new@example.com",
       status: "active",
     });
-    const updated = await updateMember(repos, created.id, { status: "paused" });
+    const updated = await updateMember(repos, studioId, created.id, { status: "paused" });
     expect(updated.status).toBe("paused");
   });
 
   it("getMember 404s for an unknown id", async () => {
-    await expect(getMember(repos, "nope")).rejects.toMatchObject({ status: 404 });
+    await expect(getMember(repos, studioId, "nope")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("getMember rejects a foreign studio's member with 404", async () => {
+    const foreignMember = await repos.members.insert({
+      id: "foreign-m1",
+      studioId: "s2",
+      name: "Foreign",
+      email: "foreign@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: ISO,
+    });
+    await expect(getMember(repos, studioId, foreignMember.id)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+  });
+
+  it("updateMember rejects a foreign studio's member with 404", async () => {
+    const foreignMember = await repos.members.insert({
+      id: "foreign-m2",
+      studioId: "s2",
+      name: "Foreign",
+      email: "foreign2@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: ISO,
+    });
+    await expect(
+      updateMember(repos, studioId, foreignMember.id, { status: "paused" }),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
   });
 });
 
@@ -210,7 +246,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
     expect(result.refundEligible).toBe(true);
   });
 
@@ -223,7 +259,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
     expect(result.refundEligible).toBe(false);
   });
 
@@ -241,13 +277,35 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const result = await cancelBooking(repos, provider, "s1", "b1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+  });
+
+  it("cancelBooking rejects a foreign studio's booking with 404", async () => {
+    const foreignMember = member("foreign-m5", { studioId: "s2" });
+    const foreignSession = session("foreign-cs1", { studioId: "s2" });
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [foreignSession],
+        members: [foreignMember],
+        bookings: [booking("foreign-b1", "foreign-m5", { sessionId: "foreign-cs1" })],
+      }),
+    );
+    await expect(
+      cancelBooking(repos, createFakeProvider(), "s1", "foreign-b1"),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    const bookingAfter = await repos.bookings.getById("foreign-b1");
+    expect(bookingAfter?.status).toBe("booked");
+    expect(bookingAfter?.cancelledAt).toBeNull();
   });
 });
 
@@ -281,9 +339,11 @@ describe("invoices service", () => {
       memberId,
       lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
     });
-    const paid = await updateInvoiceStatus(repos, detail.invoice.id, "paid");
+    const paid = await updateInvoiceStatus(repos, studioId, detail.invoice.id, "paid");
     expect(paid.status).toBe("paid");
-    await expect(updateInvoiceStatus(repos, detail.invoice.id, "open")).rejects.toMatchObject({
+    await expect(
+      updateInvoiceStatus(repos, studioId, detail.invoice.id, "open"),
+    ).rejects.toMatchObject({
       status: 409,
       code: "invalid_transition",
     });
@@ -292,8 +352,76 @@ describe("invoices service", () => {
   it("lists invoices with member names and reads a detail", async () => {
     const list = await listInvoices(repos, studioId);
     expect(list.length).toBeGreaterThan(0);
-    const detail = await getInvoiceDetail(repos, list[0].id);
+    const detail = await getInvoiceDetail(repos, studioId, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("getInvoiceDetail rejects a foreign studio's invoice with 404", async () => {
+    const foreignMember = await repos.members.insert({
+      id: "foreign-m3",
+      studioId: "s2",
+      name: "Foreign",
+      email: "foreign3@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: ISO,
+    });
+    const foreignInvoice = await repos.invoices.insert({
+      id: "foreign-inv1",
+      studioId: "s2",
+      memberId: foreignMember.id,
+      number: "S2-0001",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: 900,
+      subtotalCents: 1000,
+      taxCents: 90,
+      totalCents: 1090,
+      issuedAt: ISO,
+      dueAt: null,
+      paidAt: null,
+      createdAt: ISO,
+    });
+    await expect(getInvoiceDetail(repos, studioId, foreignInvoice.id)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+  });
+
+  it("updateInvoiceStatus rejects a foreign studio's invoice with 404", async () => {
+    const foreignMember = await repos.members.insert({
+      id: "foreign-m4",
+      studioId: "s2",
+      name: "Foreign",
+      email: "foreign4@example.com",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: ISO,
+    });
+    const foreignInvoice = await repos.invoices.insert({
+      id: "foreign-inv2",
+      studioId: "s2",
+      memberId: foreignMember.id,
+      number: "S2-0002",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: 900,
+      subtotalCents: 1000,
+      taxCents: 90,
+      totalCents: 1090,
+      issuedAt: ISO,
+      dueAt: null,
+      paidAt: null,
+      createdAt: ISO,
+    });
+    await expect(
+      updateInvoiceStatus(repos, studioId, foreignInvoice.id, "paid"),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
   });
 });
 
