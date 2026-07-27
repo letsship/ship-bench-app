@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
 import { createInMemoryRepositories } from "./fakes";
-import type { Repositories } from "./types";
+import { DuplicateActiveBookingError, type Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -49,6 +49,48 @@ describe("in-memory repositories", () => {
     const ids = sessions.slice(0, 3).map((s) => s.id);
     const bookings = await repos.bookings.listBySessionIds(ids);
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
+  });
+
+  it("rejects inserting a second active booking for the same member + session", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const memberId = (await repos.members.listByStudio(studioId))[0].id;
+
+    await repos.bookings.insert({
+      id: "bk_active_1",
+      sessionId,
+      memberId,
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    await expect(
+      repos.bookings.insert({
+        id: "bk_active_2",
+        sessionId,
+        memberId,
+        status: "waitlisted",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).rejects.toBeInstanceOf(DuplicateActiveBookingError);
+
+    await repos.bookings.update("bk_active_1", {
+      status: "cancelled",
+      cancelledAt: NOW.toISOString(),
+    });
+
+    await expect(
+      repos.bookings.insert({
+        id: "bk_active_3",
+        sessionId,
+        memberId,
+        status: "booked",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).resolves.toMatchObject({ id: "bk_active_3", status: "booked" });
   });
 
   it("inserts then reads back by id", async () => {

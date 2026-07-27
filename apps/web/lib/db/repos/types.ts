@@ -23,6 +23,17 @@ export interface SessionRange {
   to?: string;
 }
 
+// Thrown by bookings.insert (both repo implementations) when the insert would
+// create a second active (booked | waitlisted | attended) booking for the
+// same member + session. Lives here, not in http.ts, so repos stay free of
+// HTTP concerns; services.ts maps it to the existing `already_booked` 409.
+export class DuplicateActiveBookingError extends Error {
+  constructor() {
+    super("Member already has an active booking for this session");
+    this.name = "DuplicateActiveBookingError";
+  }
+}
+
 export interface StudioRepo {
   getFirst(): Promise<Studio | null>;
 }

@@ -9,7 +9,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
-import type { Repositories, SessionRange } from "./types";
+import { DuplicateActiveBookingError, type Repositories, type SessionRange } from "./types";
 
 // In-memory implementation of the repository seam. Used by the test suite
 // (fully hermetic — no Postgres, no native modules) and by the local
@@ -42,6 +42,10 @@ interface Store {
 
 const clone = <T>(row: T): T => ({ ...row });
 const cloneAll = <T>(rows: T[]): T[] => rows.map(clone);
+
+// Mirrors the partial unique index in packages/db/migrations/0002_bookings_unique_active.sql:
+// a member may hold at most one active booking per session.
+const ACTIVE_BOOKING_STATUSES = new Set(["booked", "waitlisted", "attended"]);
 
 function inRange(startsAt: string, range: SessionRange): boolean {
   if (range.from && startsAt < range.from) return false;
@@ -160,6 +164,13 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        const hasActiveBooking = store.bookings.some(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            ACTIVE_BOOKING_STATUSES.has(row.status),
+        );
+        if (hasActiveBooking) throw new DuplicateActiveBookingError();
         store.bookings.push(clone(booking));
         return clone(booking);
       },
