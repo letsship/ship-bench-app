@@ -51,6 +51,20 @@ describe("in-memory repositories", () => {
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
   });
 
+  it("finds a member by their calendar token", async () => {
+    const [member] = await repos.members.listByStudio(studioId);
+    const found = await repos.members.getByCalendarToken(member.calendarToken);
+    expect(found?.id).toBe(member.id);
+    expect(await repos.members.getByCalendarToken("does-not-exist")).toBeNull();
+  });
+
+  it("lists only a single member's bookings", async () => {
+    const [member] = await repos.members.listByStudio(studioId);
+    const bookings = await repos.bookings.listByMember(member.id);
+    expect(bookings.length).toBeGreaterThan(0);
+    expect(bookings.every((b) => b.memberId === member.id)).toBe(true);
+  });
+
   it("inserts then reads back by id", async () => {
     const member = {
       id: "mem_new",
@@ -61,6 +75,7 @@ describe("in-memory repositories", () => {
       status: "active",
       notificationsOptedOut: false,
       createdAt: NOW.toISOString(),
+      calendarToken: "cal_new",
     };
     await repos.members.insert(member);
     expect(await repos.members.getById("mem_new")).toEqual(member);

@@ -32,6 +32,9 @@ export interface Member {
   status: string;
   notificationsOptedOut: boolean;
   createdAt: string;
+  // Secret used to authorize GET /api/ical/[token] — a calendar app can't send
+  // our session cookie, so this token itself is the authorization.
+  calendarToken: string;
 }
 
 export interface ClassType {
