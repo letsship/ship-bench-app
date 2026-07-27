@@ -149,15 +149,27 @@ jobs:
           sed -i "s#\"database_id\": *\"[^\"]*\"#\"database_id\": \"$DB_ID\"#g" "$CONFIG"
           sed -i "s#\"database_name\": *\"[^\"]*\"#\"database_name\": \"$DB_NAME\"#g" "$CONFIG"
           echo "D1 binding -> $DB_NAME ($DB_ID)"
-          # Reset: drop every user table (incl. d1_migrations) so each preview
-          # starts clean and migrations re-apply from scratch.
-          pnpm exec wrangler d1 execute "$DB_NAME" --remote --json --command \
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'" \
-            > /tmp/d1-tables.json || echo '[]' > /tmp/d1-tables.json
-          node -e 'const j=require("/tmp/d1-tables.json");const rows=(Array.isArray(j)?j[0]:j)?.results||[];const s=rows.map(r=>`DROP TABLE IF EXISTS \"${r.name}\";`).join("\n");require("fs").writeFileSync("/tmp/d1-drop.sql",s);console.log(`reset: dropping ${rows.length} table(s)`)'
-          if [ -s /tmp/d1-drop.sql ]; then
-            pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --file /tmp/d1-drop.sql
-          fi
+          # Reset: drop every user table so each preview starts clean and
+          # migrations re-apply from scratch. D1 enforces foreign keys and does not
+          # honor foreign_keys/defer pragmas across its separate-statement execution,
+          # so a single-batch drop fails on a parent table (e.g. "members") whose
+          # children still exist. Multi-pass instead: each pass drops the current
+          # leaves; parents become droppable next pass. Converges in ~3 passes and is
+          # schema-agnostic.
+          for pass in 1 2 3 4 5 6; do
+            pnpm exec wrangler d1 execute "$DB_NAME" --remote --json --command \
+              "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'" \
+              > /tmp/d1t.json 2>/dev/null || echo '[]' > /tmp/d1t.json
+            NAMES=$(node -e 'const j=require("/tmp/d1t.json");const r=(Array.isArray(j)?j[0]:j)?.results||[];console.log(r.map(x=>x.name).join(" "))')
+            if [ -z "$NAMES" ]; then
+              echo "reset: clean after $((pass-1)) pass(es)"
+              break
+            fi
+            echo "reset pass $pass: dropping $(echo $NAMES | wc -w | tr -d ' ') table(s)"
+            for t in $NAMES; do
+              pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --command "DROP TABLE IF EXISTS \"$t\"" >/dev/null 2>&1 || true
+            done
+          done
           # Apply the solution's migrations, then seed via the solution's emitter.
           # NOTE: `d1 migrations apply` has NO --yes flag (only `d1 execute` does);
           # it auto-proceeds in CI's non-interactive shell.
