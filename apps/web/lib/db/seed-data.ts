@@ -1,6 +1,6 @@
 // Deterministic seed dataset: byte-stable ids + a fixed clock so emit-seed-sql
-// renders an IDENTICAL supabase/seed.sql on every run (no churn on unrelated
-// PRs). Runtime rows the app creates still use the random newId from ./ids;
+// renders an IDENTICAL apps/web/migrations/0002_seed.sql on every run (no churn on
+// unrelated PRs). Runtime rows the app creates still use the random newId from ./ids;
 // only the demo seed is deterministic. buildSeed resets the counter so repeated
 // calls are identical.
 export const SEED_NOW = new Date("2026-07-01T12:00:00.000Z");
