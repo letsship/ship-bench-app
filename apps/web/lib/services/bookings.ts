@@ -8,6 +8,7 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import { resolvePackDraw } from "@/lib/domain/pack-rules";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -83,6 +84,15 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  const draw = resolvePackDraw(await repos.classPacks.listByMember(member.id));
+  if (draw.kind === "exhausted") {
+    throw new HttpError(
+      402,
+      "pack_exhausted",
+      "This member has no class pack credits left — buy another pack",
+    );
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +102,15 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  if (draw.kind === "draw") {
+    const pack = await repos.classPacks.getById(draw.packId);
+    if (pack) {
+      await repos.classPacks.update(draw.packId, {
+        creditsRemaining: pack.creditsRemaining - 1,
+      });
+    }
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
