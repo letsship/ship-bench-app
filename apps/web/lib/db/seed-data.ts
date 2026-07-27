@@ -9,6 +9,9 @@ function seedId(): string {
   __seedIdSeq += 1;
   return `00000000-0000-4000-8000-${__seedIdSeq.toString(16).padStart(12, "0")}`;
 }
+function seedToken(index: number): string {
+  return `caltok${index.toString().padStart(32, "0")}`;
+}
 import type { SeedData } from "./repos/fakes";
 import type {
   Booking,
@@ -96,6 +99,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    calendarToken: seedToken(index),
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }

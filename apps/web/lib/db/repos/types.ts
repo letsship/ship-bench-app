@@ -36,6 +36,7 @@ export interface MembersRepo {
   listByStudio(studioId: string): Promise<Member[]>;
   getById(id: string): Promise<Member | null>;
   findByEmail(studioId: string, email: string): Promise<Member | null>;
+  findByCalendarToken(token: string): Promise<Member | null>;
   insert(member: Member): Promise<Member>;
   update(id: string, patch: Partial<Member>): Promise<Member>;
 }
