@@ -19,6 +19,7 @@ import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
+import { drawCreditForBooking } from "./packages";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -82,6 +83,8 @@ export async function createBooking(
   if (!decision.ok) {
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
+
+  await drawCreditForBooking(repos, member.id);
 
   const bookingId = newId();
   await repos.bookings.insert({
