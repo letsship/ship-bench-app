@@ -324,4 +324,54 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
   });
+
+  it("reads members + class sessions a bounded number of times regardless of booking count", async () => {
+    function countingProxy<T extends object>(target: T, counter: { count: number }): T {
+      return new Proxy(target, {
+        get(obj, prop, receiver) {
+          const value = Reflect.get(obj, prop, receiver);
+          if (typeof value !== "function") return value;
+          return (...args: unknown[]) => {
+            counter.count += 1;
+            return value.apply(obj, args);
+          };
+        },
+      });
+    }
+
+    async function countReadsFor(bookingCount: number) {
+      const seed = buildSeed(NOW);
+      const sessionIds = seed.sessions.map((session) => session.id);
+      const memberIds = seed.members.map((member) => member.id);
+      const bookings = Array.from({ length: bookingCount }, (_, index) => ({
+        id: `bulk-booking-${index}`,
+        sessionId: sessionIds[index % sessionIds.length],
+        memberId: memberIds[index % memberIds.length],
+        status: "booked",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }));
+      const bulkRepos = createInMemoryRepositories({ ...seed, bookings });
+
+      const memberReads = { count: 0 };
+      const sessionReads = { count: 0 };
+      const countingRepos: Repositories = {
+        ...bulkRepos,
+        members: countingProxy(bulkRepos.members, memberReads),
+        classSessions: countingProxy(bulkRepos.classSessions, sessionReads),
+      };
+
+      const rows = await listBookingRows(countingRepos, seed.studio.id);
+      expect(rows.length).toBe(bookingCount);
+      return { memberReads: memberReads.count, sessionReads: sessionReads.count };
+    }
+
+    const small = await countReadsFor(5);
+    const large = await countReadsFor(500);
+
+    expect(large.memberReads).toBe(small.memberReads);
+    expect(large.sessionReads).toBe(small.sessionReads);
+    expect(large.memberReads).toBeLessThanOrEqual(2);
+    expect(large.sessionReads).toBeLessThanOrEqual(2);
+  });
 });
