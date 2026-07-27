@@ -7,6 +7,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  Package,
   Studio,
   StudioSettings,
 } from "../types";
@@ -201,6 +202,24 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+    },
+    packages: {
+      listByMember: (memberId) =>
+        rows<Package>(
+          db
+            .from("packages")
+            .select("*")
+            .eq("member_id", memberId)
+            .order("purchased_at", { ascending: false }),
+          "packages.listByMember",
+        ),
+      getById: (id) =>
+        maybeOne<Package>(
+          db.from("packages").select("*").eq("id", id).maybeSingle(),
+          "packages.getById",
+        ),
+      insert: (pkg) => insertReturning("packages", pkg),
+      update: (id, patch) => updateReturning<Package>("packages", "id", id, patch),
     },
   };
 }
