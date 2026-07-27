@@ -21,6 +21,7 @@ export interface StudioSettings {
   notifyCancellations: boolean;
   notifyWaitlistPromotions: boolean;
   notifyInvoices: boolean;
+  notifyBookingReminders: boolean;
 }
 
 export interface Member {
