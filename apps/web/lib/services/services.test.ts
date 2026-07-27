@@ -160,21 +160,27 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("stamps bookedAt with the current time", async () => {
     // Freeze the clock so the stored timestamp is deterministic to assert on.
+    // Restore real timers unconditionally so this doesn't leak a frozen clock
+    // into later tests in this file.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
-    const repos = createInMemoryRepositories(
-      baseSeed({
-        classTypes: [classType("ct1")],
-        sessions: [session("cs1")],
-        members: [member("m1")],
-      }),
-    );
-    const result = await createBooking(repos, createFakeProvider(), {
-      sessionId: "cs1",
-      memberId: "m1",
-    });
-    const stored = await repos.bookings.getById(result.bookingId);
-    expect(stored?.bookedAt).toBe("2020-01-01T00:00:00.000Z");
+    try {
+      vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
+      const repos = createInMemoryRepositories(
+        baseSeed({
+          classTypes: [classType("ct1")],
+          sessions: [session("cs1")],
+          members: [member("m1")],
+        }),
+      );
+      const result = await createBooking(repos, createFakeProvider(), {
+        sessionId: "cs1",
+        memberId: "m1",
+      });
+      const stored = await repos.bookings.getById(result.bookingId);
+      expect(stored?.bookedAt).toBe("2020-01-01T00:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("books an open future session and sends a confirmation", async () => {
