@@ -4,6 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { createRecordingTracker } from "@/lib/analytics/fake-tracker";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -167,9 +168,19 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    const tracker = createRecordingTracker();
+    const result = await createBooking(repos, provider, tracker, {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
     expect(result.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind)).toEqual(["booking_confirmation"]);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0]).toEqual({
+      event: "booking_created",
+      distinctId: "m1",
+      properties: { session_id: "cs1" },
+    });
   });
 
   it("waitlists when full (and sends no confirmation)", async () => {
@@ -182,9 +193,19 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    const tracker = createRecordingTracker();
+    const result = await createBooking(repos, provider, tracker, {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
     expect(result.status).toBe("waitlisted");
     expect(provider.sent).toHaveLength(0);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0]).toEqual({
+      event: "waitlist_joined",
+      distinctId: "m2",
+      properties: { session_id: "cs1" },
+    });
   });
 
   it("rejects a double booking with 409", async () => {
@@ -197,7 +218,10 @@ describe("bookings service", () => {
       }),
     );
     await expect(
-      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+      createBooking(repos, createFakeProvider(), createRecordingTracker(), {
+        sessionId: "cs1",
+        memberId: "m1",
+      }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
   });
 
@@ -210,8 +234,15 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const tracker = createRecordingTracker();
+    const result = await cancelBooking(repos, createFakeProvider(), tracker, "b1");
     expect(result.refundEligible).toBe(true);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0]).toEqual({
+      event: "booking_cancelled",
+      distinctId: "m1",
+      properties: { session_id: "cs1" },
+    });
   });
 
   it("marks a last-minute cancellation refund-ineligible", async () => {
@@ -223,8 +254,11 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const tracker = createRecordingTracker();
+    const result = await cancelBooking(repos, createFakeProvider(), tracker, "b1");
     expect(result.refundEligible).toBe(false);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("booking_cancelled");
   });
 
   it("promotes the earliest waitlisted member when a seat frees up", async () => {
@@ -241,13 +275,21 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const tracker = createRecordingTracker();
+    const result = await cancelBooking(repos, provider, tracker, "b1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+    // Cancellation fires exactly once; promotion does not emit booking_created
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0]).toEqual({
+      event: "booking_cancelled",
+      distinctId: "m1",
+      properties: { session_id: "cs1" },
+    });
   });
 });
 
