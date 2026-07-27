@@ -61,5 +61,10 @@ export async function listBookingsForExport(
 ): Promise<BookingRow[]> {
   const rows = await listBookingRows(repos, studioId);
   const { from, to } = range;
-  return rows.filter((row) => (!from || row.startsAt >= from) && (!to || row.startsAt <= to));
+  const fromMs = from ? new Date(from).getTime() : undefined;
+  const toMs = to ? new Date(to).getTime() : undefined;
+  return rows.filter((row) => {
+    const startMs = new Date(row.startsAt).getTime();
+    return (fromMs === undefined || startMs >= fromMs) && (toMs === undefined || startMs <= toMs);
+  });
 }

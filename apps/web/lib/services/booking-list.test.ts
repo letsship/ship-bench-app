@@ -144,4 +144,21 @@ describe("listBookingsForExport", () => {
     });
     expect(rows[0].email).toBe("m1@e.co");
   });
+
+  it("includes a boundary booking even when the stored startsAt format differs from the query bound", async () => {
+    const boundaryRepos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", "2026-06-25T08:00:00+00:00")],
+        bookings: [booking("b1", "cs1", "m1")],
+      }),
+    );
+
+    const rows = await listBookingsForExport(boundaryRepos, "s1", {
+      from: "2026-06-25T08:00:00.000Z",
+      to: "2026-06-25T08:00:00.000Z",
+    });
+    expect(rows.map((row) => row.id)).toEqual(["b1"]);
+  });
 });
