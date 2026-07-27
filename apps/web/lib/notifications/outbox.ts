@@ -8,7 +8,8 @@ const SETTING_FOR_KIND = {
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
-} as const satisfies Record<NotificationKind, string>;
+  booking_reminder: undefined,
+} as const satisfies Partial<Record<NotificationKind, string | undefined>>;
 
 export interface OptOutContext {
   memberOptedOut: boolean;
@@ -19,10 +20,12 @@ export interface OptOutContext {
 }
 
 // A member opt-out wins over everything; otherwise the studio-level setting for
-// the kind decides. Pure so both the dispatcher and tests share one rule.
+// the kind decides (or allow by default if no studio-level setting exists). Pure so
+// both the dispatcher and tests share one rule.
 export function shouldSend(kind: NotificationKind, context: OptOutContext): boolean {
   if (context.memberOptedOut) return false;
-  return context[SETTING_FOR_KIND[kind]];
+  const setting = SETTING_FOR_KIND[kind];
+  return setting === undefined ? true : context[setting];
 }
 
 // Persist a notification as a pending outbox row. Delivery happens later in
