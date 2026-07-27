@@ -18,6 +18,8 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { noOpTracker_ } from "@/lib/analytics/tracker";
+import type { Tracker } from "@/lib/analytics/types";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -64,6 +66,7 @@ export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
   input: CreateBookingInput,
+  tracker: Tracker = noOpTracker_(),
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
   const session = await loadSession(repos, input.sessionId);
@@ -99,6 +102,17 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    await tracker.capture({
+      event: "booking_created",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
+  } else if (decision.status === "waitlisted") {
+    await tracker.capture({
+      event: "waitlist_joined",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -112,6 +126,7 @@ export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
   bookingId: string,
+  tracker: Tracker = noOpTracker_(),
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
@@ -133,6 +148,12 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+
+  await tracker.capture({
+    event: "booking_cancelled",
+    distinctId: booking.memberId,
+    properties: { session_id: session.id },
+  });
 
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
