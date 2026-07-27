@@ -324,4 +324,73 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
   });
+
+  it("lists bookings with bounded repository reads (no N+1 queries)", async () => {
+    // Regression test: verify that the number of members and classSessions
+    // repository reads does not grow with the number of bookings.
+    const createTestRepos = (bookingCount: number) => {
+      const members = [member("m1"), member("m2")];
+      const classTypes = [classType("ct1")];
+      const sessions = [session("cs1"), session("cs2")];
+      const bookings = [];
+      for (let i = 0; i < bookingCount; i++) {
+        bookings.push(
+          booking(`b${i}`, i % 2 === 0 ? "m1" : "m2", { sessionId: i % 2 === 0 ? "cs1" : "cs2" }),
+        );
+      }
+      return createInMemoryRepositories(baseSeed({ members, classTypes, sessions, bookings }));
+    };
+
+    // Count repository calls to detect N+1 queries.
+    let membersReadCount = 0;
+    let sessionsReadCount = 0;
+
+    const wrapRepos = (repos: Repositories) => {
+      const originalMembers = repos.members;
+      const originalSessions = repos.classSessions;
+      return {
+        ...repos,
+        members: {
+          ...originalMembers,
+          listByStudio: async (sid: string) => {
+            membersReadCount++;
+            return originalMembers.listByStudio(sid);
+          },
+        },
+        classSessions: {
+          ...originalSessions,
+          listByStudio: async (sid: string, range) => {
+            sessionsReadCount++;
+            return originalSessions.listByStudio(sid, range);
+          },
+        },
+      };
+    };
+
+    // Run with 1 booking.
+    membersReadCount = 0;
+    sessionsReadCount = 0;
+    const repos1 = wrapRepos(await createTestRepos(1));
+    const rows1 = await listBookingRows(repos1, "s1");
+    const reads1 = { members: membersReadCount, sessions: sessionsReadCount };
+
+    // Run with 50 bookings.
+    membersReadCount = 0;
+    sessionsReadCount = 0;
+    const repos50 = wrapRepos(await createTestRepos(50));
+    const rows50 = await listBookingRows(repos50, "s1");
+    const reads50 = { members: membersReadCount, sessions: sessionsReadCount };
+
+    // Verify reads are bounded (same for 1 and 50 bookings).
+    expect(reads1.members).toBe(reads50.members);
+    expect(reads1.sessions).toBe(reads50.sessions);
+    expect(reads1.members).toBe(1);
+    expect(reads1.sessions).toBe(1);
+
+    // Verify output shape and order (sorted by startsAt).
+    expect(rows1[0]).toHaveProperty("id");
+    expect(rows1[0]).toHaveProperty("memberName");
+    expect(rows1[0]).toHaveProperty("className");
+    expect(rows50.every((r, i) => i === 0 || r.startsAt >= rows50[i - 1].startsAt)).toBe(true);
+  });
 });
