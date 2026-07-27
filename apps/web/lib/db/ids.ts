@@ -5,3 +5,10 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// URL-safe unguessable random token for per-member calendar subscriptions.
+export function newCalendarToken(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(24)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
