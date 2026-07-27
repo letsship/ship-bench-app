@@ -33,12 +33,10 @@ export function resolveTracker(): AnalyticsTracker {
   const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
 
-  // In test environments without PostHog config, use the fake tracker
   if (!token || !host) {
-    if (!globalForFakes.__studiobookFakeTracker) {
-      globalForFakes.__studiobookFakeTracker = createFakeTracker();
-    }
-    return globalForFakes.__studiobookFakeTracker;
+    throw new Error(
+      "NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN and NEXT_PUBLIC_POSTHOG_HOST are not set. Set them for analytics, or run with USE_FAKE_BACKENDS=1.",
+    );
   }
 
   return createPostHogTracker({ token, host });

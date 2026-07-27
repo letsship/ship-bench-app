@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOOKING_CANCELLED, BOOKING_CREATED, WAITLIST_JOINED } from "./types";
 import { createFakeTracker } from "./fake-tracker";
 import { __setTestTracker, resolveTracker } from "./index";
@@ -41,11 +41,13 @@ describe("analytics tracking", () => {
   });
 
   it("__setTestTracker(null) restores default resolution", () => {
+    vi.stubEnv("USE_FAKE_BACKENDS", "1");
     const fake = createFakeTracker();
     __setTestTracker(fake);
     __setTestTracker(null);
     const resolved = resolveTracker();
     expect(resolved).not.toBe(fake);
+    vi.unstubAllEnvs();
   });
 
   it("captured events carry the expected event/distinctId/properties shape", async () => {

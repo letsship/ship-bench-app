@@ -25,6 +25,9 @@ export function createPostHogTracker(config: PostHogConfig): AnalyticsTracker {
         event: event.event,
         properties: event.properties,
       });
+      // Flush immediately so events are sent before the request context ends
+      // (critical for short-lived Workers/serverless).
+      await client.flush();
     },
     async shutdown() {
       await client.shutdown();

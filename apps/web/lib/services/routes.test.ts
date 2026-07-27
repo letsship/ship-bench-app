@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
@@ -67,11 +67,13 @@ describe("route handler analytics injection", () => {
   });
 
   it("__setTestTracker(null) restores default tracker resolution", () => {
+    vi.stubEnv("USE_FAKE_BACKENDS", "1");
     const tracker = createFakeTracker();
     __setTestTracker(tracker);
     __setTestTracker(null);
     const resolved = resolveTracker();
     expect(resolved).not.toBe(tracker);
+    vi.unstubAllEnvs();
   });
 
   it("captured events do not contain PII", async () => {
