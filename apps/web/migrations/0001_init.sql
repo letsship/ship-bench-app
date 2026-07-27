@@ -1,13 +1,3 @@
--- Studiobook initial schema (Cloudflare D1 / SQLite).
--- Translated from packages/db/migrations/0001_init.sql (Postgres): uuid -> text,
--- timestamptz -> text (the app writes and reads ISO-8601 UTC strings), boolean ->
--- integer 0/1. Row Level Security has no D1 equivalent and is dropped; the app
--- accesses D1 exclusively through the Worker's own repository code, so there is
--- no separate "service role" to gate.
-
--- =============================================================
--- STUDIOS
--- =============================================================
 CREATE TABLE studios (
   id          text PRIMARY KEY,
   name        text NOT NULL,
@@ -28,9 +18,6 @@ CREATE TABLE studio_settings (
   notify_invoices              integer NOT NULL DEFAULT 1
 );
 
--- =============================================================
--- MEMBERS
--- =============================================================
 CREATE TABLE members (
   id                      text PRIMARY KEY,
   studio_id               text NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
@@ -45,9 +32,6 @@ CREATE TABLE members (
 
 CREATE INDEX idx_members_studio ON members (studio_id);
 
--- =============================================================
--- CLASS TYPES + SESSIONS
--- =============================================================
 CREATE TABLE class_types (
   id                  text PRIMARY KEY,
   studio_id           text NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
@@ -75,9 +59,6 @@ CREATE TABLE class_sessions (
 CREATE INDEX idx_class_sessions_studio ON class_sessions (studio_id);
 CREATE INDEX idx_class_sessions_starts_at ON class_sessions (starts_at);
 
--- =============================================================
--- BOOKINGS
--- =============================================================
 CREATE TABLE bookings (
   id           text PRIMARY KEY,
   session_id   text NOT NULL REFERENCES class_sessions(id) ON DELETE CASCADE,
@@ -90,9 +71,6 @@ CREATE TABLE bookings (
 CREATE INDEX idx_bookings_session ON bookings (session_id);
 CREATE INDEX idx_bookings_member ON bookings (member_id);
 
--- =============================================================
--- INVOICES + LINE ITEMS
--- =============================================================
 CREATE TABLE invoices (
   id             text PRIMARY KEY,
   studio_id      text NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
@@ -126,9 +104,6 @@ CREATE TABLE invoice_line_items (
 
 CREATE INDEX idx_invoice_line_items_invoice ON invoice_line_items (invoice_id);
 
--- =============================================================
--- NOTIFICATION OUTBOX
--- =============================================================
 CREATE TABLE notification_outbox (
   id                  text PRIMARY KEY,
   member_id           text NOT NULL REFERENCES members(id) ON DELETE CASCADE,
