@@ -162,10 +162,18 @@ jobs:
           # NOTE: `d1 migrations apply` has NO --yes flag (only `d1 execute` does);
           # it auto-proceeds in CI's non-interactive shell.
           pnpm exec wrangler d1 migrations apply "$DB_NAME" --remote -c "$CONFIG"
+          # Seed: the solution's emitter WRITES a Postgres seed to supabase/seed.sql
+          # (it prints only a log line to stdout — do NOT capture stdout as SQL).
+          # Regenerate it (a migration solution deletes the committed copy), then
+          # adapt Postgres -> SQLite for D1 by dropping the `public.` schema
+          # qualifier (SQLite has no schemas), and load it.
           if [ -f scripts/emit-seed-sql.ts ]; then
-            pnpm exec tsx scripts/emit-seed-sql.ts > /tmp/d1-seed.sql
-            pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --file /tmp/d1-seed.sql
-            echo "D1 seeded ($(wc -l < /tmp/d1-seed.sql) lines)"
+            pnpm exec tsx scripts/emit-seed-sql.ts
+            if [ -f ../../supabase/seed.sql ]; then
+              sed 's/into public\./into /g' ../../supabase/seed.sql > /tmp/d1-seed.sql
+              pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --file /tmp/d1-seed.sql
+              echo "D1 seeded ($(wc -l < /tmp/d1-seed.sql) lines)"
+            fi
           fi
           echo "D1 provisioned"
 
