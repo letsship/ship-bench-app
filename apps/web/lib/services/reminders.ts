@@ -29,7 +29,8 @@ function parsePayloadForBookingId(payload: string): string | null {
   try {
     const data = JSON.parse(payload);
     return data.data?.bookingId ?? null;
-  } catch {
+  } catch (err) {
+    console.error("Failed to parse booking_reminder payload:", err);
     return null;
   }
 }
