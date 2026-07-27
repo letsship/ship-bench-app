@@ -139,3 +139,16 @@ export async function updateInvoiceStatus(
   const paidAt = status === "paid" ? new Date().toISOString() : invoice.paidAt;
   return repos.invoices.update(id, { status, paidAt });
 }
+
+// Marks an invoice paid from a verified Stripe `invoice.paid` webhook. Bypasses
+// canTransitionInvoice — a payment webhook must mark paid regardless of the
+// invoice's prior state. Idempotent: an unknown invoice or one already paid is
+// a no-op, so replaying the same event has no further effect.
+export async function markInvoicePaidFromWebhook(
+  repos: Repositories,
+  invoiceId: string,
+): Promise<void> {
+  const invoice = await repos.invoices.getById(invoiceId);
+  if (!invoice || invoice.status === "paid") return;
+  await repos.invoices.update(invoiceId, { status: "paid", paidAt: new Date().toISOString() });
+}
