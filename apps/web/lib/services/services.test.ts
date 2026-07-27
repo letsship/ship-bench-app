@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,121 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("exports booking rows with member email", async () => {
+    const mid1 = "m1";
+    const mid2 = "m2";
+    const sid1 = "s1";
+    const sid2 = "s2";
+    const repos2 = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [
+          member(mid1, { email: "alice@example.com" }),
+          member(mid2, { email: "bob@example.com" }),
+        ],
+        sessions: [session(sid1, { startsAt: FUTURE }), session(sid2, { startsAt: FUTURE_END })],
+        bookings: [
+          booking("b1", mid1, { sessionId: sid1 }),
+          booking("b2", mid2, { sessionId: sid2 }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos2, "s1");
+    expect(rows).toHaveLength(2);
+    expect(rows[0].email).toBe("alice@example.com");
+    expect(rows[1].email).toBe("bob@example.com");
+  });
+
+  it("applies an inclusive from filter on session start", async () => {
+    const mid = "m1";
+    const sid1 = "s1";
+    const sid2 = "s2";
+    const start1 = "2026-06-01T10:00:00Z";
+    const start2 = "2026-06-15T10:00:00Z";
+    const repos2 = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member(mid)],
+        sessions: [session(sid1, { startsAt: start1 }), session(sid2, { startsAt: start2 })],
+        bookings: [
+          booking("b1", mid, { sessionId: sid1 }),
+          booking("b2", mid, { sessionId: sid2 }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos2, "s1", { from: start1 });
+    expect(rows).toHaveLength(2);
+    const rowsAfter = await listBookingsForExport(repos2, "s1", { from: start2 });
+    expect(rowsAfter).toHaveLength(1);
+    expect(rowsAfter[0].starts).toBe(start2);
+  });
+
+  it("applies an inclusive to filter on session start", async () => {
+    const mid = "m1";
+    const sid1 = "s1";
+    const sid2 = "s2";
+    const start1 = "2026-06-01T10:00:00Z";
+    const start2 = "2026-06-15T10:00:00Z";
+    const repos2 = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member(mid)],
+        sessions: [session(sid1, { startsAt: start1 }), session(sid2, { startsAt: start2 })],
+        bookings: [
+          booking("b1", mid, { sessionId: sid1 }),
+          booking("b2", mid, { sessionId: sid2 }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos2, "s1", { to: start2 });
+    expect(rows).toHaveLength(2);
+    const rowsBefore = await listBookingsForExport(repos2, "s1", { to: start1 });
+    expect(rowsBefore).toHaveLength(1);
+    expect(rowsBefore[0].starts).toBe(start1);
+  });
+
+  it("omits bounds are unbounded", async () => {
+    const mid = "m1";
+    const sid1 = "s1";
+    const sid2 = "s2";
+    const start1 = "2026-01-01T10:00:00Z";
+    const start2 = "2026-12-31T10:00:00Z";
+    const repos2 = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member(mid)],
+        sessions: [session(sid1, { startsAt: start1 }), session(sid2, { startsAt: start2 })],
+        bookings: [
+          booking("b1", mid, { sessionId: sid1 }),
+          booking("b2", mid, { sessionId: sid2 }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos2, "s1");
+    expect(rows).toHaveLength(2);
+  });
+
+  it("orders by session start", async () => {
+    const mid = "m1";
+    const sid1 = "s1";
+    const sid2 = "s2";
+    const start1 = "2026-06-15T10:00:00Z";
+    const start2 = "2026-06-01T10:00:00Z";
+    const repos2 = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member(mid)],
+        sessions: [session(sid1, { startsAt: start1 }), session(sid2, { startsAt: start2 })],
+        bookings: [
+          booking("b1", mid, { sessionId: sid1 }),
+          booking("b2", mid, { sessionId: sid2 }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos2, "s1");
+    expect(rows[0].starts).toBe(start2);
+    expect(rows[1].starts).toBe(start1);
   });
 });
