@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingExportRows, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,54 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("listBookingExportRows", () => {
+  let repos: Repositories;
+  let studioId: string;
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(buildSeed(NOW));
+    studioId = (await repos.studios.getFirst())?.id ?? "";
+  });
+
+  it("includes the member email alongside the name", async () => {
+    const rows = await listBookingExportRows(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.memberEmail).toMatch(/@/);
+    }
+  });
+
+  it("is sorted by session start time", async () => {
+    const rows = await listBookingExportRows(repos, studioId);
+    const sorted = [...rows].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    expect(rows).toEqual(sorted);
+  });
+
+  it("includes both bounds inclusively and excludes rows outside them", async () => {
+    const all = await listBookingExportRows(repos, studioId);
+    const from = all[0].startsAt;
+    const to = all[all.length - 1].startsAt;
+
+    const bounded = await listBookingExportRows(repos, studioId, { from, to });
+    expect(bounded.length).toBe(all.length);
+    expect(bounded.some((row) => row.startsAt === from)).toBe(true);
+    expect(bounded.some((row) => row.startsAt === to)).toBe(true);
+
+    const narrower = await listBookingExportRows(repos, studioId, { from, to: from });
+    expect(narrower.every((row) => row.startsAt === from)).toBe(true);
+    expect(narrower.length).toBeGreaterThan(0);
+  });
+
+  it("is unbounded on an omitted side", async () => {
+    const all = await listBookingExportRows(repos, studioId);
+    const to = all[all.length - 1].startsAt;
+    const onlyTo = await listBookingExportRows(repos, studioId, { to });
+    expect(onlyTo.length).toBe(all.length);
+
+    const from = all[0].startsAt;
+    const onlyFrom = await listBookingExportRows(repos, studioId, { from });
+    expect(onlyFrom.length).toBe(all.length);
   });
 });
