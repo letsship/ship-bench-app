@@ -1,12 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+
+/* Replaces the `content` globs from the old tailwind.config.js. */
+@source "../app/**/*.{ts,tsx}";
+@source "../lib/**/*.{ts,tsx}";
 
 /* Studiobook design tokens — a warm, tactile studio aesthetic: parchment
-   surfaces, espresso ink, clay + sage accents drawn from pottery and yoga. */
-:root {
-  color-scheme: light;
-
+   surfaces, espresso ink, clay + sage accents drawn from pottery and yoga.
+   Declared in `@theme` so Tailwind both emits them as `:root` custom
+   properties (the app references them via `var(--color-*)` arbitrary values)
+   and exposes them as theme utilities, matching the old JS config. */
+@theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
   --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 
@@ -20,6 +23,83 @@
   --color-sage-soft: #dcead9;
   --color-line: #e7ddca;
   --color-danger: #b3402f;
+}
+
+:root {
+  color-scheme: light;
+}
+
+/* --- Tailwind v3 compatibility -------------------------------------------
+   v4 ships Preflight and `space-y-*` changes that would visibly shift this UI.
+   The migration is meant to be purely a toolchain change, so the three rules
+   below pin the affected behaviour back to v3. Each is independent and can be
+   dropped later if we deliberately adopt the v4 rendering. */
+
+/* 1. Preflight fades placeholders to `currentColor` at 50%, where v3 used a
+      fixed grey. Affects the login, invoice and booking forms. */
+@layer base {
+  input::placeholder,
+  textarea::placeholder {
+    opacity: 1;
+    color: #9ca3af;
+  }
+}
+
+/* 2. Preflight gained `::-webkit-datetime-edit*` resets that v3 did not have,
+      which makes `<input type="datetime-local">` 2px shorter (the class
+      scheduler's start-time field). Hand the fields back to the UA. */
+@layer base {
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: revert;
+  }
+  ::-webkit-datetime-edit,
+  ::-webkit-datetime-edit-year-field,
+  ::-webkit-datetime-edit-month-field,
+  ::-webkit-datetime-edit-day-field,
+  ::-webkit-datetime-edit-hour-field,
+  ::-webkit-datetime-edit-minute-field,
+  ::-webkit-datetime-edit-second-field,
+  ::-webkit-datetime-edit-millisecond-field,
+  ::-webkit-datetime-edit-meridiem-field {
+    padding-block: revert;
+  }
+}
+
+/* 3. v4 reimplemented `space-y-*` as `margin-block-end` on `> :not(:last-child)`
+      (a perf win) where v3 used `margin-block-start` on
+      `> :not([hidden]) ~ :not([hidden])`. The two diverge when a container has
+      a non-rendering first child or a `<legend>`, and /settings has both: React
+      injects a `display:none` action input into every server-action `<form>`,
+      and a `<fieldset>` ignores margins on its `<legend>`. Restoring the v3
+      selector keeps that page pixel-identical.
+      v4 emits its rule inside `:where()` (specificity 0,0,0), so the reset below
+      overrides it on source order alone and still loses to any `mb-*` utility,
+      exactly as both versions behave. Keep this list in sync with the
+      `space-y-*` values actually used in the app. */
+@layer utilities {
+  :where(.space-y-1 > :not(:last-child)),
+  :where(.space-y-2 > :not(:last-child)),
+  :where(.space-y-3 > :not(:last-child)),
+  :where(.space-y-4 > :not(:last-child)),
+  :where(.space-y-6 > :not(:last-child)) {
+    margin-block-end: 0;
+  }
+
+  .space-y-1 > :not([hidden]) ~ :not([hidden]) {
+    margin-block-start: calc(var(--spacing) * 1);
+  }
+  .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+    margin-block-start: calc(var(--spacing) * 2);
+  }
+  .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-block-start: calc(var(--spacing) * 3);
+  }
+  .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-block-start: calc(var(--spacing) * 4);
+  }
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-block-start: calc(var(--spacing) * 6);
+  }
 }
 
 html {
@@ -64,7 +144,9 @@ a {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 .sb-btn:hover {
   border-color: var(--color-clay);
