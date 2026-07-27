@@ -62,8 +62,52 @@ describe("getMemberCalendarFeed", () => {
     const body1 = await getMemberCalendarFeed(repos, member1.calendarToken, studioName);
     const body2 = await getMemberCalendarFeed(repos, member2.calendarToken, studioName);
 
-    // Both should return valid ICS, but they may have different sessions or the same depending on bookings
-    expect(body1).toContain("BEGIN:VCALENDAR");
-    expect(body2).toContain("BEGIN:VCALENDAR");
+    // Extract UIDs from both feeds (format: UID:sessionId@studiobook)
+    const extractUIDs = (body: string): Set<string> => {
+      const uids = new Set<string>();
+      const lines = body.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("UID:")) {
+          uids.add(line.substring(4));
+        }
+      }
+      return uids;
+    };
+
+    const uids1 = extractUIDs(body1);
+    const uids2 = extractUIDs(body2);
+
+    // Find a session that member1 is booked into but member2 is NOT
+    // (deterministic seed bookings ensure they don't book all the same sessions)
+    const member1Booked = new Set(
+      seed.bookings
+        .filter((b) => b.memberId === member1.id && b.status === "booked")
+        .map((b) => b.sessionId),
+    );
+    const member2Booked = new Set(
+      seed.bookings
+        .filter((b) => b.memberId === member2.id && b.status === "booked")
+        .map((b) => b.sessionId),
+    );
+
+    // Find a session unique to member1
+    let uniqueSessionId: string | null = null;
+    for (const sessionId of member1Booked) {
+      if (!member2Booked.has(sessionId)) {
+        uniqueSessionId = sessionId;
+        break;
+      }
+    }
+
+    // Verify isolation: if member1 has a session exclusive to them,
+    // that session should NOT appear in member2's feed
+    if (uniqueSessionId) {
+      const uid = `${uniqueSessionId}@studiobook`;
+      // The session may be in member1's feed if it's in the future
+      // But it must NEVER be in member2's feed since they're not booked
+      if (uids1.has(uid)) {
+        expect(uids2.has(uid)).toBe(false);
+      }
+    }
   });
 });
