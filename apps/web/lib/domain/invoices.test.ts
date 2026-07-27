@@ -36,6 +36,32 @@ describe("computeInvoiceTotals", () => {
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 4).taxCents).toBe(0);
   });
 
+  it("is zero across the board with no line items", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("charges nothing when every line is refunded", () => {
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 9000, refunded: true },
+          { quantity: 2, unitAmountCents: 1500, refunded: true },
+        ],
+        2100,
+      ),
+    ).toEqual({
+      subtotalCents: 0,
+      refundedCents: 12_000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
   it("is zero across the board for a zero-amount line", () => {
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 0 }], 2100)).toEqual({
       subtotalCents: 0,
