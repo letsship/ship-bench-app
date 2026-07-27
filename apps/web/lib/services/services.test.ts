@@ -10,6 +10,7 @@ import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
+import { getMemberStatement } from "./account-statements";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
 
@@ -294,6 +295,68 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("account statements service", () => {
+  it("excludes refunded lines from taxable subtotal", async () => {
+    // Create seed data with an invoice that has a refunded line
+    // € 100 billable + € 50 refunded at 9% tax = € 109.00 (10900 cents)
+    // not € 163.50 (16350 cents, which would tax the full € 150)
+    const seed = baseSeed({
+      members: [member("m1")],
+      invoices: [
+        {
+          id: "inv1",
+          studioId: "s1",
+          memberId: "m1",
+          number: "INV-2026-0001",
+          status: "open",
+          currency: "EUR",
+          taxRateBps: 900,
+          subtotalCents: 10000,
+          taxCents: 900,
+          totalCents: 10900,
+          issuedAt: ISO,
+          dueAt: FUTURE,
+          paidAt: null,
+          createdAt: ISO,
+        },
+      ],
+      lineItems: [
+        {
+          id: "li1",
+          invoiceId: "inv1",
+          description: "Billable",
+          quantity: 1,
+          unitAmountCents: 10000,
+          amountCents: 10000,
+          refunded: false,
+          bookingId: null,
+        },
+        {
+          id: "li2",
+          invoiceId: "inv1",
+          description: "Refunded",
+          quantity: 1,
+          unitAmountCents: 5000,
+          amountCents: 5000,
+          refunded: true,
+          bookingId: null,
+        },
+      ],
+    });
+    const repos = createInMemoryRepositories(seed);
+    const studioId = "s1";
+    const memberId = "m1";
+
+    // Get the account statement and verify the total excludes the refunded line
+    const statement = await getMemberStatement(repos, studioId, memberId);
+    const statementLine = statement.lines.find((l) => l.invoiceId === "inv1");
+
+    // Expected: subtotal €100, tax €9 (9% of €100), total €109 = 10900 cents
+    // Not: subtotal €150, tax €13.50, total €163.50 = 16350 cents
+    expect(statementLine?.totalCents).toBe(10900);
   });
 });
 
