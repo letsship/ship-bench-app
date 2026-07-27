@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 // Derive the site URL from environment or use a documented fallback.
-// NEXT_PUBLIC_SITE_URL is optional and read from lib/env.ts; in production,
-// it should be set to the canonical domain (e.g., https://app.example.com).
+// NEXT_PUBLIC_SITE_URL is optional; in production, it should be set to
+// the canonical domain (e.g., https://app.example.com).
 // The fallback is used for builds and tests that do not specify the var.
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://studiobook.example";
 
