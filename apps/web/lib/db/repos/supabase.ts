@@ -7,6 +7,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  StripeWebhookEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -201,6 +202,27 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+    },
+    webhookEvents: {
+      has: async (eventId) => {
+        const row = await maybeOne<StripeWebhookEvent>(
+          db.from("stripe_webhook_events").select("id").eq("id", eventId).maybeSingle(),
+          "webhookEvents.has",
+        );
+        return row !== null;
+      },
+      // Upsert on the event id so a concurrent redelivery cannot fail on the
+      // primary key — recording an already-recorded event is a no-op, exactly
+      // as it is in the in-memory implementation.
+      insert: async (row) => {
+        const { data, error } = await db
+          .from("stripe_webhook_events")
+          .upsert(toSnakeRow(row as unknown as Record<string, unknown>), { onConflict: "id" })
+          .select()
+          .single();
+        if (error) fail("webhookEvents.insert", error);
+        return toCamelRow<StripeWebhookEvent>(data as Record<string, unknown>);
+      },
     },
   };
 }

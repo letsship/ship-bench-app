@@ -71,9 +71,23 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+// Stripe webhook envelope. Deliberately loose: we only need the event id, the
+// type, and (for invoice events) the invoice id in the object's metadata, while
+// every other event shape must still parse so the route can acknowledge it.
+export const stripeWebhookEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  data: z.object({
+    object: z.looseObject({
+      metadata: z.looseObject({ invoice_id: z.string().optional() }).optional(),
+    }),
+  }),
+});
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+export type StripeWebhookEventInput = z.infer<typeof stripeWebhookEventSchema>;

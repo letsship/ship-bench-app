@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  StripeWebhookEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -38,6 +39,7 @@ interface Store {
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  webhookEvents: StripeWebhookEvent[];
 }
 
 const clone = <T>(row: T): T => ({ ...row });
@@ -67,6 +69,8 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
+    // No seed fixtures: the ledger only ever holds events this process received.
+    webhookEvents: [],
   };
 
   return {
@@ -209,6 +213,18 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
+      },
+    },
+    webhookEvents: {
+      async has(eventId) {
+        return store.webhookEvents.some((row) => row.id === eventId);
+      },
+      async insert(row) {
+        // Replays land here at most once; a duplicate id keeps the first record.
+        if (!store.webhookEvents.some((existing) => existing.id === row.id)) {
+          store.webhookEvents.push(clone(row));
+        }
+        return clone(row);
       },
     },
   };

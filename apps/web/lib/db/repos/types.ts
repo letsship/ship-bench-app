@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  StripeWebhookEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -79,6 +80,13 @@ export interface NotificationOutboxRepo {
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
+// Idempotency ledger for inbound webhooks: `has` answers "did we already
+// process this event id?", `insert` records one we just processed.
+export interface WebhookEventsRepo {
+  has(eventId: string): Promise<boolean>;
+  insert(row: StripeWebhookEvent): Promise<StripeWebhookEvent>;
+}
+
 export interface Repositories {
   studios: StudioRepo;
   settings: StudioSettingsRepo;
@@ -89,4 +97,5 @@ export interface Repositories {
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
   outbox: NotificationOutboxRepo;
+  webhookEvents: WebhookEventsRepo;
 }

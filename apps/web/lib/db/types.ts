@@ -95,6 +95,13 @@ export interface InvoiceLineItem {
   bookingId: string | null;
 }
 
+// One row per Stripe webhook event we have already processed. `id` is the
+// Stripe event id — the idempotency key that makes duplicate deliveries no-ops.
+export interface StripeWebhookEvent {
+  id: string;
+  processedAt: string;
+}
+
 export interface NotificationOutboxRow {
   id: string;
   memberId: string;
