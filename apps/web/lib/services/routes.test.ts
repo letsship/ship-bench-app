@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as invoiceDetailGet } from "@/app/api/invoices/[id]/route";
+import { GET as memberDetailGet } from "@/app/api/members/[id]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +46,59 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+});
+
+describe("detail route handlers (against injected fake repositories)", () => {
+  let invoiceId: string;
+  let memberId: string;
+
+  beforeEach(async () => {
+    const repos = createInMemoryRepositories(buildSeed(new Date("2026-03-15T12:00:00.000Z")));
+    __setTestRepositories(repos);
+
+    // Get an invoice id from the seeded data
+    const invoices = await repos.invoices.listByStudio("s1");
+    if (invoices.length > 0) {
+      invoiceId = invoices[0].id;
+    }
+
+    // Get a member id from the seeded data
+    const members = await repos.members.listByStudio("s1");
+    if (members.length > 0) {
+      memberId = members[0].id;
+    }
+  });
+
+  afterEach(() => {
+    __setTestRepositories(null);
+  });
+
+  it("GET /api/invoices/:id returns an invoice detail", async () => {
+    if (!invoiceId) {
+      // Skip if no invoice in seed
+      return;
+    }
+    const res = await invoiceDetailGet(new NextRequest("http://localhost/api/invoices/test"), {
+      params: Promise.resolve({ id: invoiceId }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown;
+    expect(body).toHaveProperty("invoice");
+    expect(body).toHaveProperty("member");
+  });
+
+  it("GET /api/members/:id returns a member detail", async () => {
+    if (!memberId) {
+      // Skip if no member in seed
+      return;
+    }
+    const res = await memberDetailGet(new NextRequest("http://localhost/api/members/test"), {
+      params: Promise.resolve({ id: memberId }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown;
+    expect(body).toHaveProperty("id");
+    expect(body).toHaveProperty("name");
   });
 });
