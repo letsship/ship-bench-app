@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingExportRows, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,66 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("lists booking export rows with email and proper defaults", async () => {
+    const rows = await listBookingExportRows(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("email");
+    expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("startsAt");
+    expect(rows[0]).toHaveProperty("memberName");
+    expect(rows[0]).toHaveProperty("status");
+  });
+
+  it("sorts booking export rows by startsAt", async () => {
+    const rows = await listBookingExportRows(repos, studioId);
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].startsAt.localeCompare(rows[i - 1].startsAt)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("filters booking export rows inclusively by date range", async () => {
+    const testSeed = baseSeed({
+      classTypes: [classType("ct1")],
+      members: [member("m1"), member("m2")],
+      sessions: [
+        session("cs1", { startsAt: "2026-07-25T10:00:00Z", endsAt: "2026-07-25T11:00:00Z" }),
+        session("cs2", { startsAt: "2026-07-26T10:00:00Z", endsAt: "2026-07-26T11:00:00Z" }),
+        session("cs3", { startsAt: "2026-07-27T10:00:00Z", endsAt: "2026-07-27T11:00:00Z" }),
+        session("cs4", { startsAt: "2026-07-28T10:00:00Z", endsAt: "2026-07-28T11:00:00Z" }),
+      ],
+      bookings: [
+        booking("b1", "m1", { sessionId: "cs1" }),
+        booking("b2", "m1", { sessionId: "cs2" }),
+        booking("b3", "m1", { sessionId: "cs3" }),
+        booking("b4", "m1", { sessionId: "cs4" }),
+      ],
+    });
+    const testRepos = createInMemoryRepositories(testSeed);
+    const testStudioId = (await testRepos.studios.getFirst())?.id ?? "";
+
+    // Query with both from and to: inclusive on both ends.
+    const rows = await listBookingExportRows(testRepos, testStudioId, {
+      from: "2026-07-26T10:00:00Z",
+      to: "2026-07-27T10:00:00Z",
+    });
+    expect(rows.length).toBe(2);
+    expect(rows[0].startsAt).toBe("2026-07-26T10:00:00Z");
+    expect(rows[1].startsAt).toBe("2026-07-27T10:00:00Z");
+
+    // Query with only from.
+    const fromOnly = await listBookingExportRows(testRepos, testStudioId, {
+      from: "2026-07-27T10:00:00Z",
+    });
+    expect(fromOnly.length).toBe(2);
+    expect(fromOnly[0].startsAt).toContain("2026-07-27");
+
+    // Query with only to.
+    const toOnly = await listBookingExportRows(testRepos, testStudioId, {
+      to: "2026-07-26T10:00:00Z",
+    });
+    expect(toOnly.length).toBe(2);
+    expect(toOnly[0].startsAt).toContain("2026-07-25");
   });
 });
