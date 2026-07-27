@@ -1,0 +1,76 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> @studiobook/web@0.0.0 test /home/user/repo/apps/web
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.6 [39m[90m/home/user/repo/apps/web[39m
+
+ [32m✓[39m lib/domain/booking-rules.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+[90mstderr[2m | lib/notifications/outbox.test.ts[2m > [22m[2mdispatchOutbox[2m > [22m[2mrecords a delivery failure and leaves the row retryable
+[22m[39mnotification dispatch failed { id: [32m'850e2aaa-1340-476b-84da-13a015a481ce'[39m, error: [32m'boom'[39m }
+
+ [32m✓[39m lib/notifications/outbox.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [31m❯[39m lib/services/services.test.ts [2m([22m[2m19 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 104[2mms[22m[39m
+   [32m✓[39m members service[2m > [22mrejects a duplicate email with 409[32m 9[2mms[22m[39m
+   [32m✓[39m members service[2m > [22mcreates and updates a member[32m 3[2mms[22m[39m
+   [32m✓[39m members service[2m > [22mgetMember 404s for an unknown id[32m 2[2mms[22m[39m
+   [32m✓[39m classes service[2m > [22mcomputes occupancy on listed sessions[32m 1[2mms[22m[39m
+   [32m✓[39m classes service[2m > [22mrejects a session with an unknown class type[32m 1[2mms[22m[39m
+   [32m✓[39m classes service[2m > [22mgetSessionView 404s for an unknown id[32m 1[2mms[22m[39m
+   [32m✓[39m bookings service[2m > [22mstamps bookedAt with the current time[32m 3[2mms[22m[39m
+   [32m✓[39m bookings service[2m > [22mbooks an open future session and sends a confirmation[32m 1[2mms[22m[39m
+   [32m✓[39m bookings service[2m > [22mwaitlists when full (and sends no confirmation)[32m 2[2mms[22m[39m
+   [32m✓[39m bookings service[2m > [22mrejects a double booking with 409[32m 1[2mms[22m[39m
+   [32m✓[39m bookings service[2m > [22mmarks a far-off cancellation refund-eligible[32m 1[2mms[22m[39m
+[31m   [31m×[31m bookings service[2m > [22mmarks a last-minute cancellation refund-ineligible[39m[32m 12[2mms[22m[39m
+[31m     → expected true to be false // Object.is equality[39m
+   [32m✓[39m bookings service[2m > [22mpromotes the earliest waitlisted member when a seat frees up[32m 11[2mms[22m[39m
+   [32m✓[39m invoices service[2m > [22mcomputes subtotal + tax + total and sends invoice_issued[32m 24[2mms[22m[39m
+   [32m✓[39m invoices service[2m > [22mallows a valid status transition and rejects an invalid one[32m 3[2mms[22m[39m
+   [32m✓[39m invoices service[2m > [22mlists invoices with member names and reads a detail[32m 2[2mms[22m[39m
+   [32m✓[39m reports + dashboard + booking list[2m > [22msummarises monthly revenue[32m 14[2mms[22m[39m
+   [32m✓[39m reports + dashboard + booking list[2m > [22mbuilds the dashboard[32m 5[2mms[22m[39m
+   [32m✓[39m reports + dashboard + booking list[2m > [22mlists booking rows joined to member + class[32m 5[2mms[22m[39m
+ [32m✓[39m lib/domain/dates.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m lib/db/repos/fakes.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m lib/domain/invoices.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m lib/domain/capacity.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m lib/domain/ical.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m lib/notifications/providers.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m lib/domain/csv.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m lib/domain/reports.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m lib/db/repos/mapping.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m lib/domain/money.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m lib/services/routes.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m lib/services/services.test.ts[2m > [22mbookings service[2m > [22mmarks a last-minute cancellation refund-ineligible
+[31m[1mAssertionError[22m: expected true to be false // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+[36m [2m❯[22m lib/services/services.test.ts:[2m246:35[22m[39m
+    [90m244| [39m    )[33m;[39m
+    [90m245| [39m    const result = await cancelBooking(repos, createFakeProvider(), "b…
+    [90m246| [39m    [34mexpect[39m(result[33m.[39mrefundEligible)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m   | [39m                                  [31m^[39m
+    [90m247| [39m  })[33m;[39m
+    [90m248| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m13 passed[39m[22m[90m (14)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m142 passed[39m[22m[90m (143)[39m
+[2m   Start at [22m 17:45:09
+[2m   Duration [22m 2.29s[2m (transform 652ms, setup 0ms, collect 1.43s, tests 363ms, environment 4ms, prepare 1.58s)[22m
+
+/home/user/repo/apps/web:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @studiobook/web@0.0.0 test: `vitest run`
+Exit status 1
