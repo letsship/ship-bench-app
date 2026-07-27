@@ -122,6 +122,51 @@ jobs:
           echo "::group::build:cf"
           pnpm --filter @studiobook/web build:cf
 
+      # A migration task (e.g. Supabase -> D1) ships a D1 binding with a
+      # placeholder database_id; without a real one, wrangler deploy fails with
+      # "binding DB must have a valid database_id [10021]". Point the binding at
+      # the shared preview D1, reset it, apply the solution's migrations, and seed
+      # via the solution's own emitter — so a correct D1 migration is deployable +
+      # QA-able. No-op when the config declares no D1 (the other tasks).
+      - name: Provision D1 for preview (when the config declares one)
+        if: inputs.action == 'deploy'
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          exec > >(tee -a /tmp/deploy-err.log) 2>&1
+          echo "::group::provision D1"
+          set -e
+          CONFIG="$(basename "${{ inputs.config_file }}")"
+          if ! grep -q '"d1_databases"' "$CONFIG"; then
+            echo "no D1 binding in $CONFIG — skipping D1 provisioning"
+            exit 0
+          fi
+          DB_NAME="studiobook-preview"
+          DB_ID="9a1d7061-5c59-43e3-a3fb-751170947225"
+          # Point every d1 binding at the shared preview DB (agent shipped a placeholder).
+          sed -i "s#\"database_id\": *\"[^\"]*\"#\"database_id\": \"$DB_ID\"#g" "$CONFIG"
+          sed -i "s#\"database_name\": *\"[^\"]*\"#\"database_name\": \"$DB_NAME\"#g" "$CONFIG"
+          echo "D1 binding -> $DB_NAME ($DB_ID)"
+          # Reset: drop every user table (incl. d1_migrations) so each preview
+          # starts clean and migrations re-apply from scratch.
+          pnpm exec wrangler d1 execute "$DB_NAME" --remote --json --command \
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'" \
+            > /tmp/d1-tables.json || echo '[]' > /tmp/d1-tables.json
+          node -e 'const j=require("/tmp/d1-tables.json");const rows=(Array.isArray(j)?j[0]:j)?.results||[];const s=rows.map(r=>`DROP TABLE IF EXISTS \"${r.name}\";`).join("\n");require("fs").writeFileSync("/tmp/d1-drop.sql",s);console.log(`reset: dropping ${rows.length} table(s)`)'
+          if [ -s /tmp/d1-drop.sql ]; then
+            pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --file /tmp/d1-drop.sql
+          fi
+          # Apply the solution's migrations, then seed via the solution's emitter.
+          pnpm exec wrangler d1 migrations apply "$DB_NAME" --remote --yes -c "$CONFIG"
+          if [ -f scripts/emit-seed-sql.ts ]; then
+            pnpm exec tsx scripts/emit-seed-sql.ts > /tmp/d1-seed.sql
+            pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --file /tmp/d1-seed.sql
+            echo "D1 seeded ($(wc -l < /tmp/d1-seed.sql) lines)"
+          fi
+          echo "D1 provisioned"
+
       - name: Deploy preview worker
         if: inputs.action == 'deploy'
         id: deploy
