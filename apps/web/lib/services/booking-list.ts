@@ -1,4 +1,5 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import type { BookingExportRow } from "@/lib/domain/csv";
 
 export interface BookingRow {
   id: string;
@@ -6,14 +7,6 @@ export interface BookingRow {
   className: string;
   classColor: string;
   instructor: string;
-  startsAt: string;
-  status: string;
-}
-
-export interface BookingExportRow {
-  className: string;
-  memberName: string;
-  email: string;
   startsAt: string;
   status: string;
 }
@@ -84,9 +77,18 @@ export async function listBookingExportRows(
     })
     .filter((row) => {
       const startsAt = row.startsAt;
-      // Inclusive on both ends: keep if (from absent OR startsAt >= from) AND (to absent OR startsAt <= to)
-      if (range.from && startsAt < range.from) return false;
-      if (range.to && startsAt > range.to) return false;
+      // Inclusive on both ends: keep if (from absent OR startsAt >= from) AND (to absent OR startsAt <= to).
+      // Parse to Date to handle different ISO-8601 UTC formats (Z vs +00:00).
+      if (range.from) {
+        const fromDate = new Date(range.from);
+        const startsDate = new Date(startsAt);
+        if (startsDate < fromDate) return false;
+      }
+      if (range.to) {
+        const toDate = new Date(range.to);
+        const startsDate = new Date(startsAt);
+        if (startsDate > toDate) return false;
+      }
       return true;
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
