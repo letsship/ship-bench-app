@@ -39,13 +39,15 @@ export async function resolvePublicStudio(slug: string): Promise<PublicStudio | 
   const studio = await repos.studios.getBySlug(slug);
   if (!studio) return null;
   const sessions = await listSessions(repos, studio.id, { from: new Date().toISOString() });
-  const classes: PublicClass[] = sessions.map((session) => ({
-    id: session.id,
-    name: session.classTypeName,
-    instructor: session.instructor,
-    startsAt: session.startsAt,
-    endsAt: session.endsAt,
-  }));
+  const classes: PublicClass[] = sessions
+    .filter((session) => session.status === "scheduled")
+    .map((session) => ({
+      id: session.id,
+      name: session.classTypeName,
+      instructor: session.instructor,
+      startsAt: session.startsAt,
+      endsAt: session.endsAt,
+    }));
   return { studio, classes };
 }
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
-import { buildStudioEventsJsonLd, studioMetadata } from "@/lib/seo";
+import { buildStudioEventsJsonLd, serializeJsonLd, studioMetadata } from "@/lib/seo";
 import { resolvePublicStudio } from "@/lib/services/public-studio";
 
 // Public, no-auth studio page. It lives OUTSIDE the (app) route group so the
@@ -37,7 +37,12 @@ export default async function PublicStudioPage({ params }: PageProps) {
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // JSON.stringify doesn't escape "<", ">", "&", or the JS line
+        // terminators U+2028/U+2029, so a studio/class name containing e.g.
+        // "</script>" would otherwise break out of this tag and execute on
+        // this public, unauthenticated page. \uXXXX escapes are valid JSON
+        // and round-trip back to the original characters when parsed.
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <img
         src="/studio-cover.svg"

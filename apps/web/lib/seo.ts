@@ -60,3 +60,28 @@ export function buildStudioEventsJsonLd(data: PublicStudio): Record<string, unkn
     },
   }));
 }
+
+// Characters that are unsafe to embed verbatim inside a <script> tag, mapped
+// to their JSON \uXXXX escape (valid JSON, decodes back to the original
+// character). Built from character codes rather than literal source
+// characters/regex so the line/paragraph separators can't be misread as plain
+// whitespace when this file is edited.
+const SCRIPT_UNSAFE_ESCAPES: [string, string][] = [
+  ["<", "\\u003c"],
+  [">", "\\u003e"],
+  ["&", "\\u0026"],
+  [String.fromCharCode(0x2028), "\\u2028"],
+  [String.fromCharCode(0x2029), "\\u2029"],
+];
+
+// Serializes JSON-LD for embedding in a <script type="application/ld+json">
+// tag. JSON.stringify alone does not escape "<", ">", "&", or the JS line
+// terminators U+2028/U+2029, so an operator-controlled value (studio/class
+// name, instructor) containing e.g. "</script>" could otherwise break out of
+// the tag and execute as HTML/script on this public, unauthenticated page.
+export function serializeJsonLd(data: unknown): string {
+  return SCRIPT_UNSAFE_ESCAPES.reduce(
+    (json, [unsafe, escaped]) => json.split(unsafe).join(escaped),
+    JSON.stringify(data),
+  );
+}

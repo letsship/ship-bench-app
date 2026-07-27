@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PublicStudio } from "@/lib/services/public-studio";
-import { buildStudioEventsJsonLd, studioMetadata } from "./seo";
+import { buildStudioEventsJsonLd, serializeJsonLd, studioMetadata } from "./seo";
 
 const STUDIO: PublicStudio = {
   studio: {
@@ -75,5 +75,31 @@ describe("buildStudioEventsJsonLd", () => {
 
   it("returns an empty array when there are no upcoming classes", () => {
     expect(buildStudioEventsJsonLd({ ...STUDIO, classes: [] })).toEqual([]);
+  });
+});
+
+describe("serializeJsonLd", () => {
+  it("escapes a literal </script> so an operator-controlled name can't break out of the tag", () => {
+    const malicious = [{ name: "</script><script>alert(1)</script>" }];
+    const serialized = serializeJsonLd(malicious);
+    expect(serialized).not.toContain("</script>");
+    expect(serialized).not.toContain("<script>");
+    expect(JSON.parse(serialized)).toEqual(malicious);
+  });
+
+  it("escapes angle brackets, ampersands, and JS line terminators", () => {
+    const value = [{ name: "<b>Tom & Jerry</b>", note: `line${String.fromCharCode(0x2028)}break` }];
+    const serialized = serializeJsonLd(value);
+    expect(serialized).not.toContain("<");
+    expect(serialized).not.toContain(">");
+    expect(serialized).not.toContain("&");
+    expect(serialized).not.toContain(String.fromCharCode(0x2028));
+    expect(JSON.parse(serialized)).toEqual(value);
+  });
+
+  it("round-trips ordinary studio event data unchanged in meaning", () => {
+    const events = buildStudioEventsJsonLd(STUDIO);
+    const serialized = serializeJsonLd(events);
+    expect(JSON.parse(serialized)).toEqual(events);
   });
 });

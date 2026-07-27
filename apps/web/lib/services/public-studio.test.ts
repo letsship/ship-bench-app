@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { __setTestRepositories } from "@/lib/db/repos";
+import { __setTestRepositories, resolveRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
 import { listPublicStudios, publicStudioUrl, resolvePublicStudio } from "./public-studio";
@@ -31,6 +31,30 @@ describe("public studio service", () => {
 
   it("returns null for a slug that matches no studio", async () => {
     expect(await resolvePublicStudio("no-such-studio")).toBeNull();
+  });
+
+  it("excludes cancelled sessions from the upcoming classes shown to the public", async () => {
+    const repos = await resolveRepositories();
+    const before = await resolvePublicStudio("riverbank");
+    const studioId = before?.studio.id;
+    expect(studioId).toBeTruthy();
+
+    const cancelled = await repos.classSessions.insert({
+      id: "session-cancelled-test",
+      studioId: studioId as string,
+      classTypeId: "class-type-cancelled-test",
+      instructor: "Someone",
+      startsAt: new Date(NOW.getTime() + 60 * 60 * 1000).toISOString(),
+      endsAt: new Date(NOW.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      capacity: 10,
+      priceCents: 1000,
+      status: "cancelled",
+      createdAt: NOW.toISOString(),
+    });
+
+    const after = await resolvePublicStudio("riverbank");
+    expect(after?.classes.some((cls) => cls.id === cancelled.id)).toBe(false);
+    expect(after?.classes.length).toBe(before?.classes.length ?? 0);
   });
 
   it("lists every public studio for the sitemap", async () => {
