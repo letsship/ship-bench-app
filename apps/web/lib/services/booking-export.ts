@@ -25,6 +25,11 @@ export async function listBookingExportRows(
   const memberById = new Map(members.map((member) => [member.id, member]));
   const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
 
+  // Parse range bounds as Date objects for numeric comparison (handles both
+  // 'Z' and '+HH:MM' ISO-8601 forms correctly).
+  const fromTime = range.from ? new Date(range.from).getTime() : -Infinity;
+  const toTime = range.to ? new Date(range.to).getTime() : Infinity;
+
   return bookings
     .map((booking) => {
       const session = sessionById.get(booking.sessionId);
@@ -40,8 +45,9 @@ export async function listBookingExportRows(
     })
     .filter((row) => {
       if (!row.startsAt) return false;
-      if (range.from && row.startsAt < range.from) return false;
-      if (range.to && row.startsAt > range.to) return false;
+      const rowTime = new Date(row.startsAt).getTime();
+      if (rowTime < fromTime) return false;
+      if (rowTime > toTime) return false;
       return true;
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
