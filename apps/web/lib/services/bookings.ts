@@ -1,3 +1,5 @@
+import { resolveTracker } from "@/lib/analytics";
+import type { Tracker } from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -64,6 +66,7 @@ export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
   input: CreateBookingInput,
+  tracker: Tracker = resolveTracker(),
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
   const session = await loadSession(repos, input.sessionId);
@@ -99,6 +102,17 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    await tracker.capture({
+      event: "booking_created",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
+  } else {
+    await tracker.capture({
+      event: "waitlist_joined",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
   }
   return { bookingId, status: decision.status };
 }
@@ -112,6 +126,7 @@ export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
   bookingId: string,
+  tracker: Tracker = resolveTracker(),
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
@@ -148,6 +163,11 @@ export async function cancelBooking(
       decision.refundEligible,
     ),
   );
+  await tracker.capture({
+    event: "booking_cancelled",
+    distinctId: member.id,
+    properties: { session_id: session.id },
+  });
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 
