@@ -26,6 +26,7 @@ export interface SeedData {
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  webhookEvents: string[];
 }
 
 interface Store {
@@ -38,6 +39,7 @@ interface Store {
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  webhookEventIds: Set<string>;
 }
 
 const clone = <T>(row: T): T => ({ ...row });
@@ -67,6 +69,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
+    webhookEventIds: seed ? new Set(seed.webhookEvents) : new Set(),
   };
 
   return {
@@ -209,6 +212,14 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
+      },
+    },
+    webhookEvents: {
+      async has(eventId) {
+        return store.webhookEventIds.has(eventId);
+      },
+      async record(eventId) {
+        store.webhookEventIds.add(eventId);
       },
     },
   };
