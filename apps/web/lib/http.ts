@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { ZodError } from "zod";
 
 // A consistent JSON error envelope for every API route: { error: { code,
@@ -62,6 +63,7 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
       return apiError(error.status, error.code, error.message, error.details);
     }
     console.error("Unhandled API error", error);
+    Sentry.captureException(error);
     return apiError(500, "internal_error", "Something went wrong");
   }
 }
