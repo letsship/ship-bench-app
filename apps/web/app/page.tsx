@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { homeMetadata } from "@/lib/seo";
+
+export const metadata = homeMetadata;
 
 const FEATURES = [
   {
