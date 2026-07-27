@@ -73,8 +73,8 @@ export async function listBookingsForExport(
     })
     .filter((row) => {
       const starts = row.starts;
-      if (from && starts < from) return false;
-      if (to && starts > to) return false;
+      if (from && new Date(starts).getTime() < new Date(from).getTime()) return false;
+      if (to && new Date(starts).getTime() > new Date(to).getTime()) return false;
       return true;
     })
     .sort((a, b) => a.starts.localeCompare(b.starts));
