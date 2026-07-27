@@ -42,6 +42,7 @@ function baseSeed(over: Partial<SeedData> = {}): SeedData {
     bookings: [],
     invoices: [],
     lineItems: [],
+    packages: [],
     outbox: [],
     ...over,
   };
