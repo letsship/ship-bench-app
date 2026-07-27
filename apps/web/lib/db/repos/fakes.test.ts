@@ -91,4 +91,61 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("rejects a duplicate active booking for the same member+session", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const members = await repos.members.listByStudio(studioId);
+    const session = sessions[0];
+    const member = members[0];
+
+    await repos.bookings.insert({
+      id: "b1",
+      sessionId: session.id,
+      memberId: member.id,
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    await expect(
+      repos.bookings.insert({
+        id: "b2",
+        sessionId: session.id,
+        memberId: member.id,
+        status: "waitlisted",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      }),
+    ).rejects.toThrow("A member cannot have more than one active booking per session");
+  });
+
+  it("allows re-booking after cancellation", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const members = await repos.members.listByStudio(studioId);
+    const session = sessions[0];
+    const member = members[0];
+
+    const booking1 = await repos.bookings.insert({
+      id: "b1",
+      sessionId: session.id,
+      memberId: member.id,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    await repos.bookings.update("b1", { status: "cancelled", cancelledAt: NOW.toISOString() });
+
+    const booking2 = await repos.bookings.insert({
+      id: "b2",
+      sessionId: session.id,
+      memberId: member.id,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    expect(booking1.id).toBe("b1");
+    expect(booking2.id).toBe("b2");
+  });
 });

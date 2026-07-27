@@ -10,6 +10,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
 
@@ -18,7 +19,7 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -47,7 +48,12 @@ export function createSupabaseRepositories(): Repositories {
       .insert(toSnakeRow(row as Record<string, unknown>))
       .select()
       .single();
-    if (error) fail(`insert into ${table}`, error);
+    if (error) {
+      if (table === "bookings" && error.code === "23505") {
+        throw new DuplicateActiveBookingError();
+      }
+      fail(`insert into ${table}`, error);
+    }
     return toCamelRow<T>(data as Record<string, unknown>);
   }
 
