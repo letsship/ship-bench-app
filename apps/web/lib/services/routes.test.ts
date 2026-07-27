@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as invoicesDetailGet } from "@/app/api/invoices/[id]/route";
+import { GET as membersDetailGet } from "@/app/api/members/[id]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +46,33 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/invoices/[id] returns invoice detail with async params", async () => {
+    const seed = buildSeed(NOW);
+    const invoiceId = seed.invoices[0].id;
+    const res = await invoicesDetailGet(
+      new NextRequest("http://localhost/api/invoices/" + invoiceId),
+      {
+        params: Promise.resolve({ id: invoiceId }),
+      },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown;
+    expect(body).toHaveProperty("invoice");
+  });
+
+  it("GET /api/members/[id] returns member detail with async params", async () => {
+    const seed = buildSeed(NOW);
+    const memberId = seed.members[0].id;
+    const res = await membersDetailGet(
+      new NextRequest("http://localhost/api/members/" + memberId),
+      {
+        params: Promise.resolve({ id: memberId }),
+      },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown;
+    expect(body).toHaveProperty("id");
   });
 });
