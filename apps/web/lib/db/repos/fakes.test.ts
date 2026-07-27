@@ -91,4 +91,30 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("webhookEvents insert then getById round-trips", async () => {
+    const event = {
+      id: "evt_test_123",
+      type: "invoice.paid",
+      receivedAt: NOW.toISOString(),
+    };
+    await repos.webhookEvents.insert(event);
+    expect(await repos.webhookEvents.getById("evt_test_123")).toEqual(event);
+  });
+
+  it("webhookEvents getById returns null for unknown id", async () => {
+    expect(await repos.webhookEvents.getById("unknown_event_id")).toBeNull();
+  });
+
+  it("webhookEvents insert returns an isolated clone", async () => {
+    const event = {
+      id: "evt_test_clone",
+      type: "customer.created",
+      receivedAt: NOW.toISOString(),
+    };
+    const inserted = await repos.webhookEvents.insert(event);
+    inserted.type = "modified";
+    const refetched = await repos.webhookEvents.getById("evt_test_clone");
+    expect(refetched?.type).toBe("customer.created");
+  });
 });
