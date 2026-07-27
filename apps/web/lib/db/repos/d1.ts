@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
+import type { D1Database } from "@cloudflare/workers-types";
 import type {
   Booking,
   ClassSession,
