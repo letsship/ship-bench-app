@@ -1,4 +1,14 @@
-import { newId } from "./ids";
+// Deterministic seed dataset: byte-stable ids + a fixed clock so emit-seed-sql
+// renders an IDENTICAL supabase/seed.sql on every run (no churn on unrelated
+// PRs). Runtime rows the app creates still use the random newId from ./ids;
+// only the demo seed is deterministic. buildSeed resets the counter so repeated
+// calls are identical.
+const SEED_NOW = new Date("2026-07-01T12:00:00.000Z");
+let __seedIdSeq = 0;
+function seedId(): string {
+  __seedIdSeq += 1;
+  return `00000000-0000-4000-8000-${__seedIdSeq.toString(16).padStart(12, "0")}`;
+}
 import type { SeedData } from "./repos/fakes";
 import type {
   Booking,
@@ -53,7 +63,7 @@ const CLASS_TYPE_SEED = [
 const INSTRUCTORS = ["Noor", "Sanne", "Tomás", "Priya", "Wouter"] as const;
 
 function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
-  const studioId = newId();
+  const studioId = seedId();
   return {
     studio: {
       id: studioId,
@@ -78,7 +88,7 @@ function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
 
 function buildMembers(now: Date, studioId: string): Member[] {
   return MEMBER_SEED.map((member, index) => ({
-    id: newId(),
+    id: seedId(),
     studioId,
     name: member.name,
     email: member.email,
@@ -92,7 +102,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
 
 function buildClassTypes(now: Date, studioId: string): ClassType[] {
   return CLASS_TYPE_SEED.map((type) => ({
-    id: newId(),
+    id: seedId(),
     studioId,
     name: type.name,
     description: `${type.name} — a ${type.kind} class at Riverbank Movement.`,
@@ -111,7 +121,7 @@ function buildSessions(now: Date, studioId: string, classTypes: ClassType[]): Cl
     for (const hour of [8, 12, 17]) {
       const type = classTypes[counter % classTypes.length];
       sessions.push({
-        id: newId(),
+        id: seedId(),
         studioId,
         classTypeId: type.id,
         instructor: INSTRUCTORS[counter % INSTRUCTORS.length],
@@ -130,7 +140,7 @@ function buildSessions(now: Date, studioId: string, classTypes: ClassType[]): Cl
 
 function newBooking(sessionId: string, memberId: string, status: string, now: Date): Booking {
   return {
-    id: newId(),
+    id: seedId(),
     sessionId,
     memberId,
     status,
@@ -251,14 +261,14 @@ function buildInvoices(
   const invoices: Invoice[] = [];
   const lineItems: InvoiceLineItem[] = [];
   INVOICE_SEED.forEach((seed, index) => {
-    const invoiceId = newId();
+    const invoiceId = seedId();
     const member = members[seed.memberIndex];
     let subtotal = 0;
     for (const line of seed.lines) {
       const amount = line.quantity * line.unit;
       if (!line.refunded) subtotal += amount;
       lineItems.push({
-        id: newId(),
+        id: seedId(),
         invoiceId,
         description: line.description,
         quantity: line.quantity,
@@ -294,7 +304,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
   const createdAt = new Date(now.getTime() - 2 * DAY_MS).toISOString();
   return [
     {
-      id: newId(),
+      id: seedId(),
       memberId: members[0].id,
       kind: "booking_confirmation",
       payload: JSON.stringify({ subject: "You're booked", body: "See you soon!", data: {} }),
@@ -304,7 +314,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
       error: null,
     },
     {
-      id: newId(),
+      id: seedId(),
       memberId: members[1].id,
       kind: "invoice_issued",
       payload: JSON.stringify({
@@ -320,7 +330,8 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
   ];
 }
 
-export function buildSeed(now: Date = new Date()): SeedData {
+export function buildSeed(now: Date = SEED_NOW): SeedData {
+  __seedIdSeq = 0;
   const { studio, settings } = buildStudio(now);
   const members = buildMembers(now, studio.id);
   const classTypes = buildClassTypes(now, studio.id);
