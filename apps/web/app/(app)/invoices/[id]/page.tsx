@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HttpError } from "@/lib/http";
-import { type InvoiceStatus, canTransitionInvoice, computeInvoiceTotals } from "@/lib/domain/invoices";
+import {
+  type InvoiceStatus,
+  canTransitionInvoice,
+  computeInvoiceTotals,
+} from "@/lib/domain/invoices";
 import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getInvoiceDetail } from "@/lib/services/invoices";
@@ -12,11 +16,7 @@ export const dynamic = "force-dynamic";
 
 const ALL_STATUSES: InvoiceStatus[] = ["draft", "open", "paid", "void", "refunded"];
 
-export default async function InvoiceDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { repos, ctx } = await resolveStudio();
   const { id } = await params;
 
@@ -31,7 +31,9 @@ export default async function InvoiceDetailPage({
   const { invoice, member, lineItems } = detail;
   const currency = invoice.currency;
   // Derive the money box from the line items so a line-level refund shows up
-  // immediately, not only after the stored totals are rewritten.
+  // immediately, not only after the stored totals are rewritten. An invoice with
+  // no billable lines left (every line refunded) totals zero rather than
+  // throwing, so the refunded lines below still render.
   const totals = computeInvoiceTotals(lineItems, invoice.taxRateBps);
   const allowed = ALL_STATUSES.filter((status) =>
     canTransitionInvoice(invoice.status as InvoiceStatus, status),
