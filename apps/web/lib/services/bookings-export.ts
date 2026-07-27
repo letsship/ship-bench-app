@@ -24,6 +24,9 @@ export async function listBookingsForExport(
   const memberById = new Map(members.map((member) => [member.id, member]));
   const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
 
+  const fromMs = range.from ? Date.parse(range.from) : undefined;
+  const toMs = range.to ? Date.parse(range.to) : undefined;
+
   return bookings
     .map((booking) => {
       const session = sessionById.get(booking.sessionId);
@@ -37,7 +40,7 @@ export async function listBookingsForExport(
         status: booking.status,
       };
     })
-    .filter((row) => (range.from ? row.startsAt >= range.from : true))
-    .filter((row) => (range.to ? row.startsAt <= range.to : true))
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    .filter((row) => (fromMs === undefined ? true : Date.parse(row.startsAt) >= fromMs))
+    .filter((row) => (toMs === undefined ? true : Date.parse(row.startsAt) <= toMs))
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 }

@@ -144,4 +144,21 @@ describe("listBookingsForExport", () => {
       "2026-06-15T09:00:00.000Z",
     ]);
   });
+
+  it("includes a boundary session even when the stored offset form differs from the query's Z form", async () => {
+    const offsetRepos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1", "Amara")],
+        classTypes: [classType("ct1", "Vinyasa Flow")],
+        sessions: [session("cs1", "2026-06-27T08:00:00+00:00")],
+        bookings: [booking("b1", "cs1", "m1")],
+      }),
+    );
+
+    const rows = await listBookingsForExport(offsetRepos, "s1", {
+      from: "2026-06-27T08:00:00.000Z",
+      to: "2026-06-27T08:00:00.000Z",
+    });
+    expect(rows.map((row) => row.startsAt)).toEqual(["2026-06-27T08:00:00+00:00"]);
+  });
 });
