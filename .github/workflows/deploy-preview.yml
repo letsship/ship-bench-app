@@ -159,7 +159,9 @@ jobs:
             pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --file /tmp/d1-drop.sql
           fi
           # Apply the solution's migrations, then seed via the solution's emitter.
-          pnpm exec wrangler d1 migrations apply "$DB_NAME" --remote --yes -c "$CONFIG"
+          # NOTE: `d1 migrations apply` has NO --yes flag (only `d1 execute` does);
+          # it auto-proceeds in CI's non-interactive shell.
+          pnpm exec wrangler d1 migrations apply "$DB_NAME" --remote -c "$CONFIG"
           if [ -f scripts/emit-seed-sql.ts ]; then
             pnpm exec tsx scripts/emit-seed-sql.ts > /tmp/d1-seed.sql
             pnpm exec wrangler d1 execute "$DB_NAME" --remote --yes --file /tmp/d1-seed.sql
