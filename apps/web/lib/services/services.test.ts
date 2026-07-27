@@ -43,6 +43,7 @@ function baseSeed(over: Partial<SeedData> = {}): SeedData {
     invoices: [],
     lineItems: [],
     outbox: [],
+    webhookEvents: [],
     ...over,
   };
 }
