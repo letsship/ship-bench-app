@@ -56,7 +56,18 @@ export async function getInvoiceDetail(repos: Repositories, id: string): Promise
   const member = await repos.members.getById(invoice.memberId);
   if (!member) throw new HttpError(404, "not_found", "Invoice member not found");
   const lineItems = await repos.invoiceLineItems.listByInvoice(id);
-  return { invoice, member, lineItems };
+  // Compute totals from current line items so post-issue line-level refunds are reflected
+  const totals = computeInvoiceTotals(lineItems, invoice.taxRateBps);
+  return {
+    invoice: {
+      ...invoice,
+      subtotalCents: totals.subtotalCents,
+      taxCents: totals.taxCents,
+      totalCents: totals.totalCents,
+    },
+    member,
+    lineItems,
+  };
 }
 
 export async function createInvoice(
