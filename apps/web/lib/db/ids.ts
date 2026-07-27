@@ -5,3 +5,11 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// An opaque, URL-safe secret for a member's private calendar subscription
+// link. Dashes are stripped so it drops cleanly into a path segment; the
+// underlying UUIDv4 still carries 122 bits of randomness, so it is
+// unguessable.
+export function newCalendarToken(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}

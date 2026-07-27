@@ -32,6 +32,7 @@ export interface Member {
   status: string;
   notificationsOptedOut: boolean;
   createdAt: string;
+  calendarToken: string;
 }
 
 export interface ClassType {

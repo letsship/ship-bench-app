@@ -56,6 +56,7 @@ const member = (id: string, over: Partial<Member> = {}): Member => ({
   status: "active",
   notificationsOptedOut: false,
   createdAt: ISO,
+  calendarToken: `${id}-token`,
   ...over,
 });
 

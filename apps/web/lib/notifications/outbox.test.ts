@@ -37,6 +37,7 @@ function seedWith(
         status: "active",
         notificationsOptedOut: false,
         createdAt: ISO,
+        calendarToken: "m1-token",
         ...memberOverrides,
       },
     ],
