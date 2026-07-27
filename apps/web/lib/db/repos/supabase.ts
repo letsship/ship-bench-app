@@ -11,6 +11,7 @@ import type {
   StudioSettings,
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
+import { DuplicateActiveBookingError } from "./types";
 import type { Repositories } from "./types";
 
 // The production repository implementation over supabase-js (service role).
@@ -18,11 +19,14 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
-function fail(context: string, error: { message: string }): never {
+function fail(context: string, error: { message: string; code?: string }): never {
+  if (context === "insert into bookings" && error.code === "23505") {
+    throw new DuplicateActiveBookingError();
+  }
   throw new Error(`Supabase ${context} failed: ${error.message}`);
 }
 
