@@ -3,7 +3,7 @@
 // PRs). Runtime rows the app creates still use the random newId from ./ids;
 // only the demo seed is deterministic. buildSeed resets the counter so repeated
 // calls are identical.
-const SEED_NOW = new Date("2026-07-01T12:00:00.000Z");
+export const SEED_NOW = new Date("2026-07-01T12:00:00.000Z");
 let __seedIdSeq = 0;
 function seedId(): string {
   __seedIdSeq += 1;
@@ -330,7 +330,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
   ];
 }
 
-export function buildSeed(now: Date = SEED_NOW): SeedData {
+export function buildSeed(now: Date = new Date()): SeedData {
   __seedIdSeq = 0;
   const { studio, settings } = buildStudio(now);
   const members = buildMembers(now, studio.id);
