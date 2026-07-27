@@ -101,6 +101,7 @@ create table public.invoices (
   currency       text not null default 'EUR',
   tax_rate_bps   integer not null default 0,
   subtotal_cents integer not null default 0,
+  refunded_cents integer not null default 0,
   tax_cents      integer not null default 0,
   total_cents    integer not null default 0,
   issued_at      timestamptz not null,

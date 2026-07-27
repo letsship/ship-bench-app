@@ -76,6 +76,7 @@ export interface Invoice {
   currency: string;
   taxRateBps: number;
   subtotalCents: number;
+  refundedCents: number;
   taxCents: number;
   totalCents: number;
   issuedAt: string;
