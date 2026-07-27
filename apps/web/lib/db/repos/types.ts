@@ -76,6 +76,9 @@ export interface InvoiceLineItemsRepo {
 export interface NotificationOutboxRepo {
   insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
   listPending(): Promise<NotificationOutboxRow[]>;
+  // Every row of a kind, in any state — pending AND already dispatched. Jobs
+  // that must not re-queue a notification need the sent rows too.
+  listByKind(kind: string): Promise<NotificationOutboxRow[]>;
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 

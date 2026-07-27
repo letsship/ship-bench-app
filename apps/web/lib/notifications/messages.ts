@@ -53,6 +53,22 @@ export function waitlistPromotion(
   };
 }
 
+// The 24-hour reminder. `bookingId` travels in `data` so the reminder job can
+// tell which bookings it has already queued a reminder for (idempotency key).
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} tomorrow`,
+    body: `Hi ${recipient.name}, this is a reminder that ${session.title} with ${session.instructor} starts on ${session.startsAt}. See you on the mat!`,
+    data: { title: session.title, startsAt: session.startsAt, bookingId },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;

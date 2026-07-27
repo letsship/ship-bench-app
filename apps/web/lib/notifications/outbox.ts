@@ -2,14 +2,6 @@ import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { NotificationKind, NotificationMessage, NotificationProvider } from "./types";
 
-// Which studio setting gates each notification kind.
-const SETTING_FOR_KIND = {
-  booking_confirmation: "notifyBookingConfirmations",
-  booking_cancellation: "notifyCancellations",
-  waitlist_promotion: "notifyWaitlistPromotions",
-  invoice_issued: "notifyInvoices",
-} as const satisfies Record<NotificationKind, string>;
-
 export interface OptOutContext {
   memberOptedOut: boolean;
   notifyBookingConfirmations: boolean;
@@ -18,11 +10,22 @@ export interface OptOutContext {
   notifyInvoices: boolean;
 }
 
+// Which studio setting gates each notification kind. Kinds with no entry (class
+// reminders) have no studio-level toggle and are gated by member opt-out alone.
+const SETTING_FOR_KIND: Partial<Record<NotificationKind, keyof OptOutContext>> = {
+  booking_confirmation: "notifyBookingConfirmations",
+  booking_cancellation: "notifyCancellations",
+  waitlist_promotion: "notifyWaitlistPromotions",
+  invoice_issued: "notifyInvoices",
+};
+
 // A member opt-out wins over everything; otherwise the studio-level setting for
-// the kind decides. Pure so both the dispatcher and tests share one rule.
+// the kind decides, and a kind without one is allowed. Pure so both the
+// dispatcher and tests share one rule.
 export function shouldSend(kind: NotificationKind, context: OptOutContext): boolean {
   if (context.memberOptedOut) return false;
-  return context[SETTING_FOR_KIND[kind]];
+  const setting = SETTING_FOR_KIND[kind];
+  return setting ? context[setting] : true;
 }
 
 // Persist a notification as a pending outbox row. Delivery happens later in
