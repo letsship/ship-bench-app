@@ -9,6 +9,8 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { isActiveBookingStatus } from "@/lib/domain/booking-rules";
+import { DuplicateActiveBookingError } from "./types";
 import type { Repositories, SessionRange } from "./types";
 
 // In-memory implementation of the repository seam. Used by the test suite
@@ -160,6 +162,16 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        if (
+          store.bookings.some(
+            (row) =>
+              row.sessionId === booking.sessionId &&
+              row.memberId === booking.memberId &&
+              isActiveBookingStatus(row.status),
+          )
+        ) {
+          throw new DuplicateActiveBookingError();
+        }
         store.bookings.push(clone(booking));
         return clone(booking);
       },

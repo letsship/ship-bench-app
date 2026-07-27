@@ -249,6 +249,58 @@ describe("bookings service", () => {
       "waitlist_promotion",
     ]);
   });
+
+  it("rejects concurrent double-submit to a full class with one active waitlist entry", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+
+    const [result, error] = await Promise.allSettled([
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+    ]).then((settled) => {
+      const fulfilled = settled.find((s) => s.status === "fulfilled");
+      const rejected = settled.find((s) => s.status === "rejected");
+      return [fulfilled?.value, rejected?.reason];
+    });
+
+    expect(result?.status).toBe("waitlisted");
+    expect(error?.status).toBe(409);
+    expect(error?.code).toBe("booking_already_booked");
+
+    const allBookings = await repos.bookings.listBySession("cs1");
+    const m2Bookings = allBookings.filter((b) => b.memberId === "m2");
+    expect(m2Bookings).toHaveLength(1);
+    expect(m2Bookings[0].status).toBe("waitlisted");
+  });
+
+  it("allows a member to rebook after cancellation", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+
+    await cancelBooking(repos, provider, "b1");
+    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    expect(result.status).toBe("booked");
+
+    const allBookings = await repos.bookings.listBySession("cs1");
+    const m1Bookings = allBookings.filter((b) => b.memberId === "m1");
+    expect(m1Bookings).toHaveLength(2);
+    expect(m1Bookings.some((b) => b.status === "cancelled")).toBe(true);
+    expect(m1Bookings.some((b) => b.status === "booked")).toBe(true);
+  });
 });
 
 describe("invoices service", () => {

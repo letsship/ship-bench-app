@@ -18,6 +18,13 @@ import type {
 // upstream changes. Services build full rows (ids + timestamps set app-side)
 // so both implementations behave identically.
 
+export class DuplicateActiveBookingError extends Error {
+  constructor(message: string = "Duplicate active booking") {
+    super(message);
+    this.name = "DuplicateActiveBookingError";
+  }
+}
+
 export interface SessionRange {
   from?: string;
   to?: string;
