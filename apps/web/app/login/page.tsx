@@ -12,11 +12,7 @@ async function signIn(formData: FormData): Promise<void> {
   redirect(next.startsWith("/") ? next : "/dashboard");
 }
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: { next?: string };
-}) {
+export default async function LoginPage({ searchParams }: { searchParams: { next?: string } }) {
   const { next } = searchParams;
 
   return (
