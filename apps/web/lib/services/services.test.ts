@@ -295,6 +295,52 @@ describe("invoices service", () => {
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
+
+  it("handles fully-refunded invoice with zero totals", async () => {
+    // Manually create an invoice with all line items already marked as refunded.
+    // This simulates the state after line-level refunds have been applied.
+    const invoiceId = "test-refunded-invoice";
+    const issuedAt = ISO;
+    const ctx = await getStudioContext(repos);
+
+    await repos.invoices.insert({
+      id: invoiceId,
+      studioId,
+      memberId,
+      number: "INV-2026-9999",
+      status: "open",
+      currency: ctx.settings.currency,
+      taxRateBps: ctx.settings.taxRateBps,
+      subtotalCents: 5000,
+      taxCents: 450,
+      totalCents: 5450,
+      issuedAt,
+      dueAt: new Date(NOW.getTime() + 14 * 86_400_000).toISOString(),
+      paidAt: null,
+      createdAt: issuedAt,
+    });
+
+    await repos.invoiceLineItems.insertMany([
+      {
+        id: "line1",
+        invoiceId,
+        description: "Pottery intensive",
+        quantity: 5,
+        unitAmountCents: 1000,
+        amountCents: 5000,
+        refunded: true,
+        bookingId: null,
+      },
+    ]);
+
+    // Verify the detail service computes zero totals from the refunded line
+    const detail = await getInvoiceDetail(repos, invoiceId);
+    expect(detail.invoice.subtotalCents).toBe(0);
+    expect(detail.invoice.taxCents).toBe(0);
+    expect(detail.invoice.totalCents).toBe(0);
+    expect(detail.lineItems).toHaveLength(1);
+    expect(detail.lineItems[0].refunded).toBe(true);
+  });
 });
 
 describe("reports + dashboard + booking list", () => {

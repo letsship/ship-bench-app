@@ -44,6 +44,43 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("handles all lines refunded safely", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 1000, refunded: true },
+        { quantity: 2, unitAmountCents: 500, refunded: true },
+      ],
+      2100,
+    );
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.refundedCents).toBe(2000);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+  });
+
+  it("handles empty array safely", () => {
+    const totals = computeInvoiceTotals([], 2100);
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.refundedCents).toBe(0);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+  });
+
+  it("handles mixed billable and refunded lines correctly", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 1000 },
+        { quantity: 1, unitAmountCents: 2000, refunded: true },
+        { quantity: 2, unitAmountCents: 500 },
+      ],
+      900,
+    );
+    expect(totals.subtotalCents).toBe(2000);
+    expect(totals.refundedCents).toBe(2000);
+    expect(totals.taxCents).toBe(180);
+    expect(totals.totalCents).toBe(2180);
+  });
 });
 
 describe("formatInvoiceNumber", () => {
