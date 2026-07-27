@@ -8,6 +8,8 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import { BOOKING_CANCELLED, BOOKING_CREATED, WAITLIST_JOINED } from "@/lib/analytics/types";
+import type { AnalyticsTracker } from "@/lib/analytics/types";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -63,6 +65,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -99,6 +102,25 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    try {
+      await tracker.capture({
+        event: BOOKING_CREATED,
+        distinctId: member.id,
+        properties: { session_id: session.id },
+      });
+    } catch (err) {
+      console.error("Failed to capture booking_created event:", err);
+    }
+  } else if (decision.status === "waitlisted") {
+    try {
+      await tracker.capture({
+        event: WAITLIST_JOINED,
+        distinctId: member.id,
+        properties: { session_id: session.id },
+      });
+    } catch (err) {
+      console.error("Failed to capture waitlist_joined event:", err);
+    }
   }
   return { bookingId, status: decision.status };
 }
@@ -111,6 +133,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -148,6 +171,17 @@ export async function cancelBooking(
       decision.refundEligible,
     ),
   );
+
+  try {
+    await tracker.capture({
+      event: BOOKING_CANCELLED,
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
+  } catch (err) {
+    console.error("Failed to capture booking_cancelled event:", err);
+  }
+
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 

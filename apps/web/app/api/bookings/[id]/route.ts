@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/auth/session";
+import { resolveTracker } from "@/lib/analytics";
 import { handle, ok } from "@/lib/http";
 import { cancelBooking } from "@/lib/services/bookings";
 import { resolveStudio } from "@/lib/services/context";
@@ -16,6 +17,7 @@ export async function DELETE(
     await requireSession();
     const { repos } = await resolveStudio();
     const { id } = await params;
-    return ok(await cancelBooking(repos, createNotificationProvider(), id));
+    const tracker = resolveTracker();
+    return ok(await cancelBooking(repos, createNotificationProvider(), tracker, id));
   });
 }
