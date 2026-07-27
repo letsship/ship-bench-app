@@ -1,6 +1,6 @@
 import type { CookieOptions } from "@supabase/ssr";
 import { createServerClient } from "@supabase/ssr";
-import { type UnsafeUnwrappedCookies, cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { clientEnv } from "../env";
 
 interface CookieToSet {
@@ -9,12 +9,17 @@ interface CookieToSet {
   options: CookieOptions;
 }
 
+interface CookieStore {
+  getAll(): Array<{ name: string; value: string }>;
+  set(name: string, value: string, options: object): void;
+}
+
 // Cookie-aware server client (the idiomatic @supabase/ssr scaffold). Studiobook
 // itself authenticates with a dev-cookie stub rather than Supabase Auth, so this
 // factory is provided for completeness and for code that wants a request-scoped
 // Supabase client.
 export const createClient = async (cookieStore?: Awaited<ReturnType<typeof cookies>>) => {
-  const store = cookieStore ?? (cookies() as unknown as UnsafeUnwrappedCookies);
+  const store = (cookieStore ?? (await cookies())) as unknown as CookieStore;
   const env = clientEnv();
 
   return createServerClient(

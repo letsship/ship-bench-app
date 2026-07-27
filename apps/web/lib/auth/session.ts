@@ -1,4 +1,4 @@
-import { type UnsafeUnwrappedCookies, cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { HttpError } from "@/lib/http";
 import { SESSION_COOKIE } from "./cookie";
 
@@ -6,6 +6,12 @@ import { SESSION_COOKIE } from "./cookie";
 // mints an HMAC-signed cookie naming the operator's email. The signing uses Web
 // Crypto so it works identically in Node and on Cloudflare Workers. This is a
 // fixture app — do not model production auth on it.
+
+interface CookieStore {
+  get(name: string): { value: string } | undefined;
+  set(name: string, value: string, options: object): void;
+  delete(name: string): void;
+}
 
 export { SESSION_COOKIE };
 const encoder = new TextEncoder();
@@ -76,7 +82,7 @@ export async function verifySessionToken(token: string): Promise<Session | null>
 }
 
 export async function getSession(): Promise<Session | null> {
-  const store = cookies() as unknown as UnsafeUnwrappedCookies;
+  const store = (await cookies()) as unknown as CookieStore;
   const token = store.get(SESSION_COOKIE)?.value;
   return token ? verifySessionToken(token) : null;
 }
@@ -88,7 +94,7 @@ export async function requireSession(): Promise<Session> {
 }
 
 export async function startSession(email: string): Promise<void> {
-  const store = cookies() as unknown as UnsafeUnwrappedCookies;
+  const store = (await cookies()) as unknown as CookieStore;
   store.set(SESSION_COOKIE, await createSessionToken(email), {
     httpOnly: true,
     sameSite: "lax",
@@ -98,6 +104,6 @@ export async function startSession(email: string): Promise<void> {
 }
 
 export async function endSession(): Promise<void> {
-  const store = cookies() as unknown as UnsafeUnwrappedCookies;
+  const store = (await cookies()) as unknown as CookieStore;
   store.delete(SESSION_COOKIE);
 }
