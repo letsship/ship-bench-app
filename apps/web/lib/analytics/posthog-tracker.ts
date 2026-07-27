@@ -27,6 +27,10 @@ export function createPostHogTracker(config: PostHogConfig): Tracker {
         event: event.event,
         properties: event.properties,
       });
+      // Ensure the event is flushed before the server function exits.
+      // In short-lived request contexts, awaiting flush guarantees delivery
+      // before the function is disposed.
+      await posthog.flush();
     },
   };
 }

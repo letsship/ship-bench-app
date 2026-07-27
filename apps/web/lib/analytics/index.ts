@@ -2,10 +2,10 @@ import { createRecordingTracker } from "./fake-tracker";
 import { createPostHogTracker } from "./posthog-tracker";
 import type { Tracker } from "./types";
 
-// The app's tracker for analytics. Production uses PostHog (real API key and
-// host are required — a missing key is surfaced as an error, never silently
-// degraded). The local fake-backends mode uses the in-memory recorder so
-// the app runs with no vendor account.
+// The app's tracker for analytics. Production uses PostHog if POSTHOG_KEY
+// is configured; if missing, a silent no-op tracker is used instead so the
+// app runs without a vendor account. The local fake-backends mode uses the
+// in-memory recorder for testing.
 
 let testTracker: Tracker | null = null;
 
