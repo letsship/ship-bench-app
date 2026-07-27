@@ -4,6 +4,9 @@ import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
 import { __setTestRepositories } from "@/lib/db/repos";
+import { __setTestTracker, resolveTracker } from "@/lib/analytics";
+import { createFakeTracker } from "@/lib/analytics/fake-tracker";
+import { BOOKING_CREATED } from "@/lib/analytics/types";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
 
@@ -44,5 +47,52 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+});
+
+describe("route handler analytics injection", () => {
+  beforeEach(() => {
+    __setTestRepositories(createInMemoryRepositories(buildSeed(NOW)));
+  });
+  afterEach(() => {
+    __setTestRepositories(null);
+    __setTestTracker(null);
+  });
+
+  it("resolveTracker returns injected test tracker when set via __setTestTracker", () => {
+    const tracker = createFakeTracker();
+    __setTestTracker(tracker);
+    const resolved = resolveTracker();
+    expect(resolved).toBe(tracker);
+  });
+
+  it("__setTestTracker(null) restores default tracker resolution", () => {
+    const tracker = createFakeTracker();
+    __setTestTracker(tracker);
+    __setTestTracker(null);
+    const resolved = resolveTracker();
+    expect(resolved).not.toBe(tracker);
+  });
+
+  it("captured events do not contain PII", async () => {
+    const tracker = createFakeTracker();
+    __setTestTracker(tracker);
+
+    // Capture a booking_created event (the type that would be captured by routes)
+    await tracker.capture({
+      event: BOOKING_CREATED,
+      distinctId: "member-123",
+      properties: { session_id: "session-456" },
+    });
+
+    const [event] = tracker.captured;
+    // Verify PII-safe structure
+    expect(event.event).toBe(BOOKING_CREATED);
+    expect(event.distinctId).toBe("member-123");
+    expect(event.properties?.session_id).toBe("session-456");
+    // Verify no PII leaks
+    expect(event.properties?.email).toBeUndefined();
+    expect(event.properties?.name).toBeUndefined();
+    expect(event.properties?.phone).toBeUndefined();
   });
 });

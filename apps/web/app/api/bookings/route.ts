@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth/session";
+import { resolveTracker } from "@/lib/analytics";
 import { created, handle, ok } from "@/lib/http";
 import { listBookingRows } from "@/lib/services/booking-list";
 import { createBooking } from "@/lib/services/bookings";
@@ -25,6 +26,7 @@ export async function POST(request: Request): Promise<Response> {
     await requireSession();
     const { repos } = await resolveStudio();
     const input = createBookingSchema.parse(await request.json());
-    return created(await createBooking(repos, createNotificationProvider(), input));
+    const tracker = resolveTracker();
+    return created(await createBooking(repos, createNotificationProvider(), tracker, input));
   });
 }
