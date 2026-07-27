@@ -97,6 +97,11 @@ export function createSupabaseRepositories(): Repositories {
           db.from("members").select("*").eq("studio_id", studioId).eq("email", email).maybeSingle(),
           "members.findByEmail",
         ),
+      findByCalendarToken: (token) =>
+        maybeOne<Member>(
+          db.from("members").select("*").eq("calendar_token", token).maybeSingle(),
+          "members.findByCalendarToken",
+        ),
       insert: (member) => insertReturning("members", member),
       update: (id, patch) => updateReturning<Member>("members", "id", id, patch),
     },
