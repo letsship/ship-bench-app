@@ -295,6 +295,21 @@ describe("invoices service", () => {
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
+
+  it("handles an all-refunded invoice without throwing", async () => {
+    // The seed includes a fully-refunded "Pottery intensive" invoice for Femke.
+    const list = await listInvoices(repos, studioId);
+    const refundedInvoice = list.find(
+      (inv) => inv.status === "refunded" && inv.memberName.includes("Femke"),
+    );
+    expect(refundedInvoice).toBeDefined();
+
+    const detail = await getInvoiceDetail(repos, refundedInvoice!.id);
+    expect(detail.invoice.subtotalCents).toBe(0);
+    expect(detail.invoice.taxCents).toBe(0);
+    expect(detail.invoice.totalCents).toBe(0);
+    expect(detail.lineItems.every((line) => line.refunded)).toBe(true);
+  });
 });
 
 describe("reports + dashboard + booking list", () => {

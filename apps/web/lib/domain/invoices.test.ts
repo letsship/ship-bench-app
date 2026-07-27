@@ -44,6 +44,43 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("handles no line items without throwing", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("handles all-refunded lines without throwing", () => {
+    expect(
+      computeInvoiceTotals([{ quantity: 1, unitAmountCents: 9000, refunded: true }], 900),
+    ).toEqual({
+      subtotalCents: 0,
+      refundedCents: 9000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("keeps refunded lines out of tax for mixed invoices", () => {
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 5000 },
+          { quantity: 1, unitAmountCents: 3000, refunded: true },
+        ],
+        900,
+      ),
+    ).toEqual({
+      subtotalCents: 5000,
+      refundedCents: 3000,
+      taxCents: 450,
+      totalCents: 5450,
+    });
+  });
 });
 
 describe("formatInvoiceNumber", () => {
