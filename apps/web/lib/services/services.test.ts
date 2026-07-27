@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { type BookingRow, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +323,110 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+// The pre-batching per-booking join, kept verbatim as an oracle: the batched
+// implementation must return byte-identical rows for any seed.
+async function perBookingJoin(repos: Repositories, studioId: string): Promise<BookingRow[]> {
+  const sessions = await repos.classSessions.listByStudio(studioId);
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const bookings = await repos.bookings.listBySessionIds(sessions.map((s) => s.id));
+
+  const rows: BookingRow[] = [];
+  for (const b of bookings) {
+    const s = await repos.classSessions.getById(b.sessionId);
+    const type = s ? typeById.get(s.classTypeId) : undefined;
+    const m = await repos.members.getById(b.memberId);
+    rows.push({
+      id: b.id,
+      memberName: m?.name ?? "—",
+      className: type?.name ?? "Class",
+      classColor: type?.color ?? "#6b7280",
+      instructor: s?.instructor ?? "",
+      startsAt: s?.startsAt ?? "",
+      status: b.status,
+    });
+  }
+  return rows.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// N bookings spread over a handful of sessions whose start times descend, so
+// the final `startsAt` sort genuinely reorders the rows.
+function bookingsSeed(count: number): SeedData {
+  const sessionCount = Math.min(count, 5);
+  const sessions = Array.from({ length: sessionCount }, (_, i) =>
+    session(`cs${i + 1}`, {
+      instructor: `I${i + 1}`,
+      startsAt: new Date(NOW.getTime() + (sessionCount - i) * 86_400_000).toISOString(),
+    }),
+  );
+  return baseSeed({
+    members: Array.from({ length: count }, (_, i) => member(`m${i + 1}`)),
+    classTypes: [classType("ct1")],
+    sessions,
+    bookings: Array.from({ length: count }, (_, i) =>
+      booking(`b${i + 1}`, `m${i + 1}`, { sessionId: sessions[i % sessionCount].id }),
+    ),
+  });
+}
+
+function trackReads(repos: Repositories) {
+  const spies = {
+    membersGetById: vi.spyOn(repos.members, "getById"),
+    membersFindByIds: vi.spyOn(repos.members, "findByIds"),
+    membersListByStudio: vi.spyOn(repos.members, "listByStudio"),
+    sessionsGetById: vi.spyOn(repos.classSessions, "getById"),
+    sessionsFindByIds: vi.spyOn(repos.classSessions, "findByIds"),
+    sessionsListByStudio: vi.spyOn(repos.classSessions, "listByStudio"),
+  };
+  const total = () => Object.values(spies).reduce((sum, spy) => sum + spy.mock.calls.length, 0);
+  return { ...spies, total };
+}
+
+describe("booking list read counts", () => {
+  async function listWithReadCounts(count: number) {
+    const repos = createInMemoryRepositories(bookingsSeed(count));
+    const reads = trackReads(repos);
+    const rows = await listBookingRows(repos, "s1");
+    return { rows, reads };
+  }
+
+  it("never reads members or sessions one row at a time", async () => {
+    const { rows, reads } = await listWithReadCounts(50);
+    expect(rows).toHaveLength(50);
+    expect(reads.membersGetById).not.toHaveBeenCalled();
+    expect(reads.sessionsGetById).not.toHaveBeenCalled();
+  });
+
+  it("keeps member + class-session reads fixed as the booking count grows", async () => {
+    const one = await listWithReadCounts(1);
+    const many = await listWithReadCounts(50);
+    expect(many.reads.total()).toBe(one.reads.total());
+    expect(many.reads.total()).toBeLessThanOrEqual(4);
+    expect(many.reads.membersFindByIds).toHaveBeenCalledTimes(1);
+    expect(many.reads.sessionsFindByIds).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the same rows, fields and order as the per-booking join", async () => {
+    for (const seed of [bookingsSeed(1), bookingsSeed(23), buildSeed(NOW)]) {
+      const repos = createInMemoryRepositories(seed);
+      const studioId = (await repos.studios.getFirst())?.id ?? "";
+      expect(await listBookingRows(repos, studioId)).toEqual(await perBookingJoin(repos, studioId));
+    }
+  });
+
+  it("keeps the missing-member fallback and honours the range filter", async () => {
+    const seed = bookingsSeed(4);
+    seed.bookings[0].memberId = "m_ghost";
+    const repos = createInMemoryRepositories(seed);
+    const rows = await listBookingRows(repos, "s1");
+    expect(rows.find((row) => row.id === "b1")?.memberName).toBe("—");
+
+    const from = seed.sessions[1].startsAt;
+    const windowed = await listBookingRows(repos, "s1", { from });
+    expect(windowed.every((row) => row.startsAt >= from)).toBe(true);
+    expect(windowed.length).toBeLessThan(rows.length);
   });
 });
