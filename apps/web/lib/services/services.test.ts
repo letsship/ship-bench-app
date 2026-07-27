@@ -94,6 +94,47 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   ...over,
 });
 
+// Builds a seed with `bookingCount` bookings, each on its own session, spread
+// across a small fixed pool of members — used to prove repository read counts
+// stay flat as booking count grows.
+function scaledBookingSeed(bookingCount: number): SeedData {
+  const memberPool = Array.from({ length: 3 }, (_, i) => member(`m${i}`));
+  const sessions = Array.from({ length: bookingCount }, (_, i) =>
+    session(`cs${i}`, {
+      classTypeId: "ct1",
+      startsAt: new Date(NOW.getTime() + i * 60_000).toISOString(),
+      endsAt: new Date(NOW.getTime() + (i + 1) * 60_000).toISOString(),
+    }),
+  );
+  const bookings = sessions.map((s, i) =>
+    booking(`b${i}`, memberPool[i % memberPool.length].id, { sessionId: s.id }),
+  );
+  return baseSeed({
+    members: memberPool,
+    classTypes: [classType("ct1")],
+    sessions,
+    bookings,
+  });
+}
+
+// Wraps a repo so every method call increments a per-method counter, without
+// changing behavior. Used to assert on read counts without touching the fakes.
+function countReads<T extends object>(repo: T): { proxy: T; counts: Record<string, number> } {
+  const counts: Record<string, number> = {};
+  const proxy = new Proxy(repo, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        const key = String(prop);
+        counts[key] = (counts[key] ?? 0) + 1;
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  }) as T;
+  return { proxy, counts };
+}
+
 describe("members service", () => {
   let repos: Repositories;
   let studioId: string;
@@ -160,7 +201,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +244,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -314,5 +364,48 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("keeps member and class-session reads bounded regardless of booking count", async () => {
+    async function run(bookingCount: number) {
+      const seedRepos = createInMemoryRepositories(scaledBookingSeed(bookingCount));
+      const members = countReads(seedRepos.members);
+      const classSessions = countReads(seedRepos.classSessions);
+      const scopedRepos: Repositories = {
+        ...seedRepos,
+        members: members.proxy,
+        classSessions: classSessions.proxy,
+      };
+      const rows = await listBookingRows(scopedRepos, "s1");
+      const totalReads = (counts: Record<string, number>) =>
+        Object.values(counts).reduce((sum, n) => sum + n, 0);
+      return {
+        rows,
+        memberReads: totalReads(members.counts),
+        sessionReads: totalReads(classSessions.counts),
+      };
+    }
+
+    const small = await run(5);
+    const large = await run(200);
+
+    // Fixed, small read counts — not one read per booking.
+    expect(small.memberReads).toBe(large.memberReads);
+    expect(small.sessionReads).toBe(large.sessionReads);
+    expect(large.memberReads).toBeLessThan(5);
+    expect(large.sessionReads).toBeLessThan(5);
+
+    expect(small.rows).toHaveLength(5);
+    expect(large.rows).toHaveLength(200);
+    expect(large.rows.map((row) => row.startsAt)).toEqual(
+      [...large.rows.map((row) => row.startsAt)].sort((a, b) => a.localeCompare(b)),
+    );
+    expect(small.rows[0]).toMatchObject({
+      memberName: "m0",
+      className: "Yoga",
+      classColor: "#111111",
+      instructor: "I",
+      status: "booked",
+    });
   });
 });
