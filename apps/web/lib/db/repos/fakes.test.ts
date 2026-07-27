@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
 import { createInMemoryRepositories } from "./fakes";
-import type { Repositories } from "./types";
+import { type Repositories, UniqueActiveBookingError } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -90,5 +91,55 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  describe("bookings.insert active-booking uniqueness", () => {
+    const makeBooking = (over: Partial<Booking> = {}): Booking => ({
+      id: "new_booking",
+      sessionId: "session_x",
+      memberId: "member_x",
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+      ...over,
+    });
+
+    it("rejects a second active booking for the same member + session", async () => {
+      const repos = createInMemoryRepositories();
+      await repos.bookings.insert(makeBooking({ id: "b1", status: "waitlisted" }));
+      await expect(
+        repos.bookings.insert(makeBooking({ id: "b2", status: "waitlisted" })),
+      ).rejects.toBeInstanceOf(UniqueActiveBookingError);
+      expect((await repos.bookings.listBySession("session_x")).length).toBe(1);
+    });
+
+    it("rejects a booked insert when the member already holds a waitlisted spot", async () => {
+      const repos = createInMemoryRepositories();
+      await repos.bookings.insert(makeBooking({ id: "b1", status: "waitlisted" }));
+      await expect(
+        repos.bookings.insert(makeBooking({ id: "b2", status: "booked" })),
+      ).rejects.toBeInstanceOf(UniqueActiveBookingError);
+    });
+
+    it("allows a new active booking after the prior one was cancelled", async () => {
+      const repos = createInMemoryRepositories();
+      await repos.bookings.insert(makeBooking({ id: "b1", status: "waitlisted" }));
+      await repos.bookings.update("b1", { status: "cancelled" });
+      const rebooked = await repos.bookings.insert(makeBooking({ id: "b2", status: "waitlisted" }));
+      expect(rebooked.id).toBe("b2");
+    });
+
+    it("allows concurrent double-submit to yield exactly one active booking", async () => {
+      const repos = createInMemoryRepositories();
+      const results = await Promise.allSettled([
+        repos.bookings.insert(makeBooking({ id: "b1", status: "waitlisted" })),
+        repos.bookings.insert(makeBooking({ id: "b2", status: "waitlisted" })),
+      ]);
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => r.status === "rejected");
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((await repos.bookings.listBySession("session_x")).length).toBe(1);
+    });
   });
 });

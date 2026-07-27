@@ -23,6 +23,23 @@ export interface SessionRange {
   to?: string;
 }
 
+// Statuses that hold an active claim (seat or waitlist spot) on a session for
+// a member. A member may have at most one active booking per session — this
+// is enforced atomically at the persistence layer (DB partial unique index in
+// `supabase.ts`, mirrored scan in `fakes.ts`) so concurrent double-submits
+// can't both insert.
+export const ACTIVE_BOOKING_STATUSES = ["booked", "waitlisted", "attended"] as const;
+
+// Thrown by a repo's `bookings.insert` when the member already has an active
+// booking for that session. Services translate this into the same 409
+// conflict as the friendly pre-check.
+export class UniqueActiveBookingError extends Error {
+  constructor(sessionId: string, memberId: string) {
+    super(`Member ${memberId} already has an active booking for session ${sessionId}`);
+    this.name = "UniqueActiveBookingError";
+  }
+}
+
 export interface StudioRepo {
   getFirst(): Promise<Studio | null>;
 }

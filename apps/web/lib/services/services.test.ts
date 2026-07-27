@@ -160,7 +160,11 @@ describe("classes service", () => {
 describe("bookings service", () => {
   it("books an open future session and sends a confirmation", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
     );
     const provider = createFakeProvider();
     const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
@@ -199,7 +203,12 @@ describe("bookings service", () => {
 
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
-      baseSeed({ classTypes: [classType("ct1")], sessions: [session("cs1")], members: [member("m1")], bookings: [booking("b1", "m1")] }),
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(true);
@@ -216,6 +225,66 @@ describe("bookings service", () => {
     );
     const result = await cancelBooking(repos, createFakeProvider(), "b1");
     expect(result.refundEligible).toBe(false);
+  });
+
+  it("rejects a repeat booking attempt while waitlisted with the same conflict as a confirmed seat", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1"), booking("b2", "m2", { status: "waitlisted" })],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    const sessionBookings = await repos.bookings.listBySession("cs1");
+    expect(sessionBookings.filter((row) => row.memberId === "m2")).toHaveLength(1);
+  });
+
+  it("resolves a concurrent double-submit onto a full class with exactly one waitlisted row", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const results = await Promise.allSettled([
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" }),
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" }),
+    ]);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({
+      status: 409,
+      code: "booking_already_booked",
+    });
+    const m2Bookings = (await repos.bookings.listBySession("cs1")).filter(
+      (row) => row.memberId === "m2" && row.status !== "cancelled",
+    );
+    expect(m2Bookings).toHaveLength(1);
+    expect(m2Bookings[0].status).toBe("waitlisted");
+  });
+
+  it("allows booking the same class again after the member's booking was cancelled", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1", { status: "cancelled", cancelledAt: ISO })],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
   });
 
   it("promotes the earliest waitlisted member when a seat frees up", async () => {
