@@ -43,6 +43,7 @@ function baseSeed(over: Partial<SeedData> = {}): SeedData {
     invoices: [],
     lineItems: [],
     outbox: [],
+    packages: [],
     ...over,
   };
 }
@@ -248,6 +249,169 @@ describe("bookings service", () => {
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+  });
+
+  it("books with a pack and spends one credit", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packages: [
+          {
+            id: "p1",
+            studioId: "s1",
+            memberId: "m1",
+            creditsTotal: 5,
+            creditsRemaining: 3,
+            priceCents: 5000,
+            status: "active",
+            purchasedAt: ISO,
+            createdAt: ISO,
+          },
+        ],
+      }),
+    );
+    await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" });
+    const updated = await repos.classPacks.getById("p1");
+    expect(updated?.creditsRemaining).toBe(2);
+    expect(updated?.status).toBe("active");
+  });
+
+  it("exhausts a pack when last credit is spent", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packages: [
+          {
+            id: "p1",
+            studioId: "s1",
+            memberId: "m1",
+            creditsTotal: 5,
+            creditsRemaining: 1,
+            priceCents: 5000,
+            status: "active",
+            purchasedAt: ISO,
+            createdAt: ISO,
+          },
+        ],
+      }),
+    );
+    await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" });
+    const updated = await repos.classPacks.getById("p1");
+    expect(updated?.creditsRemaining).toBe(0);
+    expect(updated?.status).toBe("exhausted");
+  });
+
+  it("rejects booking with 402 pack_exhausted when no credits", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packages: [
+          {
+            id: "p1",
+            studioId: "s1",
+            memberId: "m1",
+            creditsTotal: 5,
+            creditsRemaining: 0,
+            priceCents: 5000,
+            status: "exhausted",
+            purchasedAt: ISO,
+            createdAt: ISO,
+          },
+        ],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
+  });
+
+  it("draws from oldest pack first", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packages: [
+          {
+            id: "p1",
+            studioId: "s1",
+            memberId: "m1",
+            creditsTotal: 5,
+            creditsRemaining: 2,
+            priceCents: 5000,
+            status: "active",
+            purchasedAt: "2026-07-15T12:00:00.000Z",
+            createdAt: "2026-07-15T12:00:00.000Z",
+          },
+          {
+            id: "p2",
+            studioId: "s1",
+            memberId: "m1",
+            creditsTotal: 10,
+            creditsRemaining: 3,
+            priceCents: 10000,
+            status: "active",
+            purchasedAt: "2026-07-20T12:00:00.000Z",
+            createdAt: "2026-07-20T12:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" });
+    const p1 = await repos.classPacks.getById("p1");
+    const p2 = await repos.classPacks.getById("p2");
+    expect(p1?.creditsRemaining).toBe(1);
+    expect(p2?.creditsRemaining).toBe(3);
+  });
+
+  it("double booking still returns 409 and spends no credit", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+        packages: [
+          {
+            id: "p1",
+            studioId: "s1",
+            memberId: "m1",
+            creditsTotal: 5,
+            creditsRemaining: 3,
+            priceCents: 5000,
+            status: "active",
+            purchasedAt: ISO,
+            createdAt: ISO,
+          },
+        ],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    const pack = await repos.classPacks.getById("p1");
+    expect(pack?.creditsRemaining).toBe(3);
+  });
+
+  it("books without a pack unchanged", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
   });
 });
 
