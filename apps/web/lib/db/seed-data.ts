@@ -9,6 +9,11 @@ function seedId(): string {
   __seedIdSeq += 1;
   return `00000000-0000-4000-8000-${__seedIdSeq.toString(16).padStart(12, "0")}`;
 }
+let __seedTokenSeq = 0;
+function seedCalendarToken(): string {
+  __seedTokenSeq += 1;
+  return `cal${__seedTokenSeq.toString(16).padStart(45, "0")}`;
+}
 import type { SeedData } from "./repos/fakes";
 import type {
   Booking,
@@ -97,6 +102,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
+    calendarToken: seedCalendarToken(),
   }));
 }
 
@@ -332,6 +338,7 @@ function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
 
 export function buildSeed(now: Date = new Date()): SeedData {
   __seedIdSeq = 0;
+  __seedTokenSeq = 0;
   const { studio, settings } = buildStudio(now);
   const members = buildMembers(now, studio.id);
   const classTypes = buildClassTypes(now, studio.id);

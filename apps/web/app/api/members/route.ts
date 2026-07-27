@@ -6,11 +6,14 @@ import { createMemberSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/members — the studio's members.
+// GET /api/members — the studio's members. This endpoint has no session
+// check, so a member's private calendarToken (the sole auth for their iCal
+// subscription) must never appear in the response.
 export async function GET(): Promise<Response> {
   return handle(async () => {
     const { repos, ctx } = await resolveStudio();
-    return ok(await listMembers(repos, ctx.studio.id));
+    const members = await listMembers(repos, ctx.studio.id);
+    return ok(members.map(({ calendarToken: _calendarToken, ...member }) => member));
   });
 }
 

@@ -8,12 +8,15 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-// GET /api/members/:id — a single member.
+// GET /api/members/:id — a single member. No session check, so the private
+// calendarToken (the sole auth for that member's iCal subscription) must be
+// redacted here.
 export async function GET(_request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
     const { repos } = await resolveStudio();
     const { id } = await params;
-    return ok(await getMember(repos, id));
+    const { calendarToken: _calendarToken, ...member } = await getMember(repos, id);
+    return ok(member);
   });
 }
 
