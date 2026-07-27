@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { badRequest, handle } from "@/lib/http";
+import { requireSession } from "@/lib/auth/session";
 import { resolveStudio } from "@/lib/services/context";
 import { bookingsToCsv, invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
 import { listBookingsForExport } from "@/lib/services/booking-list";
@@ -20,6 +21,7 @@ function isValidIsoDatetime(value: string): boolean {
 // GET /api/export?type=members|invoices|bookings — a CSV download.
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
+    await requireSession();
     const { repos, ctx } = await resolveStudio();
     const type = request.nextUrl.searchParams.get("type") ?? "members";
     const from = request.nextUrl.searchParams.get("from") ?? undefined;
