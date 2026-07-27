@@ -1,9 +1,25 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import { ActiveBookingConflictError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
+
+function makeBooking(
+  id: string,
+  status: string,
+  over: { sessionId?: string; memberId?: string } = {},
+) {
+  return {
+    id,
+    sessionId: over.sessionId ?? "cs1",
+    memberId: over.memberId ?? "m1",
+    status,
+    bookedAt: NOW.toISOString(),
+    cancelledAt: status === "cancelled" ? NOW.toISOString() : null,
+  };
+}
 
 describe("in-memory repositories", () => {
   let repos: Repositories;
@@ -90,5 +106,48 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+});
+
+describe("bookings repo — active booking guard", () => {
+  it("rejects a second waitlisted booking for the same member + session", async () => {
+    const repos = createInMemoryRepositories();
+    await repos.bookings.insert(makeBooking("b1", "waitlisted"));
+    await expect(repos.bookings.insert(makeBooking("b2", "waitlisted"))).rejects.toBeInstanceOf(
+      ActiveBookingConflictError,
+    );
+  });
+
+  it("rejects a second booked booking for the same member + session", async () => {
+    const repos = createInMemoryRepositories();
+    await repos.bookings.insert(makeBooking("b1", "booked"));
+    await expect(repos.bookings.insert(makeBooking("b2", "booked"))).rejects.toBeInstanceOf(
+      ActiveBookingConflictError,
+    );
+  });
+
+  it("rejects a waitlisted booking when the member already holds a confirmed seat", async () => {
+    const repos = createInMemoryRepositories();
+    await repos.bookings.insert(makeBooking("b1", "booked"));
+    await expect(repos.bookings.insert(makeBooking("b2", "waitlisted"))).rejects.toBeInstanceOf(
+      ActiveBookingConflictError,
+    );
+  });
+
+  it("allows a new booking once the prior one is cancelled", async () => {
+    const repos = createInMemoryRepositories();
+    await repos.bookings.insert(makeBooking("b1", "cancelled"));
+    const inserted = await repos.bookings.insert(makeBooking("b2", "waitlisted"));
+    expect(inserted.status).toBe("waitlisted");
+    expect(await repos.bookings.listBySession("cs1")).toHaveLength(2);
+  });
+
+  it("does not block a different member on the same session", async () => {
+    const repos = createInMemoryRepositories();
+    await repos.bookings.insert(makeBooking("b1", "booked"));
+    const inserted = await repos.bookings.insert(
+      makeBooking("b2", "waitlisted", { memberId: "m2" }),
+    );
+    expect(inserted.status).toBe("waitlisted");
   });
 });

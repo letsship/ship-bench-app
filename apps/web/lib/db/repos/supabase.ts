@@ -10,8 +10,15 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { ActiveBookingConflictError } from "./errors";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
+
+// Postgres unique_violation SQLSTATE. Raised when the partial unique index
+// `bookings_active_member_session_key` (0002_bookings_unique_active.sql)
+// rejects a second active booking for the same member + session.
+const UNIQUE_VIOLATION = "23505";
+const ACTIVE_BOOKING_INDEX = "bookings_active_member_session_key";
 
 // The production repository implementation over supabase-js (service role).
 // Reads come back snake_case and are mapped to camelCase entities; writes map
@@ -145,7 +152,21 @@ export function createSupabaseRepositories(): Repositories {
           db.from("bookings").select("*").eq("id", id).maybeSingle(),
           "bookings.getById",
         ),
-      insert: (booking) => insertReturning("bookings", booking),
+      insert: async (booking) => {
+        const { data, error } = await db
+          .from("bookings")
+          .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+          .select()
+          .single();
+        if (error) {
+          const code = (error as { code?: string }).code;
+          if (code === UNIQUE_VIOLATION && error.message.includes(ACTIVE_BOOKING_INDEX)) {
+            throw new ActiveBookingConflictError(booking.sessionId, booking.memberId);
+          }
+          fail("insert into bookings", error);
+        }
+        return toCamelRow<Booking>(data as Record<string, unknown>);
+      },
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {
