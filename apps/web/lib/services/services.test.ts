@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
+import { newId } from "@/lib/db/ids";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
+import { getMemberStatement } from "./account-statements";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
@@ -294,6 +297,140 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("account statements service", () => {
+  let repos: Repositories;
+  let studioId: string;
+  let memberId: string;
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(baseSeed());
+    const studio = await repos.studios.getFirst();
+    studioId = studio?.id ?? "";
+    const newMember = await createMember(repos, studioId, {
+      name: "Test Member",
+      email: "test@e.co",
+      phone: null,
+    });
+    memberId = newMember.id;
+  });
+
+  it("excludes refunded lines from taxable subtotal", async () => {
+    // Create an invoice with €100 billable + €50 refunded at 9% tax
+    const invoiceId = newId();
+    const settings = await getStudioContext(repos);
+    const issuedAt = ISO;
+    const lineItems = [
+      { quantity: 1, unitAmountCents: 10000, refunded: false },
+      { quantity: 1, unitAmountCents: 5000, refunded: true },
+    ];
+    const totals = computeInvoiceTotals(lineItems, settings.settings.taxRateBps);
+
+    // totals should be: subtotalCents=10000, taxCents=900, totalCents=10900
+    expect(totals.subtotalCents).toBe(10000);
+    expect(totals.taxCents).toBe(900);
+    expect(totals.totalCents).toBe(10900);
+
+    // Store the invoice
+    await repos.invoices.insert({
+      id: invoiceId,
+      studioId,
+      memberId,
+      number: "INV-2026-0001",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: settings.settings.taxRateBps,
+      subtotalCents: totals.subtotalCents,
+      taxCents: totals.taxCents,
+      totalCents: totals.totalCents,
+      issuedAt,
+      dueAt: new Date(new Date(issuedAt).getTime() + 14 * 86_400_000).toISOString(),
+      paidAt: null,
+      createdAt: issuedAt,
+    });
+
+    // Store the line items
+    await repos.invoiceLineItems.insertMany([
+      {
+        id: newId(),
+        invoiceId,
+        description: "Billable service",
+        quantity: 1,
+        unitAmountCents: 10000,
+        amountCents: 10000,
+        refunded: false,
+        bookingId: null,
+      },
+      {
+        id: newId(),
+        invoiceId,
+        description: "Refunded service",
+        quantity: 1,
+        unitAmountCents: 5000,
+        amountCents: 5000,
+        refunded: true,
+        bookingId: null,
+      },
+    ]);
+
+    // Get the statement and verify it has the correct total
+    const statement = await getMemberStatement(repos, studioId, memberId);
+    expect(statement.lines).toHaveLength(1);
+    expect(statement.lines[0].totalCents).toBe(10900);
+    expect(statement.balanceCents).toBe(10900);
+  });
+
+  it("includes non-refunded invoices unchanged", async () => {
+    // Create an invoice with only non-refunded lines
+    const invoiceId = newId();
+    const settings = await getStudioContext(repos);
+    const issuedAt = ISO;
+    const lineItems = [{ quantity: 2, unitAmountCents: 1000, refunded: false }];
+    const totals = computeInvoiceTotals(lineItems, settings.settings.taxRateBps);
+
+    // totals should be: subtotalCents=2000, taxCents=180, totalCents=2180
+    expect(totals.subtotalCents).toBe(2000);
+    expect(totals.taxCents).toBe(180);
+    expect(totals.totalCents).toBe(2180);
+
+    // Store the invoice
+    await repos.invoices.insert({
+      id: invoiceId,
+      studioId,
+      memberId,
+      number: "INV-2026-0002",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: settings.settings.taxRateBps,
+      subtotalCents: totals.subtotalCents,
+      taxCents: totals.taxCents,
+      totalCents: totals.totalCents,
+      issuedAt,
+      dueAt: new Date(new Date(issuedAt).getTime() + 14 * 86_400_000).toISOString(),
+      paidAt: null,
+      createdAt: issuedAt,
+    });
+
+    // Store the line items
+    await repos.invoiceLineItems.insertMany([
+      {
+        id: newId(),
+        invoiceId,
+        description: "Service",
+        quantity: 2,
+        unitAmountCents: 1000,
+        amountCents: 2000,
+        refunded: false,
+        bookingId: null,
+      },
+    ]);
+
+    // Get the statement and verify it has the correct total
+    const statement = await getMemberStatement(repos, studioId, memberId);
+    expect(statement.lines).toHaveLength(1);
+    expect(statement.lines[0].totalCents).toBe(2180);
+    expect(statement.balanceCents).toBe(2180);
   });
 });
 
