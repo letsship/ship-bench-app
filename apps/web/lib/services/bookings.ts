@@ -1,4 +1,5 @@
 import { newId } from "@/lib/db/ids";
+import { DuplicateActiveBookingError } from "@/lib/db/repos/errors";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
 import {
@@ -84,14 +85,25 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  await repos.bookings.insert({
-    id: bookingId,
-    sessionId: session.id,
-    memberId: member.id,
-    status: decision.status,
-    bookedAt: nowIso(),
-    cancelledAt: null,
-  });
+  try {
+    await repos.bookings.insert({
+      id: bookingId,
+      sessionId: session.id,
+      memberId: member.id,
+      status: decision.status,
+      bookedAt: nowIso(),
+      cancelledAt: null,
+    });
+  } catch (error) {
+    // `canBook` above is the fast path; the persistence layer is the authority.
+    // Two near-simultaneous submits (a double-clicked `join`) both clear the
+    // pre-check, so the loser lands here and gets the same conflict a
+    // sequential repeat would — never a second waitlist row.
+    if (error instanceof DuplicateActiveBookingError) {
+      throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+    }
+    throw error;
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
@@ -142,7 +154,11 @@ export async function cancelBooking(
   await enqueueAndDispatch(
     repos,
     provider,
-    bookingCancellation(recipientOf(member), await summaryOf(repos, session), decision.refundEligible),
+    bookingCancellation(
+      recipientOf(member),
+      await summaryOf(repos, session),
+      decision.refundEligible,
+    ),
   );
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }

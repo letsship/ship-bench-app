@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canBook, canCancel, pickWaitlistPromotion } from "./booking-rules";
+import { canBook, canCancel, isActiveBooking, pickWaitlistPromotion } from "./booking-rules";
 import { computeOccupancy } from "./capacity";
 
 const FUTURE = "2026-06-01T09:00:00Z";
@@ -56,12 +56,46 @@ describe("canBook", () => {
     });
   });
 
+  it("rejects a member who is already on the waitlist", () => {
+    const occupancy = computeOccupancy(1, [{ status: "booked" }]);
+    expect(canBook(baseContext({ occupancy, memberBookings: [{ status: "waitlisted" }] }))).toEqual(
+      { ok: false, reason: "already_booked" },
+    );
+  });
+
+  it("rejects a member who already attended", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "attended" }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
+  it("lets a member book again after cancelling", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "cancelled" }] }))).toEqual({
+      ok: true,
+      status: "booked",
+    });
+  });
+
   it("rejects when full and the waitlist is closed", () => {
     const occupancy = computeOccupancy(1, [{ status: "booked" }]);
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
       ok: false,
       reason: "session_full_no_waitlist",
     });
+  });
+});
+
+describe("isActiveBooking", () => {
+  it("counts a seat, an attendance, and a waitlist entry as active", () => {
+    expect(isActiveBooking("booked")).toBe(true);
+    expect(isActiveBooking("attended")).toBe(true);
+    expect(isActiveBooking("waitlisted")).toBe(true);
+  });
+
+  it("does not count cancelled or no-show as active", () => {
+    expect(isActiveBooking("cancelled")).toBe(false);
+    expect(isActiveBooking("no_show")).toBe(false);
   });
 });
 

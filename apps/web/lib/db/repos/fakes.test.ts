@@ -1,9 +1,21 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
+
+const bookingRow = (id: string, over: Partial<Booking> = {}): Booking => ({
+  id,
+  sessionId: "cs1",
+  memberId: "m1",
+  status: "booked",
+  bookedAt: NOW.toISOString(),
+  cancelledAt: null,
+  ...over,
+});
 
 describe("in-memory repositories", () => {
   let repos: Repositories;
@@ -84,6 +96,44 @@ describe("in-memory repositories", () => {
   it("listPending returns only unsent outbox rows", async () => {
     const pending = await repos.outbox.listPending();
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
+  });
+
+  // Mirrors the partial unique index from 0002_unique_active_booking.sql: at most
+  // one active booking per member + session, whatever the active status is.
+  describe("bookings.insert uniqueness", () => {
+    let empty: Repositories;
+    beforeEach(() => {
+      empty = createInMemoryRepositories();
+    });
+
+    it("rejects a second active booking for the same member + session", async () => {
+      await empty.bookings.insert(bookingRow("b1", { status: "waitlisted" }));
+      await expect(
+        empty.bookings.insert(bookingRow("b2", { status: "waitlisted" })),
+      ).rejects.toThrow(DuplicateActiveBookingError);
+      expect(await empty.bookings.listBySession("cs1")).toHaveLength(1);
+    });
+
+    it("rejects a confirmed seat when the member is already waitlisted", async () => {
+      await empty.bookings.insert(bookingRow("b1", { status: "waitlisted" }));
+      await expect(empty.bookings.insert(bookingRow("b2", { status: "booked" }))).rejects.toThrow(
+        DuplicateActiveBookingError,
+      );
+    });
+
+    it("allows a new booking once the first one is cancelled", async () => {
+      await empty.bookings.insert(bookingRow("b1"));
+      await empty.bookings.update("b1", { status: "cancelled", cancelledAt: NOW.toISOString() });
+      await empty.bookings.insert(bookingRow("b2"));
+      expect(await empty.bookings.listBySession("cs1")).toHaveLength(2);
+    });
+
+    it("allows another member, and the same member in another session", async () => {
+      await empty.bookings.insert(bookingRow("b1"));
+      await empty.bookings.insert(bookingRow("b2", { memberId: "m2" }));
+      await empty.bookings.insert(bookingRow("b3", { sessionId: "cs2" }));
+      expect(await empty.bookings.listBySessionIds(["cs1", "cs2"])).toHaveLength(3);
+    });
   });
 
   it("empty repositories return nulls / empty lists", async () => {

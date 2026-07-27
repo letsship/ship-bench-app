@@ -13,10 +13,12 @@ export type BookingDenyReason =
   | "already_booked"
   | "session_full_no_waitlist";
 
-export type BookingDecision = { ok: true; status: "booked" | "waitlisted" } | {
-  ok: false;
-  reason: BookingDenyReason;
-};
+export type BookingDecision =
+  | { ok: true; status: "booked" | "waitlisted" }
+  | {
+      ok: false;
+      reason: BookingDenyReason;
+    };
 
 export interface BookingContext {
   sessionStatus: string;
@@ -29,9 +31,21 @@ export interface BookingContext {
   now: string;
 }
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// Statuses that mean the member already holds a live claim on this session: a
+// confirmed seat, a recorded attendance, or a waitlist entry. A waitlist entry
+// holds no seat, but it does hold a place in the queue — booking again while it
+// stands would list the member twice and promote them twice. `cancelled` and
+// `no_show` are excluded, which is what lets a cancelled member rebook.
+//
+// The partial unique index in `packages/db/migrations/0002_unique_active_booking.sql`
+// and the guard in `lib/db/repos/fakes.ts` both mirror this set. Keep all three
+// in step: dropping a status here without dropping it there wrongly blocks a
+// rebooking, and the reverse reopens the double-booking hole.
+export const ACTIVE_MEMBER_BOOKING_STATUSES = ["booked", "waitlisted", "attended"] as const;
+
+export function isActiveBooking(status: string): boolean {
+  return (ACTIVE_MEMBER_BOOKING_STATUSES as readonly string[]).includes(status);
+}
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
@@ -41,7 +55,7 @@ export function canBook(context: BookingContext): BookingDecision {
     return { ok: false, reason: "session_started" };
   }
   if (context.memberStatus !== "active") return { ok: false, reason: "member_inactive" };
-  if (context.memberBookings.some((booking) => ACTIVE_MEMBER_BOOKING.has(booking.status))) {
+  if (context.memberBookings.some((booking) => isActiveBooking(booking.status))) {
     return { ok: false, reason: "already_booked" };
   }
   if (context.occupancy.isFull) {
@@ -54,8 +68,7 @@ export function canBook(context: BookingContext): BookingDecision {
 export type CancellationDenyReason = "already_cancelled" | "session_passed";
 
 export type CancellationDecision =
-  | { ok: true; refundEligible: boolean }
-  | { ok: false; reason: CancellationDenyReason };
+  { ok: true; refundEligible: boolean } | { ok: false; reason: CancellationDenyReason };
 
 export interface CancellationContext {
   bookingStatus: string;
