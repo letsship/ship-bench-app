@@ -7,6 +7,14 @@ export interface StudioContext {
   settings: StudioSettings;
 }
 
+// Resolve a studio by its public slug, or null if no studio owns that slug.
+// Single-studio demo: in this dataset only the seeded studio (riverbank) resolves.
+export async function getStudioBySlug(repos: Repositories, slug: string): Promise<Studio | null> {
+  const studio = await repos.studios.getFirst();
+  if (!studio || studio.slug !== slug) return null;
+  return studio;
+}
+
 // Studiobook is single-studio in the demo dataset: resolve the one studio and
 // its settings. A missing studio means the database was never seeded.
 export async function getStudioContext(repos: Repositories): Promise<StudioContext> {

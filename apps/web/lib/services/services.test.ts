@@ -11,7 +11,7 @@ import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
-import { getStudioContext } from "./studio";
+import { getStudioContext, getStudioBySlug } from "./studio";
 
 // Anchored to the real clock: the booking/cancellation rules compare against
 // `new Date()` inside the services, so fixtures must be genuinely future/past.
@@ -323,5 +323,23 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("studio service", () => {
+  let repos: Repositories;
+  beforeEach(() => {
+    repos = createInMemoryRepositories(buildSeed(NOW));
+  });
+
+  it("getStudioBySlug returns the studio for the seeded slug", async () => {
+    const studio = await getStudioBySlug(repos, "riverbank");
+    expect(studio).toBeDefined();
+    expect(studio?.slug).toBe("riverbank");
+  });
+
+  it("getStudioBySlug returns null for an unknown slug", async () => {
+    const studio = await getStudioBySlug(repos, "nonexistent");
+    expect(studio).toBeNull();
   });
 });
