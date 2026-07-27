@@ -15,11 +15,15 @@ export interface PackageListItem {
   purchasedAt: string;
 }
 
+export interface PackageCreateResponse extends PackageListItem {
+  memberId: string;
+}
+
 export async function createPackage(
   repos: Repositories,
   studioId: string,
   input: CreatePackageInput,
-): Promise<PackageListItem> {
+): Promise<PackageCreateResponse> {
   const member = await repos.members.getById(input.memberId);
   if (!member || member.studioId !== studioId) {
     throw new HttpError(400, "bad_request", "Unknown member");
@@ -41,6 +45,7 @@ export async function createPackage(
 
   return {
     id: pkg.id,
+    memberId: pkg.memberId,
     creditsTotal: pkg.creditsTotal,
     creditsRemaining: pkg.creditsRemaining,
     priceCents: pkg.priceCents,

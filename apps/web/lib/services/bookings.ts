@@ -106,7 +106,7 @@ export async function createBooking(
     cancelledAt: null,
   });
 
-  if (hasEverOwnedPack(memberPackages)) {
+  if (decision.status === "booked" && hasEverOwnedPack(memberPackages)) {
     const packToDraw = pickPackToDraw(memberPackages);
     if (packToDraw) {
       await repos.packages.update(packToDraw.id, {
