@@ -51,3 +51,10 @@ export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
 };
+
+// Stripe webhook signing secret, validated lazily and independently so the
+// webhook route needs none of the Supabase/email vars to be set.
+const stripeWebhookSecretSchema = z.string().min(1);
+
+export const stripeWebhookSecret = (): string =>
+  stripeWebhookSecretSchema.parse(process.env.STRIPE_WEBHOOK_SECRET);
