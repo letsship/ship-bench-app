@@ -1,5 +1,5 @@
 // Deterministic seed dataset: byte-stable ids + a fixed clock so emit-seed-sql
-// renders an IDENTICAL supabase/seed.sql on every run (no churn on unrelated
+// renders an IDENTICAL migrations/0002_seed.sql on every run (no churn on unrelated
 // PRs). Runtime rows the app creates still use the random newId from ./ids;
 // only the demo seed is deterministic. buildSeed resets the counter so repeated
 // calls are identical.
@@ -24,7 +24,7 @@ import type {
 
 // Single source of the demo dataset, producing plain entity rows. Consumed by
 // the in-memory fakes (tests + fake-backends mode) and by scripts/emit-seed-sql
-// (renders packages/db/seed.sql for Supabase). Given a `now`, sessions land on
+// (renders apps/web/migrations/0002_seed.sql for Cloudflare D1). Given a `now`, sessions land on
 // calendar days around today so the dashboard always has "today's classes".
 
 const DAY_MS = 86_400_000;

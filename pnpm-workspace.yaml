@@ -7,3 +7,4 @@ onlyBuiltDependencies:
   - sharp
   - supabase
   - workerd
+  - better-sqlite3
