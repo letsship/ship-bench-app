@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
-import { listBookingRows, type BookingRow } from "./booking-list";
+import { listBookingRows } from "./booking-list";
 
 // ---------------------------------------------------------------------------
 // Counting decorator: wraps any in-memory repos so we can tally member and
@@ -213,12 +213,12 @@ describe("booking-list N+1 regression", () => {
     // Small N
     const countsSmall = zeroCounts();
     const reposSmall = countingRepos(createInMemoryRepositories(smallSeed()), countsSmall);
-    const rowsSmall = await listBookingRows(reposSmall, STUDIO_ID);
+    await listBookingRows(reposSmall, STUDIO_ID);
 
     // Large N
     const countsLarge = zeroCounts();
     const reposLarge = countingRepos(createInMemoryRepositories(largeSeed()), countsLarge);
-    const rowsLarge = await listBookingRows(reposLarge, STUDIO_ID);
+    await listBookingRows(reposLarge, STUDIO_ID);
 
     // Both runs perform exactly the same number of member reads (one
     // listByStudio, zero getById) and exactly the same number of
