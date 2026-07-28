@@ -289,6 +289,19 @@ describe("invoices service", () => {
     });
   });
 
+  it("returns zeroed live totals and the refunded sum for a fully-refunded invoice", async () => {
+    const invoices = await repos.invoices.listByStudio(studioId);
+    const refunded = invoices.find((invoice) => invoice.status === "refunded");
+    expect(refunded).toBeDefined();
+    const detail = await getInvoiceDetail(repos, refunded!.id);
+    expect(detail.lineItems.length).toBeGreaterThan(0);
+    expect(detail.lineItems.every((line) => line.refunded)).toBe(true);
+    expect(detail.totals.subtotalCents).toBe(0);
+    expect(detail.totals.taxCents).toBe(0);
+    expect(detail.totals.totalCents).toBe(0);
+    expect(detail.totals.refundedCents).toBe(9000);
+  });
+
   it("lists invoices with member names and reads a detail", async () => {
     const list = await listInvoices(repos, studioId);
     expect(list.length).toBeGreaterThan(0);

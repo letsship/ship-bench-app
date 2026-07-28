@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HttpError } from "@/lib/http";
-import {
-  type InvoiceStatus,
-  canTransitionInvoice,
-  computeInvoiceTotals,
-} from "@/lib/domain/invoices";
+import { type InvoiceStatus, canTransitionInvoice } from "@/lib/domain/invoices";
 import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getInvoiceDetail } from "@/lib/services/invoices";
@@ -28,11 +24,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     throw error;
   }
 
-  const { invoice, member, lineItems } = detail;
+  const { invoice, member, lineItems, totals } = detail;
   const currency = invoice.currency;
-  // Derive the money box from the line items so a line-level refund shows up
-  // immediately, not only after the stored totals are rewritten.
-  const totals = computeInvoiceTotals(lineItems, invoice.taxRateBps);
   const allowed = ALL_STATUSES.filter((status) =>
     canTransitionInvoice(invoice.status as InvoiceStatus, status),
   );
@@ -114,6 +107,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           Tax ({(invoice.taxRateBps / 100).toFixed(1)}%){" "}
           <Money cents={totals.taxCents} currency={currency} />
         </div>
+        {totals.refundedCents > 0 ? (
+          <div className="text-[var(--color-muted)]">
+            Refunded <Money cents={totals.refundedCents} currency={currency} />
+          </div>
+        ) : null}
         <div className="text-lg font-semibold">
           Total <Money cents={totals.totalCents} currency={currency} />
         </div>
