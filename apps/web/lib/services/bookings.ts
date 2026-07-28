@@ -18,6 +18,8 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import type { Tracker } from "@/lib/analytics/types";
+import { BOOKING_CANCELLED, BOOKING_CREATED, WAITLIST_JOINED } from "@/lib/analytics/types";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -63,6 +65,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -99,6 +102,9 @@ export async function createBooking(
       provider,
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
+    tracker.capture({ event: BOOKING_CREATED, distinctId: member.id, properties: { session_id: session.id } });
+  } else {
+    tracker.capture({ event: WAITLIST_JOINED, distinctId: member.id, properties: { session_id: session.id } });
   }
   return { bookingId, status: decision.status };
 }
@@ -111,6 +117,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -133,6 +140,7 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+  tracker.capture({ event: BOOKING_CANCELLED, distinctId: booking.memberId, properties: { session_id: session.id } });
 
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
