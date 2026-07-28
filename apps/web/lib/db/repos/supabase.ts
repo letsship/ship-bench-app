@@ -19,7 +19,7 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string; code?: string; constraint?: string } | null;
+type PgError = { message: string; code?: string; details?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
