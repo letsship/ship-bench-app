@@ -309,6 +309,8 @@ describe("bookings service", () => {
       await expect(
         createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
       ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
+      const bookings = await repos.bookings.listBySession("cs1");
+      expect(bookings).toHaveLength(0);
     });
 
     it("rejects with 402 pack_exhausted when all packs are refunded", async () => {
@@ -323,6 +325,8 @@ describe("bookings service", () => {
       await expect(
         createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
       ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
+      const bookings = await repos.bookings.listBySession("cs1");
+      expect(bookings).toHaveLength(0);
     });
 
     it("does not double-spend on a 409 duplicate booking", async () => {
