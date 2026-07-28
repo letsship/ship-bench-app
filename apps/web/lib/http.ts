@@ -58,7 +58,7 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
     if (error instanceof ZodError) {
       return badRequest(
         "Validation failed",
-        error.errors.map((issue) => ({ path: issue.path, message: issue.message })),
+        error.issues.map((issue) => ({ path: issue.path, message: issue.message })),
       );
     }
     if (error instanceof HttpError) {
