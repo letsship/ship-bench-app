@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
+import { GET as invoiceGet } from "@/app/api/invoices/[id]/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as memberGet } from "@/app/api/members/[id]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +46,23 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/members/:id awaits async params and returns the member", async () => {
+    const list = (await (await membersGet()).json()) as { id: string }[];
+    const res = await memberGet(new NextRequest("http://localhost/api/members/x"), {
+      params: Promise.resolve({ id: list[0].id }),
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { id: string }).id).toBe(list[0].id);
+  });
+
+  it("GET /api/invoices/:id awaits async params and returns the invoice", async () => {
+    const list = (await (await invoicesGet()).json()) as { id: string }[];
+    const res = await invoiceGet(new NextRequest("http://localhost/api/invoices/x"), {
+      params: Promise.resolve({ id: list[0].id }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as unknown).toHaveProperty("invoice");
   });
 });
