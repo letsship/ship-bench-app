@@ -8,6 +8,7 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import { memberOwnsPack, pickPackToDraw } from "@/lib/domain/packs";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -83,6 +84,20 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  // Class packs: once a member owns any pack, their bookings draw a credit
+  // from the oldest drawable pack. A member who never bought a pack books
+  // unchanged. The canBook decision above ran first, so a repeated booking
+  // still fails 409 here without spending a credit.
+  const memberPacks = await repos.packs.listByMember(member.id);
+  const packToDraw = memberOwnsPack(memberPacks) ? pickPackToDraw(memberPacks) : null;
+  if (memberOwnsPack(memberPacks) && !packToDraw) {
+    throw new HttpError(
+      402,
+      "pack_exhausted",
+      "This member's class pack is empty — buy another pack to keep booking",
+    );
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +107,12 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  if (packToDraw) {
+    await repos.packs.update(packToDraw.id, {
+      creditsRemaining: packToDraw.creditsRemaining - 1,
+    });
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
