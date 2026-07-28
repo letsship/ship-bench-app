@@ -23,8 +23,10 @@ type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
-function fail(context: string, error: { message: string }): never {
-  throw new Error(`Supabase ${context} failed: ${error.message}`);
+function fail(context: string, error: { message: string; code?: string }): never {
+  const wrapped = new Error(`Supabase ${context} failed: ${error.message}`);
+  if (error.code) (wrapped as { code?: string }).code = error.code;
+  throw wrapped;
 }
 
 async function rows<T>(query: ListResponse, context: string): Promise<T[]> {
