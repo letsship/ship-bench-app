@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import { DuplicateActiveBookingError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -84,6 +85,44 @@ describe("in-memory repositories", () => {
   it("listPending returns only unsent outbox rows", async () => {
     const pending = await repos.outbox.listPending();
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
+  });
+
+  it("rejects a second active booking for the same session + member", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const base = {
+      sessionId,
+      memberId: "mem_race",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await repos.bookings.insert({ ...base, id: "bk_a", status: "waitlisted" });
+    await expect(
+      repos.bookings.insert({ ...base, id: "bk_b", status: "waitlisted" }),
+    ).rejects.toBeInstanceOf(DuplicateActiveBookingError);
+    await expect(
+      repos.bookings.insert({ ...base, id: "bk_c", status: "booked" }),
+    ).rejects.toBeInstanceOf(DuplicateActiveBookingError);
+    // The store still holds exactly the one active row.
+    const rows = (await repos.bookings.listBySession(sessionId)).filter(
+      (b) => b.memberId === "mem_race",
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("allows a booking insert after the prior one was cancelled", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const base = {
+      sessionId,
+      memberId: "mem_rebook",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await repos.bookings.insert({ ...base, id: "bk_d", status: "booked" });
+    await repos.bookings.update("bk_d", { status: "cancelled", cancelledAt: NOW.toISOString() });
+    const rebooked = await repos.bookings.insert({ ...base, id: "bk_e", status: "booked" });
+    expect(rebooked.id).toBe("bk_e");
   });
 
   it("empty repositories return nulls / empty lists", async () => {
