@@ -2,6 +2,9 @@ packages:
   - "apps/*"
   - "packages/*"
 
+overrides:
+  "semver@>=7.0.0 <7.5.2": ">=7.5.2"
+
 onlyBuiltDependencies:
   - esbuild
   - sharp
