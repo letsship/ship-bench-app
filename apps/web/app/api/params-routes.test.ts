@@ -43,9 +43,13 @@ describe("[id] route handlers (Next 16 Promise params)", () => {
     __setTestRepositories(repos);
     cookieStore.values.clear();
     cookieStore.set(SESSION_COOKIE, await createSessionToken("operator@riverbank.studio"));
+    // The bookings DELETE handler builds the notification provider; route it at
+    // the in-memory fake so no Resend key is required.
+    process.env.USE_FAKE_BACKENDS = "1";
   });
   afterEach(() => {
     __setTestRepositories(null);
+    delete process.env.USE_FAKE_BACKENDS;
   });
 
   it("GET /api/invoices/:id awaits Promise params and returns the invoice detail", async () => {
@@ -82,19 +86,50 @@ describe("[id] route handlers (Next 16 Promise params)", () => {
     expect(body.id).toBe(member.id);
   });
 
-  it("DELETE /api/bookings/:id awaits Promise params and reports 404 for an unknown booking", async () => {
-    // The fake provider keeps the handler hermetic (no Resend key required).
-    const previous = process.env.USE_FAKE_BACKENDS;
-    process.env.USE_FAKE_BACKENDS = "1";
-    try {
-      const res = await bookingsDelete(new Request("http://localhost"), {
-        params: Promise.resolve({ id: "no-such-booking" }),
-      });
+  it("DELETE /api/bookings/:id awaits Promise params and cancels the booking", async () => {
+    // Seed a future session + booked seat so the cancellation path is exercisable
+    // regardless of the real wall clock (the seed sessions are pinned to NOW).
+    const studio = await repos.studios.getFirst();
+    const [classType] = await repos.classTypes.listByStudio(studio!.id);
+    const [member] = await repos.members.listByStudio(studio!.id);
+    const startsAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const session = await repos.classSessions.insert({
+      id: "session-future",
+      studioId: studio!.id,
+      classTypeId: classType.id,
+      instructor: "Instructor",
+      startsAt,
+      endsAt: new Date(Date.now() + 49 * 60 * 60 * 1000).toISOString(),
+      capacity: 10,
+      priceCents: classType.defaultPriceCents,
+      status: "scheduled",
+      createdAt: new Date().toISOString(),
+    });
+    const booking = await repos.bookings.insert({
+      id: "booking-future",
+      sessionId: session.id,
+      memberId: member.id,
+      status: "booked",
+      bookedAt: new Date().toISOString(),
+      cancelledAt: null,
+    });
 
-      expect(res.status).toBe(404);
-    } finally {
-      if (previous === undefined) delete process.env.USE_FAKE_BACKENDS;
-      else process.env.USE_FAKE_BACKENDS = previous;
-    }
+    const res = await bookingsDelete(new Request("http://localhost"), {
+      params: Promise.resolve({ id: booking.id }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { refundEligible: boolean };
+    expect(body.refundEligible).toBe(true);
+    const after = await repos.bookings.getById(booking.id);
+    expect(after?.status).toBe("cancelled");
+  });
+
+  it("DELETE /api/bookings/:id returns 404 for an unknown id", async () => {
+    const res = await bookingsDelete(new Request("http://localhost"), {
+      params: Promise.resolve({ id: "no-such-booking" }),
+    });
+
+    expect(res.status).toBe(404);
   });
 });
