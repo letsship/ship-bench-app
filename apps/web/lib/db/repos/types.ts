@@ -71,6 +71,7 @@ export interface InvoicesRepo {
 export interface InvoiceLineItemsRepo {
   listByInvoice(invoiceId: string): Promise<InvoiceLineItem[]>;
   insertMany(items: InvoiceLineItem[]): Promise<InvoiceLineItem[]>;
+  update(id: string, patch: Partial<InvoiceLineItem>): Promise<InvoiceLineItem>;
 }
 
 export interface NotificationOutboxRepo {

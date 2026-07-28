@@ -29,6 +29,17 @@ describe("computeInvoiceTotals", () => {
     expect(totals.totalCents).toBe(1090);
   });
 
+  it("yields zero totals but the full refunded sum when every line is refunded", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 2000, refunded: true },
+        { quantity: 2, unitAmountCents: 500, refunded: true },
+      ],
+      900,
+    );
+    expect(totals).toEqual({ subtotalCents: 0, refundedCents: 3000, taxCents: 0, totalCents: 0 });
+  });
+
   it("rounds tax half-up", () => {
     // 1000 * 5 / 10000 = 0.5 -> rounds to 1
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 5).taxCents).toBe(1);
