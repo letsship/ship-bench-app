@@ -7,6 +7,7 @@ import {
   canCancel,
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
+import { memberOwnsAnyPack, pickDrawablePack } from "@/lib/domain/packs";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
 import { HttpError } from "@/lib/http";
 import {
@@ -92,6 +93,18 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  // If the member owns any pack, require a drawable one; spend a credit on confirmed bookings.
+  const memberPacks = await repos.packs.listByMember(member.id);
+  if (memberOwnsAnyPack(memberPacks)) {
+    const drawable = pickDrawablePack(memberPacks);
+    if (!drawable) {
+      throw new HttpError(402, "pack_exhausted", "This member has no class credits remaining; buy another pack");
+    }
+    if (decision.status === "booked") {
+      await repos.packs.update(drawable.id, { creditsRemaining: drawable.creditsRemaining - 1 });
+    }
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  Pack,
   Studio,
   StudioSettings,
 } from "../types";
@@ -25,6 +26,7 @@ export interface SeedData {
   bookings: Booking[];
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
+  packs: Pack[];
   outbox: NotificationOutboxRow[];
 }
 
@@ -37,6 +39,7 @@ interface Store {
   bookings: Booking[];
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
+  packs: Pack[];
   outbox: NotificationOutboxRow[];
 }
 
@@ -66,6 +69,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     bookings: seed ? cloneAll(seed.bookings) : [],
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
+    packs: seed ? cloneAll(seed.packs) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
   };
 
@@ -197,6 +201,26 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       async insertMany(items) {
         for (const item of items) store.invoiceLineItems.push(clone(item));
         return cloneAll(items);
+      },
+    },
+    packs: {
+      async listByMember(memberId) {
+        return cloneAll(
+          store.packs
+            .filter((row) => row.memberId === memberId)
+            .sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)),
+        );
+      },
+      async getById(id) {
+        const found = store.packs.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(pack) {
+        store.packs.push(clone(pack));
+        return clone(pack);
+      },
+      async update(id, patch) {
+        return patched(store.packs, (row) => row.id === id, patch, "Pack");
       },
     },
     outbox: {

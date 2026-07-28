@@ -34,6 +34,7 @@ const sections: [string, readonly object[]][] = [
   ["bookings", seed.bookings],
   ["invoices", seed.invoices],
   ["invoice_line_items", seed.lineItems],
+  ["packs", seed.packs],
   ["notification_outbox", seed.outbox],
 ];
 
