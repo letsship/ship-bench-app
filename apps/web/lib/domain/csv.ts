@@ -49,6 +49,24 @@ export interface InvoiceRow {
   currency: string;
 }
 
+export interface BookingExportRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+export function bookingsToCsv(bookings: readonly BookingExportRow[]): string {
+  return toCsv(bookings, [
+    { header: "Starts", value: (booking) => booking.startsAt },
+    { header: "Class", value: (booking) => booking.className },
+    { header: "Member", value: (booking) => booking.memberName },
+    { header: "Email", value: (booking) => booking.email },
+    { header: "Status", value: (booking) => booking.status },
+  ]);
+}
+
 export function invoicesToCsv(invoices: readonly InvoiceRow[]): string {
   return toCsv(invoices, [
     { header: "Number", value: (invoice) => invoice.number },

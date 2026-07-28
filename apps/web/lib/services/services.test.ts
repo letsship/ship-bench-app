@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingExportRows, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -120,6 +120,69 @@ describe("members service", () => {
 
   it("getMember 404s for an unknown id", async () => {
     await expect(getMember(repos, "nope")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("listBookingExportRows", () => {
+  const T1 = "2026-06-01T08:00:00.000Z";
+  const T2 = "2026-06-15T08:00:00.000Z";
+  const T3 = "2026-06-30T20:00:00.000Z";
+  const exportSeed = (): SeedData =>
+    baseSeed({
+      members: [member("m1", { name: "Rossi, Chiara", email: "chiara@example.com" })],
+      classTypes: [classType("ct1")],
+      sessions: [
+        session("cs1", { startsAt: T1, endsAt: "2026-06-01T09:00:00.000Z" }),
+        session("cs2", { startsAt: T2, endsAt: "2026-06-15T09:00:00.000Z" }),
+        session("cs3", { startsAt: T3, endsAt: "2026-06-30T21:00:00.000Z" }),
+      ],
+      bookings: [
+        booking("b1", "m1", { sessionId: "cs1" }),
+        booking("b2", "m1", { sessionId: "cs2", status: "attended" }),
+        booking("b3", "m1", { sessionId: "cs3", status: "cancelled" }),
+      ],
+    });
+
+  it("joins bookings to class name, member name + email, and status, sorted by start", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingExportRows(repos, "s1");
+    expect(rows).toEqual([
+      {
+        startsAt: T1,
+        className: "Yoga",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "booked",
+      },
+      {
+        startsAt: T2,
+        className: "Yoga",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "attended",
+      },
+      {
+        startsAt: T3,
+        className: "Yoga",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "cancelled",
+      },
+    ]);
+  });
+
+  it("treats an omitted bound as unbounded", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    expect((await listBookingExportRows(repos, "s1", { from: T2 })).map((row) => row.startsAt))
+      .toEqual([T2, T3]);
+    expect((await listBookingExportRows(repos, "s1", { to: T2 })).map((row) => row.startsAt))
+      .toEqual([T1, T2]);
+  });
+
+  it("includes sessions starting exactly at the to bound (inclusive upper bound)", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingExportRows(repos, "s1", { from: T1, to: T3 });
+    expect(rows.map((row) => row.startsAt)).toEqual([T1, T2, T3]);
   });
 });
 
