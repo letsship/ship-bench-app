@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingExportRows, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,33 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("lists booking export rows with email, class, and UTC starts, sorted ascending", async () => {
+    const rows = await listBookingExportRows(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("email");
+    expect(rows[0].email).toContain("@");
+    expect(rows[0]).toHaveProperty("className");
+    expect(rows[0].starts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/);
+    const starts = rows.map((row) => row.starts);
+    expect([...starts].sort()).toEqual(starts);
+  });
+
+  it("returns everything when from/to are omitted", async () => {
+    const all = await listBookingExportRows(repos, studioId);
+    const open = await listBookingExportRows(repos, studioId, {});
+    expect(open.length).toBe(all.length);
+  });
+
+  it("includes bookings exactly at the from and to bounds", async () => {
+    const all = await listBookingExportRows(repos, studioId);
+    const from = all[0].starts;
+    const to = all[all.length - 1].starts;
+    const ranged = await listBookingExportRows(repos, studioId, { from, to });
+    expect(ranged.length).toBe(all.length);
+    const mid = await listBookingExportRows(repos, studioId, { from, to: from });
+    expect(mid.length).toBeGreaterThan(0);
+    expect(mid.every((row) => row.starts === from)).toBe(true);
   });
 });
