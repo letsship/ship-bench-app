@@ -36,6 +36,20 @@ describe("computeInvoiceTotals", () => {
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 4).taxCents).toBe(0);
   });
 
+  it("is all zeros when every line is refunded (regression: no crash on empty reduce)", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 9000, refunded: true },
+        { quantity: 2, unitAmountCents: 500, refunded: true },
+      ],
+      2100,
+    );
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+    expect(totals.refundedCents).toBe(10_000);
+  });
+
   it("is zero across the board for a zero-amount line", () => {
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 0 }], 2100)).toEqual({
       subtotalCents: 0,
