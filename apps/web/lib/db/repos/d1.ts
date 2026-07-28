@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/d1";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
+import type { SQLiteTable, AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import * as s from "./schema";
 import type {
   Booking,
@@ -24,31 +25,43 @@ import type { Repositories, SessionRange } from "./types";
 // row after applying the patch. Since all rows are fully-formed app-side
 // (ids + timestamps set by the caller), insert simply returns the input.
 
+/** Runtime-safe cast for passing generic rows to Drizzle's typed builders. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DrizzleBuilder = any;
+
 export function createD1Repositories(db: D1Database): Repositories {
   const d = drizzle(db, { schema: s });
 
   // --- helpers ---------------------------------------------------------------
 
-  async function insertRow<T extends { id: string }>(table: any, row: T): Promise<T> {
-    await d.insert(table).values(row as any);
+  async function insertRow<T extends { id: string }>(
+    table: SQLiteTable,
+    row: T,
+  ): Promise<T> {
+    await (d.insert(table) as DrizzleBuilder).values(row);
     return row;
   }
 
-  async function insertRows<T extends { id: string }>(table: any, rows: T[]): Promise<T[]> {
+  async function insertRows<T extends { id: string }>(
+    table: SQLiteTable,
+    rows: T[],
+  ): Promise<T[]> {
     if (rows.length === 0) return [];
-    await d.insert(table).values(rows as any);
+    await (d.insert(table) as DrizzleBuilder).values(rows);
     return rows;
   }
 
   // Update then re-fetch (D1 has no RETURNING).
+  // `idColumn` is the table's id column object (e.g., s.members.id).
   async function updateById<T extends { id: string }>(
-    table: any,
+    table: SQLiteTable,
+    idColumn: AnySQLiteColumn,
     id: string,
     patch: Partial<T>,
-    fetchFn: (db: any, uid: string) => Promise<T | null>,
+    fetchFn: (uid: string) => Promise<T | null>,
   ): Promise<T> {
-    await d.update(table).set(patch as any).where(eq(table.id, id));
-    const row = await fetchFn(d, id);
+    await (d.update(table) as DrizzleBuilder).set(patch).where(eq(idColumn, id));
+    const row = await fetchFn(id);
     if (!row) throw new Error(`Row with id ${id} not found after update`);
     return row;
   }
@@ -57,7 +70,7 @@ export function createD1Repositories(db: D1Database): Repositories {
     studioId: string,
     patch: Partial<StudioSettings>,
   ): Promise<StudioSettings> {
-    await d.update(s.studioSettings).set(patch as any).where(eq(s.studioSettings.studioId, studioId));
+    await (d.update(s.studioSettings) as DrizzleBuilder).set(patch).where(eq(s.studioSettings.studioId, studioId));
     const rows = await d
       .select()
       .from(s.studioSettings)
@@ -124,14 +137,20 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
 
       async insert(member: Member): Promise<Member> {
-        return insertRow<Member>(s.members, member);
+        return insertRow<Member>(s.members as unknown as SQLiteTable, member);
       },
 
       async update(id: string, patch: Partial<Member>): Promise<Member> {
-        return updateById<Member>(s.members, id, patch, async (_d, uid) => {
-          const rows = await d.select().from(s.members).where(eq(s.members.id, uid)).limit(1);
-          return (rows[0] as Member) ?? null;
-        });
+        return updateById<Member>(
+          s.members as unknown as SQLiteTable,
+          s.members.id,
+          id,
+          patch,
+          async (uid) => {
+            const rows = await d.select().from(s.members).where(eq(s.members.id, uid)).limit(1);
+            return (rows[0] as Member) ?? null;
+          },
+        );
       },
     },
 
@@ -155,7 +174,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
 
       async insert(classType: ClassType): Promise<ClassType> {
-        return insertRow<ClassType>(s.classTypes, classType);
+        return insertRow<ClassType>(s.classTypes as unknown as SQLiteTable, classType);
       },
     },
 
@@ -189,7 +208,7 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
 
       async insert(session: ClassSession): Promise<ClassSession> {
-        return insertRow<ClassSession>(s.classSessions, session);
+        return insertRow<ClassSession>(s.classSessions as unknown as SQLiteTable, session);
       },
     },
 
@@ -221,14 +240,20 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
 
       async insert(booking: Booking): Promise<Booking> {
-        return insertRow<Booking>(s.bookings, booking);
+        return insertRow<Booking>(s.bookings as unknown as SQLiteTable, booking);
       },
 
       async update(id: string, patch: Partial<Booking>): Promise<Booking> {
-        return updateById<Booking>(s.bookings, id, patch, async (_d, uid) => {
-          const rows = await d.select().from(s.bookings).where(eq(s.bookings.id, uid)).limit(1);
-          return (rows[0] as Booking) ?? null;
-        });
+        return updateById<Booking>(
+          s.bookings as unknown as SQLiteTable,
+          s.bookings.id,
+          id,
+          patch,
+          async (uid) => {
+            const rows = await d.select().from(s.bookings).where(eq(s.bookings.id, uid)).limit(1);
+            return (rows[0] as Booking) ?? null;
+          },
+        );
       },
     },
 
@@ -260,14 +285,20 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
 
       async insert(invoice: Invoice): Promise<Invoice> {
-        return insertRow<Invoice>(s.invoices, invoice);
+        return insertRow<Invoice>(s.invoices as unknown as SQLiteTable, invoice);
       },
 
       async update(id: string, patch: Partial<Invoice>): Promise<Invoice> {
-        return updateById<Invoice>(s.invoices, id, patch, async (_d, uid) => {
-          const rows = await d.select().from(s.invoices).where(eq(s.invoices.id, uid)).limit(1);
-          return (rows[0] as Invoice) ?? null;
-        });
+        return updateById<Invoice>(
+          s.invoices as unknown as SQLiteTable,
+          s.invoices.id,
+          id,
+          patch,
+          async (uid) => {
+            const rows = await d.select().from(s.invoices).where(eq(s.invoices.id, uid)).limit(1);
+            return (rows[0] as Invoice) ?? null;
+          },
+        );
       },
     },
 
@@ -281,13 +312,13 @@ export function createD1Repositories(db: D1Database): Repositories {
       },
 
       async insertMany(items: InvoiceLineItem[]): Promise<InvoiceLineItem[]> {
-        return insertRows<InvoiceLineItem>(s.invoiceLineItems, items);
+        return insertRows<InvoiceLineItem>(s.invoiceLineItems as unknown as SQLiteTable, items);
       },
     },
 
     outbox: {
       async insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow> {
-        return insertRow<NotificationOutboxRow>(s.notificationOutbox, row);
+        return insertRow<NotificationOutboxRow>(s.notificationOutbox as unknown as SQLiteTable, row);
       },
 
       async listPending(): Promise<NotificationOutboxRow[]> {
@@ -303,7 +334,11 @@ export function createD1Repositories(db: D1Database): Repositories {
         patch: Partial<NotificationOutboxRow>,
       ): Promise<NotificationOutboxRow> {
         return updateById<NotificationOutboxRow>(
-          s.notificationOutbox, id, patch, async (_d, uid) => {
+          s.notificationOutbox as unknown as SQLiteTable,
+          s.notificationOutbox.id,
+          id,
+          patch,
+          async (uid) => {
             const rows = await d
               .select()
               .from(s.notificationOutbox)

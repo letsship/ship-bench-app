@@ -70,8 +70,9 @@ class D1StmtShim implements D1PreparedStatement {
       const stmt = this.db.prepare(this.sql);
       const rows = stmt.all(...this.params) as Record<string, unknown>[];
       return { results: rows ?? [], success: true };
-    } catch (e: any) {
-      return { results: [], success: false, error: e?.message ?? String(e) };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { results: [], success: false, error: message };
     }
   }
 
@@ -85,8 +86,9 @@ class D1StmtShim implements D1PreparedStatement {
       const stmt = this.db.prepare(this.sql);
       stmt.run(...this.params);
       return { success: true, meta: { changes: 1, last_row_id: 0 } } as D1Result;
-    } catch (e: any) {
-      return { success: false, error: e?.message ?? String(e) };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { success: false, error: message };
     }
   }
 
@@ -102,8 +104,9 @@ class D1StmtShim implements D1PreparedStatement {
       // Use column names in insertion order (from the first row's keys).
       const cols = Object.keys(rows[0]);
       return rows.map((row) => cols.map((c) => row[c]));
-    } catch (e: any) {
-      throw new Error(`raw() failed: ${e?.message ?? String(e)}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      throw new Error(`raw() failed: ${message}`);
     }
   }
 }
