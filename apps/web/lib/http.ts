@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
@@ -61,6 +62,7 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
     if (error instanceof HttpError) {
       return apiError(error.status, error.code, error.message, error.details);
     }
+    captureException(error);
     console.error("Unhandled API error", error);
     return apiError(500, "internal_error", "Something went wrong");
   }
