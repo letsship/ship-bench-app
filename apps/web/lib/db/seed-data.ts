@@ -21,6 +21,7 @@ import type {
   Studio,
   StudioSettings,
 } from "./types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 
 // Single source of the demo dataset, producing plain entity rows. Consumed by
 // the in-memory fakes (tests + fake-backends mode) and by scripts/emit-seed-sql
@@ -263,11 +264,9 @@ function buildInvoices(
   INVOICE_SEED.forEach((seed, index) => {
     const invoiceId = seedId();
     const member = members[seed.memberIndex];
-    let subtotal = 0;
-    for (const line of seed.lines) {
+    const invoiceLines: InvoiceLineItem[] = seed.lines.map((line) => {
       const amount = line.quantity * line.unit;
-      if (!line.refunded) subtotal += amount;
-      lineItems.push({
+      return {
         id: seedId(),
         invoiceId,
         description: line.description,
@@ -276,9 +275,11 @@ function buildInvoices(
         amountCents: amount,
         refunded: line.refunded ?? false,
         bookingId: null,
-      });
-    }
-    const tax = Math.round((subtotal * taxRateBps) / 10_000);
+      };
+    });
+    // Totals flow from the single domain implementation so the seed agrees
+    // with the invoice page, the create path, and account statements.
+    const totals = computeInvoiceTotals(invoiceLines, taxRateBps);
     const issuedAt = monthsAgoIso(now, seed.monthsAgo, seed.day);
     invoices.push({
       id: invoiceId,
@@ -288,14 +289,15 @@ function buildInvoices(
       status: seed.status,
       currency: "EUR",
       taxRateBps,
-      subtotalCents: subtotal,
-      taxCents: tax,
-      totalCents: subtotal + tax,
+      subtotalCents: totals.subtotalCents,
+      taxCents: totals.taxCents,
+      totalCents: totals.totalCents,
       issuedAt,
       dueAt: new Date(new Date(issuedAt).getTime() + 14 * DAY_MS).toISOString(),
       paidAt: seed.status === "paid" ? issuedAt : null,
       createdAt: issuedAt,
     });
+    lineItems.push(...invoiceLines);
   });
   return { invoices, lineItems };
 }
