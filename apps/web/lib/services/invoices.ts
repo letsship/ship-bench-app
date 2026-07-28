@@ -3,6 +3,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import type { Invoice, InvoiceLineItem, Member } from "@/lib/db/types";
 import {
   type InvoiceStatus,
+  type InvoiceTotals,
   canTransitionInvoice,
   computeInvoiceTotals,
   formatInvoiceNumber,
@@ -30,6 +31,9 @@ export interface InvoiceDetail {
   invoice: Invoice;
   member: Member;
   lineItems: InvoiceLineItem[];
+  // Live-computed from the current line items, so the page never depends on
+  // potentially stale stored totals (e.g. after a line-level refund).
+  totals: InvoiceTotals;
 }
 
 export async function listInvoices(
@@ -56,7 +60,8 @@ export async function getInvoiceDetail(repos: Repositories, id: string): Promise
   const member = await repos.members.getById(invoice.memberId);
   if (!member) throw new HttpError(404, "not_found", "Invoice member not found");
   const lineItems = await repos.invoiceLineItems.listByInvoice(id);
-  return { invoice, member, lineItems };
+  const totals = computeInvoiceTotals(lineItems, invoice.taxRateBps);
+  return { invoice, member, lineItems, totals };
 }
 
 export async function createInvoice(
