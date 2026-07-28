@@ -7,6 +7,8 @@ import {
   canCancel,
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
+import { memberOwnsAnyPack, pickDrawablePack } from "@/lib/domain/packs";
+import { spendCreditForMember } from "@/lib/services/packages";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
 import { HttpError } from "@/lib/http";
 import {
@@ -83,6 +85,14 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  // If the member owns any pack, require a drawable one BEFORE inserting the
+  // booking, so we never persist an orphaned row that a 402 would strand.
+  const memberPacks = await repos.packs.listByMember(member.id);
+  const ownsAnyPack = memberOwnsAnyPack(memberPacks);
+  if (ownsAnyPack && !pickDrawablePack(memberPacks)) {
+    throw new HttpError(402, "pack_exhausted", "This member has no class credits remaining; buy another pack");
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +102,11 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  // Spend a credit from the pack only for confirmed (booked) bookings.
+  if (ownsAnyPack && decision.status === "booked") {
+    await spendCreditForMember(repos, member.id);
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

@@ -7,6 +7,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  Pack,
   Studio,
   StudioSettings,
 } from "../types";
@@ -191,6 +192,20 @@ export function createSupabaseRepositories(): Repositories {
           toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
         );
       },
+    },
+    packs: {
+      listByMember: (memberId) =>
+        rows<Pack>(
+          db.from("packs").select("*").eq("member_id", memberId).order("purchased_at", { ascending: false }),
+          "packs.listByMember",
+        ),
+      getById: (id) =>
+        maybeOne<Pack>(
+          db.from("packs").select("*").eq("id", id).maybeSingle(),
+          "packs.getById",
+        ),
+      insert: (pack) => insertReturning("packs", pack),
+      update: (id, patch) => updateReturning<Pack>("packs", "id", id, patch),
     },
     outbox: {
       insert: (row) => insertReturning("notification_outbox", row),
