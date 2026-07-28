@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import { UniqueViolationError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -84,6 +85,48 @@ describe("in-memory repositories", () => {
   it("listPending returns only unsent outbox rows", async () => {
     const pending = await repos.outbox.listPending();
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
+  });
+
+  it("rejects a second active booking for the same session + member", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    const row = (id: string, status: string) => ({
+      id,
+      sessionId,
+      memberId: "mem_dup",
+      status,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    await repos.bookings.insert(row("b_active", "booked"));
+    await expect(repos.bookings.insert(row("b_dup", "waitlisted"))).rejects.toBeInstanceOf(
+      UniqueViolationError,
+    );
+    await expect(repos.bookings.insert(row("b_dup2", "booked"))).rejects.toBeInstanceOf(
+      UniqueViolationError,
+    );
+  });
+
+  it("allows a new booking when the only prior row is cancelled", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sessionId = sessions[0].id;
+    await repos.bookings.insert({
+      id: "b_cancelled",
+      sessionId,
+      memberId: "mem_rebook",
+      status: "cancelled",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: NOW.toISOString(),
+    });
+    const rebooked = await repos.bookings.insert({
+      id: "b_rebooked",
+      sessionId,
+      memberId: "mem_rebook",
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+    expect(rebooked.status).toBe("booked");
   });
 
   it("empty repositories return nulls / empty lists", async () => {
