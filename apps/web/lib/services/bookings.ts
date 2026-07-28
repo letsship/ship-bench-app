@@ -1,3 +1,4 @@
+import type { Tracker } from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -21,6 +22,25 @@ import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
+
+// Analytics is a non-critical side effect: a tracking failure must never block
+// a booking, but it is always logged rather than silently swallowed.
+async function captureSafely(
+  tracker: Tracker,
+  event: string,
+  member: Member,
+  session: ClassSession,
+): Promise<void> {
+  try {
+    await tracker.capture({
+      distinctId: member.id,
+      event,
+      properties: { session_id: session.id },
+    });
+  } catch (error) {
+    console.error(`analytics capture failed for ${event}`, error);
+  }
+}
 
 const DENY_MESSAGES: Record<BookingDenyReason, string> = {
   session_cancelled: "This class session has been cancelled",
@@ -63,6 +83,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -93,6 +114,16 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  // Funnel event: exactly one per creation. A confirmed booking fires
+  // booking_created, a waitlisted one fires waitlist_joined — never both.
+  // Properties carry structural ids only, never PII.
+  await captureSafely(
+    tracker,
+    decision.status === "booked" ? "booking_created" : "waitlist_joined",
+    member,
+    session,
+  );
+
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
@@ -111,6 +142,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -134,16 +166,18 @@ export async function cancelBooking(
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
+  const cancellingMember = await loadMember(repos, booking.memberId);
+  await captureSafely(tracker, "booking_cancelled", cancellingMember, session);
+
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
     : null;
 
-  const member = await loadMember(repos, booking.memberId);
   await enqueueAndDispatch(
     repos,
     provider,
     bookingCancellation(
-      recipientOf(member),
+      recipientOf(cancellingMember),
       await summaryOf(repos, session),
       decision.refundEligible,
     ),
