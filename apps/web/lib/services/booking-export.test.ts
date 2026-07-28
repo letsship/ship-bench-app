@@ -6,7 +6,7 @@ import { listBookingExportRows } from "./booking-export";
 function setup() {
   const seed = buildSeed(SEED_NOW);
   const repos = createInMemoryRepositories(seed);
-  return { repos, studioId: seed.studio.id, seed };
+  return { repos, studioId: seed.studio.id };
 }
 
 describe("listBookingExportRows", () => {
@@ -17,7 +17,7 @@ describe("listBookingExportRows", () => {
   });
 
   it("filters inclusively on the from bound", async () => {
-    const { repos, studioId, seed } = setup();
+    const { repos, studioId } = setup();
     // Use a from time that cuts out the earliest sessions.
     const from = "2026-07-01T12:00:00.000Z";
     const rows = await listBookingExportRows(repos, studioId, { from });
@@ -28,7 +28,7 @@ describe("listBookingExportRows", () => {
   });
 
   it("filters inclusively on the to bound (session exactly on to IS included)", async () => {
-    const { repos, studioId, seed } = setup();
+    const { repos, studioId } = setup();
     // Find a session start time that exists so we can test the inclusive bound.
     const sessions = await repos.classSessions.listByStudio(studioId);
     expect(sessions.length).toBeGreaterThan(0);
