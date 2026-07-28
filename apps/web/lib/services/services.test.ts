@@ -295,6 +295,15 @@ describe("invoices service", () => {
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
+
+  it("resolves the detail of the fully-refunded seed invoice without throwing", async () => {
+    const list = await listInvoices(repos, studioId);
+    const refunded = list.find((invoice) => invoice.status === "refunded");
+    expect(refunded).toBeDefined();
+    const detail = await getInvoiceDetail(repos, refunded!.id);
+    expect(detail.lineItems.length).toBeGreaterThan(0);
+    expect(detail.lineItems.every((line) => line.refunded)).toBe(true);
+  });
 });
 
 describe("reports + dashboard + booking list", () => {

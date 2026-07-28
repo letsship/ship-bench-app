@@ -111,6 +111,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           Subtotal <Money cents={totals.subtotalCents} currency={currency} />
         </div>
         <div className="text-[var(--color-muted)]">
+          Refunded <Money cents={totals.refundedCents} currency={currency} />
+        </div>
+        <div className="text-[var(--color-muted)]">
           Tax ({(invoice.taxRateBps / 100).toFixed(1)}%){" "}
           <Money cents={totals.taxCents} currency={currency} />
         </div>
