@@ -80,6 +80,14 @@ describe("shouldSend", () => {
   it("member opt-out wins over every setting", () => {
     expect(shouldSend("booking_confirmation", { ...base, memberOptedOut: true })).toBe(false);
   });
+
+  it("booking_reminder is sent when member has not opted out (no studio gate)", () => {
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: false })).toBe(true);
+  });
+
+  it("booking_reminder is suppressed when member has opted out", () => {
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: true })).toBe(false);
+  });
 });
 
 describe("dispatchOutbox", () => {
