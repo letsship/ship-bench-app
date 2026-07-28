@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import { DuplicateActiveBookingError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
+import type { Booking } from "../types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -90,5 +92,51 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  describe("bookings.insert duplicate-active guard", () => {
+    const bookingRow = (id: string, status: Booking["status"]): Booking => ({
+      id,
+      sessionId: "cs_dup",
+      memberId: "m_dup",
+      status,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: status === "cancelled" ? NOW.toISOString() : null,
+    });
+
+    it("rejects a second active booking for the same session + member", async () => {
+      const repos = createInMemoryRepositories(buildSeed(NOW));
+      await repos.bookings.insert(bookingRow("b1", "waitlisted"));
+      await expect(repos.bookings.insert(bookingRow("b2", "waitlisted"))).rejects.toBeInstanceOf(
+        DuplicateActiveBookingError,
+      );
+      // A confirmed seat blocks just the same.
+      await expect(repos.bookings.insert(bookingRow("b3", "booked"))).rejects.toBeInstanceOf(
+        DuplicateActiveBookingError,
+      );
+      // Nothing for a different session or member is blocked.
+      await repos.bookings.insert({
+        ...bookingRow("b4", "waitlisted"),
+        sessionId: "cs_other",
+      });
+      await repos.bookings.insert({
+        ...bookingRow("b5", "waitlisted"),
+        memberId: "m_other",
+      });
+      const rows = await repos.bookings.listBySession("cs_dup");
+      // b1 (the original) + b5 (different member) survive; b2/b3 were rejected.
+      expect(rows.map((r) => r.id).sort()).toEqual(["b1", "b5"]);
+    });
+
+    it("allows a fresh booking after the prior one is cancelled", async () => {
+      const repos = createInMemoryRepositories(buildSeed(NOW));
+      await repos.bookings.insert(bookingRow("b1", "booked"));
+      await repos.bookings.update("b1", { status: "cancelled", cancelledAt: NOW.toISOString() });
+      // Now a new active booking for the same session + member is allowed.
+      const fresh = await repos.bookings.insert(bookingRow("b2", "waitlisted"));
+      expect(fresh.status).toBe("waitlisted");
+      const rows = await repos.bookings.listBySession("cs_dup");
+      expect(rows.filter((r) => r.status !== "cancelled").map((r) => r.id)).toEqual(["b2"]);
+    });
   });
 });

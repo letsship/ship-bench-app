@@ -1,4 +1,5 @@
 import { newId } from "@/lib/db/ids";
+import { isDuplicateActiveBookingError } from "@/lib/db/repos/errors";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
 import {
@@ -84,14 +85,27 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  await repos.bookings.insert({
-    id: bookingId,
-    sessionId: session.id,
-    memberId: member.id,
-    status: decision.status,
-    bookedAt: nowIso(),
-    cancelledAt: null,
-  });
+  try {
+    await repos.bookings.insert({
+      id: bookingId,
+      sessionId: session.id,
+      memberId: member.id,
+      status: decision.status,
+      bookedAt: nowIso(),
+      cancelledAt: null,
+    });
+  } catch (error) {
+    // `canBook` above is the cheap first line of defence and rejects slow
+    // sequential repeats. But the read-decide-insert sequence is not atomic,
+    // so two overlapping requests (a double-click) can both pass `canBook`
+    // before either writes. The data-layer unique guard catches the losing
+    // insert; translate it into the same 409 conflict a confirmed-seat
+    // repeat gets so the client sees a consistent response.
+    if (isDuplicateActiveBookingError(error)) {
+      throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+    }
+    throw error;
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

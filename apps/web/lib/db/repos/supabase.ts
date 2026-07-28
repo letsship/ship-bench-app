@@ -10,6 +10,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
 
@@ -18,7 +19,7 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -49,6 +50,27 @@ export function createSupabaseRepositories(): Repositories {
       .single();
     if (error) fail(`insert into ${table}`, error);
     return toCamelRow<T>(data as Record<string, unknown>);
+  }
+
+  // Booking inserts are guarded by a partial unique index
+  // (bookings_session_member_active_unique; see migration 0002) so a concurrent
+  // double-submit cannot create a second active row for the same session +
+  // member. Postgres surfaces that as a unique_violation (23505), which we map
+  // to the shared DuplicateActiveBookingError so the service returns the same
+  // 409 "already booked" conflict a sequential repeat gets.
+  async function insertBooking(booking: Booking): Promise<Booking> {
+    const { data, error } = await db
+      .from("bookings")
+      .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+      .select()
+      .single();
+    if (error) {
+      if (error.code === "23505") {
+        throw new DuplicateActiveBookingError(booking.sessionId, booking.memberId);
+      }
+      fail("insert into bookings", error);
+    }
+    return toCamelRow<Booking>(data as Record<string, unknown>);
   }
 
   async function updateReturning<T>(
@@ -145,7 +167,7 @@ export function createSupabaseRepositories(): Repositories {
           db.from("bookings").select("*").eq("id", id).maybeSingle(),
           "bookings.getById",
         ),
-      insert: (booking) => insertReturning("bookings", booking),
+      insert: (booking) => insertBooking(booking),
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {

@@ -31,9 +31,13 @@ export interface BookingContext {
   now: string;
 }
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// Any existing active booking for this session — a confirmed seat, an
+// attendance already recorded, OR a waitlist entry — blocks another booking
+// attempt. A waitlisted member has no seat, but they are already in line for
+// one, so a repeat submit must be rejected with the same "already booked"
+// conflict rather than adding a second waitlist row. (Seat accounting for
+// occupancy is handled separately in lib/domain/capacity.ts.)
+const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended", "waitlisted"]);
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.

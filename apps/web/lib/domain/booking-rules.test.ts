@@ -56,6 +56,16 @@ describe("canBook", () => {
     });
   });
 
+  it("rejects a member who is already waitlisted for the session", () => {
+    // A waitlisted member holds no seat, but they are already in line for one —
+    // a repeat submit must not add a second waitlist row. It gets the same
+    // "already booked" conflict as a confirmed seat.
+    expect(canBook(baseContext({ memberBookings: [{ status: "waitlisted" }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
   it("rejects when full and the waitlist is closed", () => {
     const occupancy = computeOccupancy(1, [{ status: "booked" }]);
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
