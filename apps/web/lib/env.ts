@@ -42,6 +42,21 @@ const getServerVars = () => ({
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
 });
 
+// Narrow lazy accessor for the Stripe webhook secret.  It has its own tiny
+// Zod schema independent of the Supabase-requiring server schema so that
+// webhook route tests (which never touch Supabase) can set just this one var.
+const stripeSecretSchema = z.string().min(1).optional();
+
+let cachedStripeSecret: string | undefined;
+
+export const stripeWebhookSecret = (): string | undefined => {
+  if (cachedStripeSecret === undefined) {
+    const parsed = stripeSecretSchema.safeParse(process.env.STRIPE_WEBHOOK_SECRET);
+    cachedStripeSecret = parsed.success ? parsed.data : undefined;
+  }
+  return cachedStripeSecret;
+};
+
 export const clientEnv = (): ClientEnv => {
   if (!cachedClientEnv) cachedClientEnv = clientSchema.parse(getClientVars());
   return cachedClientEnv;

@@ -76,4 +76,22 @@ export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
+// Stripe webhook event envelope.  Fields beyond `id` and `type` are accessed
+// resiliently so that non-`invoice.paid` events and events missing metadata
+// still parse fine (the route acknowledges them rather than returning 400).
+export const stripeWebhookEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  data: z.object({
+    object: z.object({
+      metadata: z
+        .object({
+          invoice_id: z.string().optional(),
+        })
+        .optional()
+        .default({}),
+    }),
+  }),
+});
+
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
