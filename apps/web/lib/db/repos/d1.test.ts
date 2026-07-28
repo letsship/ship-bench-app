@@ -2,21 +2,25 @@
 //
 // These run in the standard node vitest environment — NOT in a Worker. To drive
 // `createD1Repositories` unchanged, we stand up an in-memory SQLite database
-// with `better-sqlite3`, apply the real D1 migration (`migrations/0001_init.sql`),
-// and wrap it in a minimal `D1Database`-compatible shim that translates Drizzle's
-// `prepare().bind().all()/run()/get()` calls onto better-sqlite3. That exercises
-// the production adapter against a real SQLite engine without pulling in
-// Miniflare or `@cloudflare/vitest-pool-workers` (which would disturb the
-// existing node suite). `better-sqlite3` is a dev-only dependency for this test.
+// with Node's built-in `node:sqlite` (`DatabaseSync`, compiled into Node 22+ —
+// no native addon to build, no wasm to load), apply the real D1 migration
+// (`migrations/0001_init.sql`), and wrap it in a minimal `D1Database`-compatible
+// shim that translates Drizzle's `prepare().bind().all()/run()/raw()` calls onto
+// `node:sqlite`. That exercises the production adapter against a real SQLite
+// engine without pulling in Miniflare, `@cloudflare/vitest-pool-workers`, or a
+// native module like `better-sqlite3` (whose prebuilt binding is not reliably
+// available across CI runners). `node:sqlite` is experimental but stable enough
+// for this in-memory contract suite; it emits a warning to stderr only.
 
 import { beforeEach, describe, expect, it } from "vitest";
-import Database from "better-sqlite3";
+import { DatabaseSync, type StatementSync, type StatementResultingChanges } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSeed, SEED_NOW } from "../seed-data";
 import { createD1Repositories } from "./d1";
 import type { Repositories } from "./types";
+import type { Studio, StudioSettings } from "../types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS = resolve(HERE, "../../../migrations");
@@ -28,14 +32,14 @@ interface D1Result<T = unknown> {
   meta: Record<string, unknown>;
 }
 
-// A minimal D1Database shim over better-sqlite3. Drizzle's D1 driver only uses
-// `prepare(sql).bind(...params).all()/.run()/.get()` (plus `batch`/`exec` for
-// completeness), so that is all we implement. better-sqlite3 returns rows as
+// A minimal D1Database shim over `node:sqlite`. Drizzle's D1 driver only uses
+// `prepare(sql).bind(...params).all()/.run()/.raw()` (plus `batch`/`exec` for
+// completeness), so that is all we implement. `node:sqlite` returns rows as
 // objects keyed by column name (snake_case), exactly what Drizzle's field
 // mapping expects.
 class D1PreparedStatement {
   constructor(
-    private readonly stmt: Database.Statement,
+    private readonly stmt: StatementSync,
     private readonly params: unknown[] = [],
   ) {}
 
@@ -44,12 +48,12 @@ class D1PreparedStatement {
   }
 
   async all<T = unknown>(): Promise<D1Result<T>> {
-    const results = this.stmt.all(...this.params) as T[];
+    const results = this.stmt.all(...(this.params as never)) as T[];
     return { results, success: true, meta: {} };
   }
 
   async run<T = unknown>(): Promise<D1Result<T>> {
-    const info = this.stmt.run(...this.params) as Database.RunResult;
+    const info = this.stmt.run(...(this.params as never)) as StatementResultingChanges;
     return {
       results: [],
       success: true,
@@ -58,12 +62,12 @@ class D1PreparedStatement {
   }
 
   async first<T = unknown>(): Promise<T | null> {
-    return (this.stmt.get(...this.params) as T) ?? null;
+    return (this.stmt.get(...(this.params as never)) as T | undefined) ?? null;
   }
 
   async raw<T = unknown>(options?: { columnNames?: boolean }): Promise<T[]> {
     const cols = this.stmt.columns().map((c) => c.name);
-    const rows = this.stmt.all(...this.params) as Record<string, unknown>[];
+    const rows = this.stmt.all(...(this.params as never)) as Record<string, unknown>[];
     const valueRows = rows.map((r) => cols.map((c) => r[c]));
     if (options?.columnNames) return [cols, ...valueRows] as unknown as T[];
     return valueRows as unknown as T[];
@@ -71,7 +75,7 @@ class D1PreparedStatement {
 }
 
 class D1DatabaseShim {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: DatabaseSync) {}
 
   prepare(query: string): D1PreparedStatement {
     return new D1PreparedStatement(this.db.prepare(query));
@@ -93,11 +97,11 @@ class D1DatabaseShim {
 
 interface TestHandle {
   repos: Repositories;
-  sqlite: Database.Database;
+  sqlite: DatabaseSync;
 }
 
 function createTestRepositories(): TestHandle {
-  const sqlite = new Database(":memory:");
+  const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(INIT_SQL);
   const repos = createD1Repositories(new D1DatabaseShim(sqlite) as unknown as D1Database);
   return { repos, sqlite };
@@ -107,7 +111,7 @@ function createTestRepositories(): TestHandle {
 // expose `studios.getFirst` and `settings.getByStudioId`/`update` — no insert),
 // so insert their seed rows directly via SQL — mirroring what the 0002_seed
 // migration does in production.
-function insertStudio(sqlite: Database.Database, studio: import("../types").Studio): void {
+function insertStudio(sqlite: DatabaseSync, studio: Studio): void {
   sqlite
     .prepare(
       `insert into studios (id, name, slug, timezone, created_at) values (?, ?, ?, ?, ?)`,
@@ -115,10 +119,7 @@ function insertStudio(sqlite: Database.Database, studio: import("../types").Stud
     .run(studio.id, studio.name, studio.slug, studio.timezone, studio.createdAt);
 }
 
-function insertSettings(
-  sqlite: Database.Database,
-  settings: import("../types").StudioSettings,
-): void {
+function insertSettings(sqlite: DatabaseSync, settings: StudioSettings): void {
   sqlite
     .prepare(
       `insert into studio_settings
@@ -141,7 +142,7 @@ function insertSettings(
 
 describe("D1 repositories (Drizzle over SQLite)", () => {
   let repos: Repositories;
-  let sqlite: Database.Database;
+  let sqlite: DatabaseSync;
   let studioId: string;
 
   beforeEach(async () => {
