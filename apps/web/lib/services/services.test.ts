@@ -324,4 +324,70 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
   });
+
+  it("does not read members or class sessions once per booking", async () => {
+    // Build a studio with N members, N sessions, and N bookings (one per
+    // member/session), then double N and assert the member + class-session
+    // repository read counts stay constant — i.e. the join is batched, not N+1.
+    const buildSeedFor = (n: number): SeedData => {
+      const members = Array.from({ length: n }, (_, i) => member(`m${i}`));
+      const sessions = Array.from({ length: n }, (_, i) =>
+        session(`cs${i}`, { startsAt: FUTURE, endsAt: FUTURE_END }),
+      );
+      const bookings = Array.from({ length: n }, (_, i) =>
+        booking(`b${i}`, `m${i}`, { sessionId: `cs${i}` }),
+      );
+      return baseSeed({
+        classTypes: [classType("ct1")],
+        members,
+        sessions,
+        bookings,
+      });
+    };
+
+    type ReadRepoKey = "members" | "classSessions";
+    const READ_METHODS: Record<ReadRepoKey, string[]> = {
+      members: ["listByStudio", "getById", "findByEmail"],
+      classSessions: ["listByStudio", "getById"],
+    };
+
+    const countReads = (base: Repositories) => {
+      const counts: Record<ReadRepoKey, number> = { members: 0, classSessions: 0 };
+      const wrap = <K extends ReadRepoKey>(key: K) =>
+        new Proxy(base[key] as Repositories[K], {
+          get(target, prop) {
+            if (typeof prop === "string" && READ_METHODS[key].includes(prop)) {
+              const fn = Reflect.get(target as object, prop) as (...args: unknown[]) => unknown;
+              return (...args: unknown[]) => {
+                counts[key] += 1;
+                return Reflect.apply(fn, target as object, args);
+              };
+            }
+            return Reflect.get(target as object, prop);
+          },
+        });
+      const wrapped: Repositories = {
+        ...base,
+        members: wrap("members"),
+        classSessions: wrap("classSessions"),
+      };
+      return { repos: wrapped, counts };
+    };
+
+    const run = async (n: number) => {
+      const { repos: wrapped, counts } = countReads(createInMemoryRepositories(buildSeedFor(n)));
+      const rows = await listBookingRows(wrapped, "s1");
+      expect(rows).toHaveLength(n);
+      return counts;
+    };
+
+    const small = await run(200);
+    const large = await run(400);
+
+    // A small fixed number of reads, regardless of booking count.
+    expect(small.members).toBeLessThanOrEqual(2);
+    expect(small.classSessions).toBeLessThanOrEqual(2);
+    expect(large.members).toBe(small.members);
+    expect(large.classSessions).toBe(small.classSessions);
+  });
 });
