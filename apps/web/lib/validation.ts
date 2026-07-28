@@ -71,9 +71,14 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+export const refundLineItemSchema = z.object({
+  refunded: z.literal(true),
+});
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+export type RefundLineItemInput = z.infer<typeof refundLineItemSchema>;

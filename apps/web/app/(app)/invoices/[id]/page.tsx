@@ -11,6 +11,7 @@ import { resolveStudio } from "@/lib/services/context";
 import { getInvoiceDetail } from "@/lib/services/invoices";
 import { Money, StatusBadge } from "../../_components/ui";
 import { InvoiceStatusControls } from "./invoice-status-controls";
+import { LineItemRefundButton } from "./line-item-refund-button";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               <th className="text-right">Qty</th>
               <th className="text-right">Unit</th>
               <th className="text-right">Amount</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -99,6 +101,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 </td>
                 <td className="text-right">
                   <Money cents={line.amountCents} currency={currency} />
+                </td>
+                <td className="text-right">
+                  {line.refunded ? null : (
+                    <LineItemRefundButton invoiceId={invoice.id} lineItemId={line.id} />
+                  )}
                 </td>
               </tr>
             ))}

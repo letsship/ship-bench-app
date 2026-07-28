@@ -8,7 +8,13 @@ import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
-import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
+import {
+  createInvoice,
+  getInvoiceDetail,
+  listInvoices,
+  refundLineItem,
+  updateInvoiceStatus,
+} from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
@@ -286,6 +292,56 @@ describe("invoices service", () => {
     await expect(updateInvoiceStatus(repos, detail.invoice.id, "open")).rejects.toMatchObject({
       status: 409,
       code: "invalid_transition",
+    });
+  });
+
+  it("refunding one line keeps other lines billable and updates stored totals", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [
+        { description: "Pass", quantity: 1, unitAmountCents: 1000 },
+        { description: "Class", quantity: 2, unitAmountCents: 500 },
+      ],
+    });
+    const updated = await refundLineItem(repos, detail.invoice.id, detail.lineItems[0].id);
+    expect(updated.lineItems.find((line) => line.id === detail.lineItems[0].id)?.refunded).toBe(
+      true,
+    );
+    expect(updated.invoice.subtotalCents).toBe(1000);
+    expect(updated.invoice.taxCents).toBe(90);
+    expect(updated.invoice.totalCents).toBe(1090);
+  });
+
+  it("refunding the last billable line settles the invoice at zero totals", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Pass", quantity: 2, unitAmountCents: 1000 }],
+    });
+    for (const line of detail.lineItems) {
+      await refundLineItem(repos, detail.invoice.id, line.id);
+    }
+    const updated = await getInvoiceDetail(repos, detail.invoice.id);
+    expect(updated.invoice.subtotalCents).toBe(0);
+    expect(updated.invoice.taxCents).toBe(0);
+    expect(updated.invoice.totalCents).toBe(0);
+    expect(updated.lineItems.every((line) => line.refunded)).toBe(true);
+  });
+
+  it("refundLineItem rejects an unknown line item with 404", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
+    });
+    await expect(refundLineItem(repos, detail.invoice.id, "missing-line")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    await expect(refundLineItem(repos, "missing-invoice", detail.lineItems[0].id)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
     });
   });
 
