@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { UniqueViolationError } from "@/lib/db/repos/errors";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -199,6 +200,68 @@ describe("bookings service", () => {
     await expect(
       createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("leaves exactly one active row after a repeated waitlist booking attempt", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const first = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m2",
+    });
+    expect(first.status).toBe("waitlisted");
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    const rows = (await repos.bookings.listBySession("cs1")).filter(
+      (row) => row.memberId === "m2" && row.status !== "cancelled" && row.status !== "no_show",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("waitlisted");
+  });
+
+  it("maps an insert-time unique violation (race loser) to the already-booked 409", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
+    );
+    // Simulate the loser of a concurrent double submit: the pre-insert check
+    // saw no active row, but the unique constraint rejects the insert.
+    const originalInsert = repos.bookings.insert;
+    repos.bookings.insert = async (row) => {
+      await originalInsert({ ...row, id: "b_winner" });
+      throw new UniqueViolationError("duplicate", "bookings_unique_active_member_session");
+    };
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("allows rebooking after a cancellation", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [
+          booking("b1", "m1", { status: "cancelled", cancelledAt: ISO }),
+        ],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
   });
 
   it("marks a far-off cancellation refund-eligible", async () => {
