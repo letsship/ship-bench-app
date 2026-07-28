@@ -43,6 +43,22 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("opens the fully-refunded Pottery intensive invoice without crashing", async ({ page }) => {
+    await page.goto("/invoices");
+    const table = page.getByTestId("invoices-table");
+    await expect(table).toBeVisible();
+
+    // Seeded invoice with every line item refunded: the detail page must render
+    // €0.00 totals and the refunded line/badge, not the error screen.
+    await table.getByRole("row", { name: /refunded/i }).getByRole("link").first().click();
+    await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+    await expect(page.getByRole("heading", { level: 1, name: /INV-/ })).toBeVisible();
+    await expect(page.getByText("Pottery intensive")).toBeVisible();
+    await expect(page.getByText("refunded", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Total", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("€0.00").first()).toBeVisible();
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");

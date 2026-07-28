@@ -26,7 +26,9 @@ export function computeInvoiceTotals(
 ): InvoiceTotals {
   const payable = items.filter((item) => !item.refunded).map(lineAmountCents);
   const refunded = items.filter((item) => item.refunded).map(lineAmountCents);
-  const subtotalCents = payable.reduce((total, cents) => total + cents);
+  // Seed both reductions: with zero billable lines (empty list, or every line
+  // refunded) an unseeded reduce throws "Reduce of empty array with no initial value".
+  const subtotalCents = payable.reduce((total, cents) => total + cents, 0);
   const refundedCents = refunded.reduce((total, cents) => total + cents, 0);
   const taxCents = Math.round((subtotalCents * taxRateBps) / 10_000);
   return { subtotalCents, refundedCents, taxCents, totalCents: subtotalCents + taxCents };
