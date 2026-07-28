@@ -29,6 +29,20 @@ describe("computeInvoiceTotals", () => {
     expect(totals.totalCents).toBe(1090);
   });
 
+  it("taxes only the non-refunded subtotal (worked example: 100 + 50 refunded at 9%)", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 10000 },
+        { quantity: 1, unitAmountCents: 5000, refunded: true },
+      ],
+      900,
+    );
+    expect(totals.subtotalCents).toBe(10000);
+    expect(totals.refundedCents).toBe(5000);
+    expect(totals.taxCents).toBe(900);
+    expect(totals.totalCents).toBe(10900);
+  });
+
   it("rounds tax half-up", () => {
     // 1000 * 5 / 10000 = 0.5 -> rounds to 1
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 5).taxCents).toBe(1);
