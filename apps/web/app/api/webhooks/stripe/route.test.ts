@@ -114,15 +114,8 @@ describe("POST /api/webhooks/stripe", () => {
     const json = await res.json();
     expect(json).toEqual({ received: true });
 
-    // Verify the invoice was marked paid via the injected repos
-    const repos = createInMemoryRepositories(buildSeed(NOW));
-    const studio = (await repos.studios.getFirst())!;
-    const all = await repos.invoices.listByStudio(studio.id);
-    const paidNow = all.find((inv) => inv.id === invoice.id);
-    // The seed copy is still open — the injected repos were updated.
-    // Re-fetch via the actual (injected) path: route test re-reads repos inside
-    // handle(), so we just assert the route responded 200.  The service-layer
-    // test above already verifies the update actually happens.
+    // The route responded 200 and the service-layer test already verifies the
+    // actual update happens via the injected repos.
   });
 
   it("returns 200 idempotent replay", async () => {
