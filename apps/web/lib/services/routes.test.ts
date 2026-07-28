@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as icalTokenGet } from "@/app/api/ical/[token]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +45,38 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/ical/[token] returns 200 with text/calendar for a valid token", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    __setTestRepositories(repos);
+    const studio = (await repos.studios.getFirst())!;
+    const members = await repos.members.listByStudio(studio.id);
+    const member = members[0];
+    const req = new NextRequest(`http://localhost/api/ical/${member.calendarToken}`);
+    const res = await icalTokenGet(req, { params: Promise.resolve({ token: member.calendarToken }) });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/calendar; charset=utf-8");
+    const body = await res.text();
+    expect(body).toContain("BEGIN:VCALENDAR");
+    expect(body).toContain("END:VCALENDAR");
+  });
+
+  it("GET /api/ical/[token] returns 404 for an unknown token", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    __setTestRepositories(repos);
+    const req = new NextRequest("http://localhost/api/ical/nonexistent");
+    const res = await icalTokenGet(req, {
+      params: Promise.resolve({ token: "nonexistent" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /api/ical/[token] returns 404 for an empty token", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    __setTestRepositories(repos);
+    const req = new NextRequest("http://localhost/api/ical/");
+    const res = await icalTokenGet(req, { params: Promise.resolve({ token: "" }) });
+    expect(res.status).toBe(404);
   });
 });

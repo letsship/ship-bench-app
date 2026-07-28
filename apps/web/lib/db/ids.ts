@@ -5,3 +5,13 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Opaque URL-safe token used for per-member calendar subscriptions. 32 random
+// bytes → 64 hex chars — unguessable and fits in a URL with no encoding.
+export function newCalendarToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
