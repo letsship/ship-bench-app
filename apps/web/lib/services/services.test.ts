@@ -8,6 +8,7 @@ import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
@@ -294,6 +295,23 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("reads a fully-refunded invoice detail without crashing (regression)", async () => {
+    // The seeded "Pottery intensive" invoice for Femke has one line item that
+    // is marked refunded, so computeInvoiceTotals must handle zero billable
+    // line items without throwing.
+    const invoices = await repos.invoices.listByStudio(studioId);
+    const refunded = invoices.find((inv) => inv.status === "refunded");
+    expect(refunded).toBeDefined();
+    const detail = await getInvoiceDetail(repos, refunded!.id);
+    const totals = computeInvoiceTotals(detail.lineItems, detail.invoice.taxRateBps);
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+    expect(totals.refundedCents).toBe(9000);
+    expect(detail.lineItems.length).toBe(1);
+    expect(detail.lineItems[0].refunded).toBe(true);
   });
 });
 
