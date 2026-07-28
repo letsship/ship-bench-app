@@ -5,7 +5,6 @@ import { buildSeed } from "@/lib/db/seed-data";
 import { createPackage, listPackages, refundPackage, spendCreditForMember } from "./packages";
 
 const NOW = new Date();
-const ISO = NOW.toISOString();
 
 describe("packages service", () => {
   let repos: Repositories;
@@ -45,8 +44,8 @@ describe("packages service", () => {
     });
 
     it("returns packs in newest-first order", async () => {
-      const pack1 = await createPackage(repos, studioId, { memberId, credits: 5 });
-      const pack2 = await createPackage(repos, studioId, { memberId, credits: 10 });
+      await createPackage(repos, studioId, { memberId, credits: 5 });
+      await createPackage(repos, studioId, { memberId, credits: 10 });
       const packs = await listPackages(repos, memberId);
       expect(packs.length).toBe(2);
       // Newest first: pack2 should come before pack1
@@ -88,7 +87,7 @@ describe("packages service", () => {
 
     it("spends oldest pack first", async () => {
       const pack1 = await createPackage(repos, studioId, { memberId, credits: 5 });
-      const pack2 = await createPackage(repos, studioId, { memberId, credits: 10 });
+      const _pack2 = await createPackage(repos, studioId, { memberId, credits: 10 });
       const updated = await spendCreditForMember(repos, memberId);
       expect(updated!.id).toBe(pack1.id);
     });
@@ -106,7 +105,7 @@ describe("packages service", () => {
     });
 
     it("returns null when all packs are exhausted", async () => {
-      const created = await createPackage(repos, studioId, { memberId, credits: 1 });
+      await createPackage(repos, studioId, { memberId, credits: 1 });
       await spendCreditForMember(repos, memberId); // spends the only credit
       const result = await spendCreditForMember(repos, memberId);
       expect(result).toBeNull();
