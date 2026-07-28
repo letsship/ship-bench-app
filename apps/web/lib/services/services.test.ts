@@ -114,12 +114,12 @@ describe("members service", () => {
       email: "new@example.com",
       status: "active",
     });
-    const updated = await updateMember(repos, created.id, { status: "paused" });
+    const updated = await updateMember(repos, studioId, created.id, { status: "paused" });
     expect(updated.status).toBe("paused");
   });
 
   it("getMember 404s for an unknown id", async () => {
-    await expect(getMember(repos, "nope")).rejects.toMatchObject({ status: 404 });
+    await expect(getMember(repos, studioId, "nope")).rejects.toMatchObject({ status: 404 });
   });
 });
 
@@ -210,7 +210,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
     expect(result.refundEligible).toBe(true);
   });
 
@@ -223,7 +223,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
     expect(result.refundEligible).toBe(false);
   });
 
@@ -241,7 +241,7 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const result = await cancelBooking(repos, provider, "s1", "b1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
@@ -292,8 +292,136 @@ describe("invoices service", () => {
   it("lists invoices with member names and reads a detail", async () => {
     const list = await listInvoices(repos, studioId);
     expect(list.length).toBeGreaterThan(0);
-    const detail = await getInvoiceDetail(repos, list[0].id);
+    const detail = await getInvoiceDetail(repos, studioId, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("cross-tenant isolation (IDOR)", () => {
+  const FOREIGN = "s2";
+
+  it("rejects getInvoiceDetail for a foreign-studio invoice", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({ members: [member("m-foreign", { studioId: FOREIGN })] }),
+    );
+    const invoiceId = "inv-foreign";
+    await repos.invoices.insert({
+      id: invoiceId,
+      studioId: FOREIGN,
+      memberId: "m-foreign",
+      number: "INV-F-001",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: 0,
+      subtotalCents: 1000,
+      taxCents: 0,
+      totalCents: 1000,
+      issuedAt: ISO,
+      dueAt: null,
+      paidAt: null,
+      createdAt: ISO,
+    });
+    await expect(getInvoiceDetail(repos, "s1", invoiceId)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+  });
+
+  it("getInvoiceDetail succeeds for own-studio invoice", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({ members: [member("m1")], invoices: [] }),
+    );
+    const invoiceId = "inv-own";
+    await repos.invoices.insert({
+      id: invoiceId,
+      studioId: "s1",
+      memberId: "m1",
+      number: "INV-O-001",
+      status: "open",
+      currency: "EUR",
+      taxRateBps: 0,
+      subtotalCents: 1000,
+      taxCents: 0,
+      totalCents: 1000,
+      issuedAt: ISO,
+      dueAt: null,
+      paidAt: null,
+      createdAt: ISO,
+    });
+    const detail = await getInvoiceDetail(repos, "s1", invoiceId);
+    expect(detail.invoice.id).toBe(invoiceId);
+  });
+
+  it("rejects getMember for a foreign-studio member", async () => {
+    const repos = createInMemoryRepositories(baseSeed());
+    const memberId = "m-foreign";
+    await repos.members.insert({
+      id: memberId,
+      studioId: FOREIGN,
+      name: "Foreign Member",
+      email: "foreign@e.co",
+      phone: null,
+      status: "active",
+      notificationsOptedOut: false,
+      createdAt: ISO,
+    });
+    await expect(getMember(repos, "s1", memberId)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+  });
+
+  it("getMember succeeds for own-studio member", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({ members: [member("m1")] }),
+    );
+    const detail = await getMember(repos, "s1", "m1");
+    expect(detail.id).toBe("m1");
+  });
+
+  it("rejects cancelBooking for a foreign-studio booking (no cancel, no promotion)", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct-foreign", { studioId: FOREIGN })],
+        sessions: [
+          session("cs-foreign", {
+            studioId: FOREIGN,
+            classTypeId: "ct-foreign",
+          }),
+        ],
+        members: [member("m-foreign", { studioId: FOREIGN })],
+        bookings: [booking("b-foreign", "m-foreign", { sessionId: "cs-foreign" })],
+      }),
+    );
+    const provider = createFakeProvider();
+    await expect(
+      cancelBooking(repos, provider, "s1", "b-foreign"),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    // Verify the booking was not modified
+    const b = await repos.bookings.getById("b-foreign");
+    expect(b?.status).toBe("booked");
+    expect(b?.cancelledAt).toBeNull();
+    // Verify no notifications were sent
+    expect(provider.sent).toHaveLength(0);
+  });
+
+  it("cancelBooking succeeds for own-studio booking", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
+    expect(result.refundEligible).toBe(true);
+    const b = await repos.bookings.getById("b1");
+    expect(b?.status).toBe("cancelled");
+    expect(b?.cancelledAt).not.toBeNull();
   });
 });
 
