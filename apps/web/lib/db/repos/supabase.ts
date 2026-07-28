@@ -191,6 +191,8 @@ export function createSupabaseRepositories(): Repositories {
           toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
         );
       },
+      update: (id, patch) =>
+        updateReturning<InvoiceLineItem>("invoice_line_items", "id", id, patch),
     },
     outbox: {
       insert: (row) => insertReturning("notification_outbox", row),

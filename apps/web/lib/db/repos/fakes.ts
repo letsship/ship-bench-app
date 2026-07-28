@@ -198,6 +198,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         for (const item of items) store.invoiceLineItems.push(clone(item));
         return cloneAll(items);
       },
+      async update(id, patch) {
+        return patched(store.invoiceLineItems, (row) => row.id === id, patch, "Invoice line item");
+      },
     },
     outbox: {
       async insert(row) {

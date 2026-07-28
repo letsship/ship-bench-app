@@ -122,6 +122,31 @@ export async function createInvoice(
   return getInvoiceDetail(repos, invoiceId);
 }
 
+// Mark a single line item as refunded and rewrite the stored invoice totals.
+// Refunds are one-way; computeInvoiceTotals is safe for an empty billable set.
+export async function refundInvoiceLineItem(
+  repos: Repositories,
+  invoiceId: string,
+  lineItemId: string,
+): Promise<InvoiceDetail> {
+  const invoice = await repos.invoices.getById(invoiceId);
+  if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
+  const lineItems = await repos.invoiceLineItems.listByInvoice(invoiceId);
+  const target = lineItems.find((item) => item.id === lineItemId);
+  if (!target) throw new HttpError(404, "not_found", "Invoice line item not found");
+  if (target.refunded) throw new HttpError(409, "already_refunded", "Line item already refunded");
+
+  await repos.invoiceLineItems.update(lineItemId, { refunded: true });
+  const updated = await repos.invoiceLineItems.listByInvoice(invoiceId);
+  const totals = computeInvoiceTotals(updated, invoice.taxRateBps);
+  await repos.invoices.update(invoiceId, {
+    subtotalCents: totals.subtotalCents,
+    taxCents: totals.taxCents,
+    totalCents: totals.totalCents,
+  });
+  return getInvoiceDetail(repos, invoiceId);
+}
+
 export async function updateInvoiceStatus(
   repos: Repositories,
   id: string,

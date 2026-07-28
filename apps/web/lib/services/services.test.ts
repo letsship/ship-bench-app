@@ -8,7 +8,13 @@ import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
-import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
+import {
+  createInvoice,
+  getInvoiceDetail,
+  listInvoices,
+  refundInvoiceLineItem,
+  updateInvoiceStatus,
+} from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
@@ -286,6 +292,42 @@ describe("invoices service", () => {
     await expect(updateInvoiceStatus(repos, detail.invoice.id, "open")).rejects.toMatchObject({
       status: 409,
       code: "invalid_transition",
+    });
+  });
+
+  it("refunding the sole line item drops the invoice totals to zero", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
+    });
+    const updated = await refundInvoiceLineItem(repos, detail.invoice.id, detail.lineItems[0].id);
+    expect(updated.lineItems[0].refunded).toBe(true);
+    expect(updated.invoice.subtotalCents).toBe(0);
+    expect(updated.invoice.taxCents).toBe(0);
+    expect(updated.invoice.totalCents).toBe(0);
+  });
+
+  it("refunding one of two items keeps the non-refunded subtotal", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [
+        { description: "Pass", quantity: 1, unitAmountCents: 1000 },
+        { description: "Workshop", quantity: 1, unitAmountCents: 2000 },
+      ],
+    });
+    const refunded = detail.lineItems.find((line) => line.description === "Workshop");
+    const updated = await refundInvoiceLineItem(repos, detail.invoice.id, refunded!.id);
+    expect(updated.invoice.subtotalCents).toBe(1000);
+    expect(updated.invoice.taxCents).toBe(90);
+    expect(updated.invoice.totalCents).toBe(1090);
+  });
+
+  it("refunding a line item on an unknown invoice is a 404", async () => {
+    await expect(refundInvoiceLineItem(repos, "nope", "nope")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
     });
   });
 
