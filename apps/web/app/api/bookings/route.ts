@@ -6,6 +6,7 @@ import { createBooking } from "@/lib/services/bookings";
 import { resolveStudio } from "@/lib/services/context";
 import { createNotificationProvider } from "@/lib/notifications/provider";
 import { createBookingSchema } from "@/lib/validation";
+import { resolveTracker } from "@/lib/analytics/tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,6 @@ export async function POST(request: Request): Promise<Response> {
     await requireSession();
     const { repos } = await resolveStudio();
     const input = createBookingSchema.parse(await request.json());
-    return created(await createBooking(repos, createNotificationProvider(), input));
+    return created(await createBooking(repos, createNotificationProvider(), resolveTracker(), input));
   });
 }

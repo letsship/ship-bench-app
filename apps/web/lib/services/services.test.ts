@@ -4,6 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
+import { createFakeTracker } from "@/lib/analytics/fake-tracker";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
@@ -167,9 +168,14 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, provider, tracker, { sessionId: "cs1", memberId: "m1" });
     expect(result.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind)).toEqual(["booking_confirmation"]);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("booking_created");
+    expect(tracker.captured[0].distinctId).toBe("m1");
+    expect(tracker.captured[0].properties?.session_id).toBe("cs1");
   });
 
   it("waitlists when full (and sends no confirmation)", async () => {
@@ -182,9 +188,15 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    const tracker = createFakeTracker();
+    const result = await createBooking(repos, provider, tracker, { sessionId: "cs1", memberId: "m2" });
     expect(result.status).toBe("waitlisted");
     expect(provider.sent).toHaveLength(0);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("waitlist_joined");
+    expect(tracker.captured[0].distinctId).toBe("m2");
+    expect(tracker.captured[0].properties?.session_id).toBe("cs1");
+    expect(tracker.captured[0].event).not.toBe("booking_created");
   });
 
   it("rejects a double booking with 409", async () => {
@@ -197,7 +209,7 @@ describe("bookings service", () => {
       }),
     );
     await expect(
-      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+      createBooking(repos, createFakeProvider(), createFakeTracker(), { sessionId: "cs1", memberId: "m1" }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
   });
 
@@ -210,8 +222,14 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const provider = createFakeProvider();
+    const tracker = createFakeTracker();
+    const result = await cancelBooking(repos, provider, tracker, "b1");
     expect(result.refundEligible).toBe(true);
+    expect(tracker.captured).toHaveLength(1);
+    expect(tracker.captured[0].event).toBe("booking_cancelled");
+    expect(tracker.captured[0].distinctId).toBe("m1");
+    expect(tracker.captured[0].properties?.session_id).toBe("cs1");
   });
 
   it("marks a last-minute cancellation refund-ineligible", async () => {
@@ -223,7 +241,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), createFakeTracker(), "b1");
     expect(result.refundEligible).toBe(false);
   });
 
@@ -241,7 +259,8 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const tracker = createFakeTracker();
+    const result = await cancelBooking(repos, provider, tracker, "b1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
