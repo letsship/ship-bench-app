@@ -18,6 +18,7 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { drawCreditForBooking } from "./packages";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -83,6 +84,10 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  // Members who own class packs must draw from one: the oldest spendable pack
+  // (null when the member owns no packs, 402 pack_exhausted when none remain).
+  const packId = await drawCreditForBooking(repos, member.id);
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +97,13 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  if (packId) {
+    const pack = await repos.classPacks.getById(packId);
+    if (pack) {
+      await repos.classPacks.update(packId, { creditsRemaining: pack.creditsRemaining - 1 });
+    }
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
