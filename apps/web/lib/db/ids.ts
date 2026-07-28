@@ -5,3 +5,9 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Long, unguessable URL-safe secret for a member's private calendar feed
+// (/api/ical/[token]). Two dash-stripped UUIDs ≈ 256 bits of entropy.
+export function newCalendarToken(): string {
+  return (crypto.randomUUID() + crypto.randomUUID()).replaceAll("-", "");
+}

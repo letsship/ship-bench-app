@@ -1,7 +1,7 @@
 import { newId } from "@/lib/db/ids";
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 import type { Booking, ClassSession, ClassType } from "@/lib/db/types";
-import { type Occupancy, computeOccupancy } from "@/lib/domain/capacity";
+import { SEAT_TAKING_STATUSES, type Occupancy, computeOccupancy } from "@/lib/domain/capacity";
 import { HttpError } from "@/lib/http";
 import type { CreateClassTypeInput, CreateSessionInput } from "@/lib/validation";
 
@@ -82,6 +82,29 @@ export async function listSessions(
   return sessions.map((session) =>
     toView(session, typeById.get(session.classTypeId), bySession.get(session.id) ?? []),
   );
+}
+
+// Upcoming sessions the given member holds a confirmed (seat-taking) booking
+// in — the source for the member's private calendar feed. Past sessions drop
+// out via the `from` range; waitlisted/cancelled bookings hold no seat.
+export async function listMemberUpcomingSessions(
+  repos: Repositories,
+  studioId: string,
+  memberId: string,
+  from: string,
+): Promise<SessionView[]> {
+  const sessions = await listSessions(repos, studioId, { from });
+  const bookings = await repos.bookings.listBySessionIds(sessions.map((s) => s.id));
+  const held = new Set(
+    bookings
+      .filter(
+        (booking) =>
+          booking.memberId === memberId &&
+          (SEAT_TAKING_STATUSES as readonly string[]).includes(booking.status),
+      )
+      .map((booking) => booking.sessionId),
+  );
+  return sessions.filter((session) => held.has(session.id));
 }
 
 export async function getSessionView(repos: Repositories, id: string): Promise<SessionView> {
