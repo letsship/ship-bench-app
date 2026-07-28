@@ -122,6 +122,32 @@ export async function createInvoice(
   return getInvoiceDetail(repos, invoiceId);
 }
 
+// Mark a single line item as refunded and recompute the stored invoice totals.
+// computeInvoiceTotals is safe for zero billable items (all refunded or none),
+// so a fully-refunded invoice settles at zero subtotal/tax/total.
+export async function refundLineItem(
+  repos: Repositories,
+  invoiceId: string,
+  lineItemId: string,
+): Promise<InvoiceDetail> {
+  const invoice = await repos.invoices.getById(invoiceId);
+  if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
+  const lineItems = await repos.invoiceLineItems.listByInvoice(invoiceId);
+  if (!lineItems.some((item) => item.id === lineItemId)) {
+    throw new HttpError(404, "not_found", "Invoice line item not found");
+  }
+
+  await repos.invoiceLineItems.updateLineItem(lineItemId, { refunded: true });
+  const updatedItems = await repos.invoiceLineItems.listByInvoice(invoiceId);
+  const totals = computeInvoiceTotals(updatedItems, invoice.taxRateBps);
+  await repos.invoices.update(invoiceId, {
+    subtotalCents: totals.subtotalCents,
+    taxCents: totals.taxCents,
+    totalCents: totals.totalCents,
+  });
+  return getInvoiceDetail(repos, invoiceId);
+}
+
 export async function updateInvoiceStatus(
   repos: Repositories,
   id: string,
