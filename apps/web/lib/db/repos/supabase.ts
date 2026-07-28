@@ -12,13 +12,14 @@ import type {
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
+import { DuplicateActiveBookingError } from "./errors";
 
 // The production repository implementation over supabase-js (service role).
 // Reads come back snake_case and are mapped to camelCase entities; writes map
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -145,7 +146,19 @@ export function createSupabaseRepositories(): Repositories {
           db.from("bookings").select("*").eq("id", id).maybeSingle(),
           "bookings.getById",
         ),
-      insert: (booking) => insertReturning("bookings", booking),
+      insert: async (booking) => {
+        try {
+          return await insertReturning("bookings", booking);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            (error as { code?: string }).code === "23505"
+          ) {
+            throw new DuplicateActiveBookingError(booking.sessionId, booking.memberId);
+          }
+          throw error;
+        }
+      },
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {

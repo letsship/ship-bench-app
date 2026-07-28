@@ -3,6 +3,7 @@ import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes"
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { DuplicateActiveBookingError } from "@/lib/db/repos/errors";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -199,6 +200,97 @@ describe("bookings service", () => {
     await expect(
       createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("rejects a waitlisted member trying to book the same session again (sequential repeat)", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    // m2 books the full session and goes to the waitlist
+    await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" });
+    // a sequential repeat should be rejected
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("rejects a concurrent double click with exactly one waitlist row created", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    // Fire two concurrent createBooking calls for m2 on the full session
+    const results = await Promise.allSettled([
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+    ]);
+    // Exactly one should succeed (waitlisted) and one should fail with 409
+    const fulfilled = results.filter(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof createBooking>>> =>
+        r.status === "fulfilled",
+    );
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(fulfilled[0].value.status).toBe("waitlisted");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({ status: 409, code: "booking_already_booked" });
+    // The member should have exactly one active booking for that session
+    const bookings = await repos.bookings.listBySession("cs1");
+    const m2Active = bookings.filter(
+      (b) => b.memberId === "m2" && b.status !== "cancelled",
+    );
+    expect(m2Active).toHaveLength(1);
+    expect(m2Active[0].status).toBe("waitlisted");
+  });
+
+  it("allows a rebooking after cancellation", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    // Cancel the booking
+    await cancelBooking(repos, createFakeProvider(), "b1");
+    // The same member should be able to rebook the same session
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+  });
+
+  it("DuplicateActiveBookingError is thrown by the in-memory repo for an active booking collision", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    await expect(
+      repos.bookings.insert({
+        id: "b-dup",
+        sessionId: "cs1",
+        memberId: "m1",
+        status: "booked",
+        bookedAt: ISO,
+        cancelledAt: null,
+      }),
+    ).rejects.toThrow(DuplicateActiveBookingError);
   });
 
   it("marks a far-off cancellation refund-eligible", async () => {
