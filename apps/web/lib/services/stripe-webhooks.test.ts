@@ -117,4 +117,22 @@ describe("processStripeWebhook", () => {
     });
     expect((await repos.invoices.getById(invoice.id))?.status).toBe("open");
   });
+
+  it("acknowledges an event whose object carries no metadata", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const payload = JSON.stringify({
+      id: "evt_3",
+      type: "balance.available",
+      data: { object: { available: [], pending: [] } },
+    });
+    const signature = signStripePayload(SECRET, payload, NOW_MS / 1000);
+    await expect(
+      processStripeWebhook(repos, {
+        payload,
+        signatureHeader: signature,
+        secret: SECRET,
+        nowMs: NOW_MS,
+      }),
+    ).resolves.toEqual({ received: true });
+  });
 });

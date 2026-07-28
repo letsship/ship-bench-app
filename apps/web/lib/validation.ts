@@ -71,9 +71,11 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
-// Minimal shape of a verified Stripe webhook event. Permissive (passthrough,
-// optional metadata) so every event type parses — the service branches on
-// `type` and ignores anything that is not an invoice payment.
+// Minimal shape of a verified Stripe webhook event. Permissive — `data`,
+// `object`, and `metadata` are all optional because many event types (e.g.
+// `balance.available`) deliver no metadata at all, and every verified event
+// must still parse so it can be acknowledged. The service branches on `type`
+// and ignores anything that is not an invoice payment.
 export const stripeEventSchema = z
   .object({
     id: z.string().min(1),
@@ -81,10 +83,17 @@ export const stripeEventSchema = z
     data: z
       .object({
         object: z
-          .object({ metadata: z.object({ invoice_id: z.string().min(1).optional() }).passthrough() })
-          .passthrough(),
+          .object({
+            metadata: z
+              .object({ invoice_id: z.string().min(1).optional() })
+              .passthrough()
+              .optional(),
+          })
+          .passthrough()
+          .optional(),
       })
-      .passthrough(),
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 
