@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
@@ -62,6 +63,10 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
       return apiError(error.status, error.code, error.message, error.details);
     }
     console.error("Unhandled API error", error);
+    // Only genuinely unexpected failures reach this point: Zod validation
+    // errors (400) and deliberate HttpErrors (404/409/402/...) returned above
+    // are normal outcomes and must not be reported to Sentry.
+    Sentry.captureException(error);
     return apiError(500, "internal_error", "Something went wrong");
   }
 }
