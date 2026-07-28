@@ -86,6 +86,26 @@ describe("in-memory repositories", () => {
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
   });
 
+  it("findByCalendarToken returns the matching member", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const member = members[0];
+    const found = await repos.members.findByCalendarToken(member.calendarToken);
+    expect(found?.id).toBe(member.id);
+  });
+
+  it("findByCalendarToken returns null for an unknown token", async () => {
+    const found = await repos.members.findByCalendarToken("no-such-token");
+    expect(found).toBeNull();
+  });
+
+  it("listByMember returns only that member's bookings", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const member = members[0];
+    const bookings = await repos.bookings.listByMember(member.id);
+    expect(bookings.length).toBeGreaterThan(0);
+    expect(bookings.every((b) => b.memberId === member.id)).toBe(true);
+  });
+
   it("empty repositories return nulls / empty lists", async () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
