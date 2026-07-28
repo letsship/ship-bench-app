@@ -9,6 +9,7 @@ import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
@@ -270,6 +271,17 @@ describe("invoices service", () => {
     expect(detail.invoice.subtotalCents).toBe(2000);
     expect(detail.invoice.taxCents).toBe(180);
     expect(detail.invoice.totalCents).toBe(2180);
+    // The stored totals are exactly what the canonical domain function
+    // produces for this input — i.e. the create path does not re-derive the
+    // subtotal/tax math, and there is no behaviour change for invoices
+    // without refunded lines.
+    const expected = computeInvoiceTotals(
+      [{ quantity: 2, unitAmountCents: 1000 }],
+      900,
+    );
+    expect(detail.invoice.subtotalCents).toBe(expected.subtotalCents);
+    expect(detail.invoice.taxCents).toBe(expected.taxCents);
+    expect(detail.invoice.totalCents).toBe(expected.totalCents);
     // buildSeed already has one pending outbox row, so assert our specific
     // invoice notification went out rather than an exact array.
     expect(provider.sent.some((m) => m.subject === `Invoice ${detail.invoice.number}`)).toBe(true);
