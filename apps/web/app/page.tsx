@@ -1,4 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: `${SITE_NAME} — studio class booking`,
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
+};
 
 const FEATURES = [
   {
