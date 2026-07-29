@@ -73,3 +73,19 @@ export function invoiceIssued(
     data: { number: invoice.number, totalCents: invoice.totalCents },
   };
 }
+
+// Day-before reminder. `bookingId` is persisted in `data` so the reminder job
+// can detect an already-queued reminder for a booking (idempotency).
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} is tomorrow`,
+    body: `Hi ${recipient.name}, this is a quick reminder that ${session.title} with ${session.instructor} starts at ${session.startsAt}. See you soon!`,
+    data: { bookingId, title: session.title, startsAt: session.startsAt },
+  };
+}
