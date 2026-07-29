@@ -94,6 +94,43 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   ...over,
 });
 
+// Counts every method call on the members + classSessions repos, so tests can
+// assert how many reads a service issues without assuming which concrete
+// methods the join uses.
+type ReadCounts = Record<string, number>;
+
+const totalReads = (counts: ReadCounts): number =>
+  Object.values(counts).reduce((sum, n) => sum + n, 0);
+
+const countCalls = <T extends object>(repo: T, counts: ReadCounts): T =>
+  new Proxy(repo, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== "function") return value;
+      const fn = value as (...args: unknown[]) => unknown;
+      const key = String(prop);
+      return (...args: unknown[]) => {
+        counts[key] = (counts[key] ?? 0) + 1;
+        return fn.apply(target, args);
+      };
+    },
+  });
+
+function withCountedReads(repos: Repositories): {
+  repos: Repositories;
+  reads: { members: ReadCounts; classSessions: ReadCounts };
+} {
+  const reads = { members: {} as ReadCounts, classSessions: {} as ReadCounts };
+  return {
+    repos: {
+      ...repos,
+      members: countCalls(repos.members, reads.members),
+      classSessions: countCalls(repos.classSessions, reads.classSessions),
+    },
+    reads,
+  };
+}
+
 describe("members service", () => {
   let repos: Repositories;
   let studioId: string;
@@ -323,5 +360,56 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("keeps member + session reads fixed as the booking list grows", async () => {
+    // One session + one member + one booking per i, with strictly increasing
+    // startsAt so the sorted output order is deterministic.
+    const seedFor = (n: number): SeedData =>
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: Array.from({ length: n }, (_, i) =>
+          session(`cs${i}`, {
+            startsAt: new Date(NOW.getTime() + (i + 1) * 3_600_000).toISOString(),
+            endsAt: new Date(NOW.getTime() + (i + 2) * 3_600_000).toISOString(),
+          }),
+        ),
+        members: Array.from({ length: n }, (_, i) => member(`m${i}`)),
+        bookings: Array.from({ length: n }, (_, i) =>
+          booking(`b${i}`, `m${i}`, { sessionId: `cs${i}` }),
+        ),
+      });
+    const run = async (n: number) => {
+      const counted = withCountedReads(createInMemoryRepositories(seedFor(n)));
+      return { rows: await listBookingRows(counted.repos, "s1"), reads: counted.reads };
+    };
+
+    const small = await run(3);
+    const large = await run(300);
+
+    // A small, fixed number of reads: identical for 3 and for 300 bookings,
+    // and never one getById per booking.
+    expect(totalReads(large.reads.members)).toBe(totalReads(small.reads.members));
+    expect(totalReads(large.reads.classSessions)).toBe(totalReads(small.reads.classSessions));
+    expect(totalReads(large.reads.members)).toBeLessThanOrEqual(2);
+    expect(totalReads(large.reads.classSessions)).toBeLessThanOrEqual(2);
+    expect(large.reads.members.getById ?? 0).toBe(0);
+    expect(large.reads.classSessions.getById ?? 0).toBe(0);
+
+    // Output contract unchanged: same rows, same fields, ascending startsAt.
+    expect(small.rows).toHaveLength(3);
+    expect(large.rows).toHaveLength(300);
+    expect(large.rows.slice(0, small.rows.length)).toEqual(small.rows);
+    expect(large.rows[0]).toEqual({
+      id: "b0",
+      memberName: "m0",
+      className: "Yoga",
+      classColor: "#111111",
+      instructor: "I",
+      startsAt: new Date(NOW.getTime() + 3_600_000).toISOString(),
+      status: "booked",
+    });
+    const startsAt = large.rows.map((row) => row.startsAt);
+    expect(startsAt).toEqual([...startsAt].sort((a, b) => a.localeCompare(b)));
   });
 });
