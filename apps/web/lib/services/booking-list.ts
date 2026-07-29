@@ -1,4 +1,5 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import type { BookingExportRow } from "@/lib/domain/csv";
 
 export interface BookingRow {
   id: string;
@@ -40,6 +41,44 @@ export async function listBookingRows(
         startsAt: session?.startsAt ?? "",
         status: booking.status,
       };
+    })
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Export-oriented variant that also carries the member email and applies an
+// INCLUSIVE [from, to] date-range filter (epoch-millis comparison) so the
+// half-open SessionRange in the repo does not clip the 'to' bound.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: { from?: string; to?: string } = {},
+): Promise<BookingExportRow[]> {
+  const sessions = await repos.classSessions.listByStudio(studioId);
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const members = await repos.members.listByStudio(studioId);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
+
+  return bookings
+    .map((booking) => {
+      const session = sessionById.get(booking.sessionId);
+      const classType = session ? typeById.get(session.classTypeId) : undefined;
+      const member = memberById.get(booking.memberId);
+      return {
+        startsAt: session?.startsAt ?? "",
+        className: classType?.name ?? "Class",
+        memberName: member?.name ?? "—",
+        email: member?.email ?? "",
+        status: booking.status,
+      };
+    })
+    .filter((row) => {
+      const startsMs = Date.parse(row.startsAt);
+      if (range.from && startsMs < Date.parse(range.from)) return false;
+      if (range.to && startsMs > Date.parse(range.to)) return false;
+      return true;
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
