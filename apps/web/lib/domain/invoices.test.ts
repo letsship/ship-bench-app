@@ -44,6 +44,28 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("totals zero and sums refunds when every line is refunded", () => {
+    // Regression: the billable set is empty here — totalling it must not throw
+    // ("Reduce of empty array with no initial value").
+    expect(
+      computeInvoiceTotals([{ quantity: 1, unitAmountCents: 9000, refunded: true }], 2100),
+    ).toEqual({
+      subtotalCents: 0,
+      refundedCents: 9000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("is zero across the board for no line items at all", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
 });
 
 describe("formatInvoiceNumber", () => {
