@@ -105,3 +105,13 @@ export interface NotificationOutboxRow {
   providerMessageId: string | null;
   error: string | null;
 }
+
+// A Stripe webhook event we have already processed (for idempotency). The id is
+// the Stripe event id (e.g. `evt_...`) — a text primary key, NOT a UUID, so it
+// must never be run through newId(). Recording an event id before acting on it
+// makes a redelivered event a no-op.
+export interface WebhookEvent {
+  id: string;
+  type: string;
+  processedAt: string;
+}
