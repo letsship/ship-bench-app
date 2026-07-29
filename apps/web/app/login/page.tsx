@@ -12,8 +12,8 @@ async function signIn(formData: FormData): Promise<void> {
   redirect(next.startsWith("/") ? next : "/dashboard");
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: { next?: string } }) {
-  const { next } = searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const { next } = await searchParams;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
