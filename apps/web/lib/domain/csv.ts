@@ -59,3 +59,21 @@ export function invoicesToCsv(invoices: readonly InvoiceRow[]): string {
     { header: "Currency", value: (invoice) => invoice.currency },
   ]);
 }
+
+export interface BookingExportRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+export function bookingsToCsv(rows: readonly BookingExportRow[]): string {
+  return toCsv(rows, [
+    { header: "Starts", value: (row) => row.startsAt },
+    { header: "Class", value: (row) => row.className },
+    { header: "Member", value: (row) => row.memberName },
+    { header: "Email", value: (row) => row.email },
+    { header: "Status", value: (row) => row.status },
+  ]);
+}
