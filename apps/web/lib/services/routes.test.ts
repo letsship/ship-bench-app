@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
+import { GET as icalTokenGet } from "@/app/api/ical/[token]/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
 import { __setTestRepositories } from "@/lib/db/repos";
@@ -44,5 +45,40 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/ical/[token] returns a text/calendar feed for the token-holder's upcoming booked sessions", async () => {
+    // Re-seed around the real clock so the member actually has upcoming
+    // sessions relative to getMemberCalendar's default `now`.
+    __setTestRepositories(createInMemoryRepositories(buildSeed()));
+    // cal-tok-0001 is Amara Okafor's deterministic seed token.
+    const res = await icalTokenGet(new NextRequest("http://localhost/api/ical/cal-tok-0001"), {
+      params: Promise.resolve({ token: "cal-tok-0001" }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/calendar; charset=utf-8");
+    const body = await res.text();
+    expect(body).toContain("BEGIN:VCALENDAR");
+    expect(body).toContain("END:VCALENDAR");
+    // The feed is non-empty (the seed books Amara into upcoming sessions).
+    expect(body).toContain("BEGIN:VEVENT");
+    // The calendar name is scoped to the member, not the whole studio.
+    expect(body).toContain("Amara Okafor classes");
+  });
+
+  it("GET /api/ical/[token] 404s for an unknown token", async () => {
+    const res = await icalTokenGet(new NextRequest("http://localhost/api/ical/nope"), {
+      params: Promise.resolve({ token: "nope" }),
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("not_found");
+  });
+
+  it("GET /api/ical/[token] 404s for a whitespace token", async () => {
+    const res = await icalTokenGet(new NextRequest("http://localhost/api/ical/%20%20"), {
+      params: Promise.resolve({ token: "  " }),
+    });
+    expect(res.status).toBe(404);
   });
 });
