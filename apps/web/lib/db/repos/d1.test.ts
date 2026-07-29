@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { Miniflare } from "miniflare";
 import { buildSeed } from "../seed-data";
@@ -5,25 +7,6 @@ import { createD1Repositories } from "./d1";
 import type { Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
-const MIGRATION_STATEMENTS = [
-  "CREATE TABLE studios ( id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, slug TEXT NOT NULL, timezone TEXT NOT NULL DEFAULT 'UTC', created_at TEXT NOT NULL )",
-  "CREATE TABLE studio_settings ( studio_id TEXT PRIMARY KEY NOT NULL REFERENCES studios(id) ON DELETE CASCADE, currency TEXT NOT NULL DEFAULT 'EUR', tax_rate_bps INTEGER NOT NULL DEFAULT 0, cancellation_window_hours INTEGER NOT NULL DEFAULT 12, waitlist_enabled INTEGER NOT NULL DEFAULT 1, notify_booking_confirmations INTEGER NOT NULL DEFAULT 1, notify_cancellations INTEGER NOT NULL DEFAULT 1, notify_waitlist_promotions INTEGER NOT NULL DEFAULT 1, notify_invoices INTEGER NOT NULL DEFAULT 1 )",
-  "CREATE TABLE members ( id TEXT PRIMARY KEY NOT NULL, studio_id TEXT NOT NULL REFERENCES studios(id) ON DELETE CASCADE, name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT, status TEXT NOT NULL DEFAULT 'active', notifications_opted_out INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, UNIQUE (studio_id, email) )",
-  "CREATE INDEX idx_members_studio ON members (studio_id)",
-  "CREATE TABLE class_types ( id TEXT PRIMARY KEY NOT NULL, studio_id TEXT NOT NULL REFERENCES studios(id) ON DELETE CASCADE, name TEXT NOT NULL, description TEXT, color TEXT NOT NULL DEFAULT '#6b7280', default_capacity INTEGER NOT NULL DEFAULT 12, default_price_cents INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL )",
-  "CREATE TABLE class_sessions ( id TEXT PRIMARY KEY NOT NULL, studio_id TEXT NOT NULL REFERENCES studios(id) ON DELETE CASCADE, class_type_id TEXT NOT NULL REFERENCES class_types(id), instructor TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, capacity INTEGER NOT NULL, price_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'scheduled', created_at TEXT NOT NULL )",
-  "CREATE INDEX idx_class_sessions_studio ON class_sessions (studio_id)",
-  "CREATE INDEX idx_class_sessions_starts_at ON class_sessions (starts_at)",
-  "CREATE TABLE bookings ( id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL REFERENCES class_sessions(id) ON DELETE CASCADE, member_id TEXT NOT NULL REFERENCES members(id), status TEXT NOT NULL DEFAULT 'booked', booked_at TEXT NOT NULL, cancelled_at TEXT )",
-  "CREATE INDEX idx_bookings_session ON bookings (session_id)",
-  "CREATE INDEX idx_bookings_member ON bookings (member_id)",
-  "CREATE TABLE invoices ( id TEXT PRIMARY KEY NOT NULL, studio_id TEXT NOT NULL REFERENCES studios(id) ON DELETE CASCADE, member_id TEXT NOT NULL REFERENCES members(id), number TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', currency TEXT NOT NULL DEFAULT 'EUR', tax_rate_bps INTEGER NOT NULL DEFAULT 0, subtotal_cents INTEGER NOT NULL DEFAULT 0, tax_cents INTEGER NOT NULL DEFAULT 0, total_cents INTEGER NOT NULL DEFAULT 0, issued_at TEXT NOT NULL, due_at TEXT, paid_at TEXT, created_at TEXT NOT NULL, UNIQUE (studio_id, number) )",
-  "CREATE INDEX idx_invoices_member ON invoices (member_id)",
-  "CREATE TABLE invoice_line_items ( id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE, description TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1, unit_amount_cents INTEGER NOT NULL DEFAULT 0, amount_cents INTEGER NOT NULL DEFAULT 0, refunded INTEGER NOT NULL DEFAULT 0, booking_id TEXT REFERENCES bookings(id) )",
-  "CREATE INDEX idx_invoice_line_items_invoice ON invoice_line_items (invoice_id)",
-  "CREATE TABLE notification_outbox ( id TEXT PRIMARY KEY NOT NULL, member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL, sent_at TEXT, provider_message_id TEXT, error TEXT )",
-  "CREATE INDEX idx_notification_outbox_sent ON notification_outbox (sent_at)",
-];
 
 async function createTestDb(): Promise<D1Database> {
   const mf = new Miniflare({
@@ -32,8 +15,14 @@ async function createTestDb(): Promise<D1Database> {
     d1Databases: { DB: "test" },
   });
   const db = await mf.getD1Database("DB");
-  for (const stmt of MIGRATION_STATEMENTS) {
-    await db.exec(stmt);
+  const migrationPath = resolve(__dirname, "../../migrations/0001_init.sql");
+  const sql = readFileSync(migrationPath, "utf-8");
+  const statements = sql
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && !s.startsWith("--"));
+  for (const stmt of statements) {
+    await db.exec(stmt + ";");
   }
   return db;
 }
