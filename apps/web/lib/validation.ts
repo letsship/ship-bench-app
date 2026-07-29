@@ -77,3 +77,22 @@ export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+
+export const stripeEventSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  data: z.object({
+    object: z
+      .object({
+        metadata: z
+          .object({
+            invoice_id: z.string(),
+          })
+          .partial()
+          .optional(),
+      })
+      .passthrough(),
+  }),
+});
+
+export type StripeEvent = z.infer<typeof stripeEventSchema>;
