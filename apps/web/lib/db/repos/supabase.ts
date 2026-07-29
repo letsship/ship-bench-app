@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
+import { DuplicateActiveBookingError } from "./errors";
 
 // The production repository implementation over supabase-js (service role).
 // Reads come back snake_case and are mapped to camelCase entities; writes map
@@ -47,7 +48,13 @@ export function createSupabaseRepositories(): Repositories {
       .insert(toSnakeRow(row as Record<string, unknown>))
       .select()
       .single();
-    if (error) fail(`insert into ${table}`, error);
+    if (error) {
+      if (table === "bookings" && (error as { code?: string }).code === "23505") {
+        const bookingRow = row as unknown as Booking;
+        throw new DuplicateActiveBookingError(bookingRow.sessionId, bookingRow.memberId);
+      }
+      fail(`insert into ${table}`, error);
+    }
     return toCamelRow<T>(data as Record<string, unknown>);
   }
 
