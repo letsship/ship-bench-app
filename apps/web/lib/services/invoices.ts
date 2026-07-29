@@ -50,9 +50,17 @@ export async function listInvoices(
   }));
 }
 
-export async function getInvoiceDetail(repos: Repositories, id: string): Promise<InvoiceDetail> {
+export async function getInvoiceDetail(
+  repos: Repositories,
+  id: string,
+  studioId: string,
+): Promise<InvoiceDetail> {
   const invoice = await repos.invoices.getById(id);
-  if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
+  // A foreign-studio invoice is indistinguishable from a missing one: collapse
+  // both into a single 404 so a caller can neither read nor act on it.
+  if (!invoice || invoice.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Invoice not found");
+  }
   const member = await repos.members.getById(invoice.memberId);
   if (!member) throw new HttpError(404, "not_found", "Invoice member not found");
   const lineItems = await repos.invoiceLineItems.listByInvoice(id);
@@ -119,16 +127,19 @@ export async function createInvoice(
       },
     ),
   );
-  return getInvoiceDetail(repos, invoiceId);
+  return getInvoiceDetail(repos, invoiceId, studioId);
 }
 
 export async function updateInvoiceStatus(
   repos: Repositories,
   id: string,
   status: InvoiceStatus,
+  studioId: string,
 ): Promise<Invoice> {
   const invoice = await repos.invoices.getById(id);
-  if (!invoice) throw new HttpError(404, "not_found", "Invoice not found");
+  if (!invoice || invoice.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Invoice not found");
+  }
   if (!canTransitionInvoice(invoice.status as InvoiceStatus, status)) {
     throw new HttpError(
       409,
