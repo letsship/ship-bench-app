@@ -44,7 +44,7 @@ export function buildStudioMetadata(
 export function buildStudioEventJsonLd(
   studio: Studio,
   sessions: PublicClass[],
-  ctx: { siteUrl: string },
+  _ctx: { siteUrl: string },
 ): Record<string, unknown>[] {
   return sessions.map((session) => ({
     "@context": "https://schema.org",

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
 import { resolvePublicStudio, publicBaseUrl } from "@/lib/services/public-studio";
@@ -41,7 +42,7 @@ export default async function PublicStudioPage({ params }: PageProps) {
         }}
       />
 
-      <img src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio`} />
+      <Image src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio`} priority />
       <div style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</div>
       <div style={{ marginTop: 8, color: "#666" }}>Upcoming classes</div>
 
