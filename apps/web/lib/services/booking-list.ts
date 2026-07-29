@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  memberEmail: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        memberEmail: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,27 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Bookings flattened for the accounting CSV export. Unlike the /bookings page
+// view we do NOT delegate the range to the repository: the repo's SessionRange
+// filter is half-open [from, to), but the export spec requires an inclusive
+// [from, to] on both bounds. So we load the flat rows and filter them here by
+// epoch comparison, leaving an omitted bound unbounded on that side.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: { from?: string; to?: string } = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  const fromMs = range.from ? Date.parse(range.from) : undefined;
+  const toMs = range.to ? Date.parse(range.to) : undefined;
+  return rows.filter((row) => {
+    if (!row.startsAt) return false;
+    const ms = Date.parse(row.startsAt);
+    if (Number.isNaN(ms)) return false;
+    if (fromMs !== undefined && !Number.isNaN(fromMs) && ms < fromMs) return false;
+    if (toMs !== undefined && !Number.isNaN(toMs) && ms > toMs) return false;
+    return true;
+  });
 }
