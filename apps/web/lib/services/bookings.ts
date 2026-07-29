@@ -18,6 +18,7 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { drawCreditForBooking } from "./packages";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -82,6 +83,12 @@ export async function createBooking(
   if (!decision.ok) {
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
+
+  // Once a member owns a class pack, every booking pays with one credit from
+  // their oldest drawable pack. This runs AFTER canBook so a rejected booking
+  // (e.g. a 409 double-book) spends no credit; if no pack is drawable the
+  // member must buy another before booking.
+  await drawCreditForBooking(repos, member.id);
 
   const bookingId = newId();
   await repos.bookings.insert({
