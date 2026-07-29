@@ -4,6 +4,7 @@ import type { Invoice, InvoiceLineItem, Member } from "@/lib/db/types";
 import {
   type InvoiceStatus,
   canTransitionInvoice,
+  computeInvoiceTotals,
   formatInvoiceNumber,
 } from "@/lib/domain/invoices";
 import { HttpError } from "@/lib/http";
@@ -70,18 +71,8 @@ export async function createInvoice(
     throw new HttpError(400, "bad_request", "Unknown member for this invoice");
   }
 
-  // Inline invoice math for the create path.
-  let subtotalCents = 0;
-  for (const line of input.lineItems) {
-    subtotalCents += line.quantity * line.unitAmountCents;
-  }
-  const taxCents = Math.round((subtotalCents * settings.taxRateBps) / 10_000);
-  const totals = {
-    subtotalCents,
-    refundedCents: 0,
-    taxCents,
-    totalCents: subtotalCents + taxCents,
-  };
+  // Single source of truth for invoice math (domain function).
+  const totals = computeInvoiceTotals(input.lineItems, settings.taxRateBps);
   const existingCount = await repos.invoices.countByStudio(studioId);
   const issuedAt = new Date().toISOString();
   const invoiceId = newId();
