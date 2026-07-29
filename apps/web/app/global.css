@@ -1,14 +1,12 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Studiobook design tokens — a warm, tactile studio aesthetic: parchment
    surfaces, espresso ink, clay + sage accents drawn from pottery and yoga. */
-:root {
-  color-scheme: light;
-
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    serif;
 
   --color-parchment: #f6f1e7;
   --color-surface: #fffdf8;
