@@ -35,7 +35,6 @@ export async function resolveRepositories(): Promise<Repositories> {
   const { createD1Repositories } = await import("./d1");
   return createD1Repositories(env.DB);
 }
-}
 
 // Test-only: re-seed the in-memory store to a clean, known dataset so e2e specs
 // can isolate per test (via the /api/test-reset endpoint). No-op unless fake

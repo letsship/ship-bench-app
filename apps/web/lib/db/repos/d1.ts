@@ -1,17 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "../schema";
-import type {
-  Booking,
-  ClassSession,
-  ClassType,
-  Invoice,
-  InvoiceLineItem,
-  Member,
-  NotificationOutboxRow,
-  Studio,
-  StudioSettings,
-} from "../types";
 import type { Repositories } from "./types";
 
 // The production repository implementation over Cloudflare D1 (the Worker's own
