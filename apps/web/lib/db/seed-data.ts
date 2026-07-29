@@ -96,6 +96,10 @@ function buildMembers(now: Date, studioId: string): Member[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    // Deterministic per-member calendar subscription token so hermetic tests
+    // can address a known member's feed URL. Not the random newCalendarToken()
+    // used at runtime — seed data must be byte-stable across runs.
+    calendarToken: `cal-tok-${String(index + 1).padStart(4, "0")}`,
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }

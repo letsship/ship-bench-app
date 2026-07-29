@@ -75,6 +75,28 @@ describe("in-memory repositories", () => {
     expect(refetched?.status).toBe("paused");
   });
 
+  it("finds a member by their calendar token", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const found = await repos.members.findByCalendarToken(target.calendarToken);
+    expect(found?.id).toBe(target.id);
+    // token lookup is global (no studio scope) and returns null for unknown tokens
+    expect(await repos.members.findByCalendarToken("unknown-token")).toBeNull();
+    // returns an isolated clone (store not mutated by reference)
+    found!.name = "mutated";
+    const refetched = await repos.members.findByCalendarToken(target.calendarToken);
+    expect(refetched?.name).toBe(target.name);
+  });
+
+  it("lists bookings for a member", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const bookings = await repos.bookings.listByMember(target.id);
+    expect(bookings.every((b) => b.memberId === target.id)).toBe(true);
+    expect(bookings.length).toBeGreaterThan(0);
+    expect(await repos.bookings.listByMember("no-such-member")).toEqual([]);
+  });
+
   it("counts invoices for the studio", async () => {
     const count = await repos.invoices.countByStudio(studioId);
     const list = await repos.invoices.listByStudio(studioId);

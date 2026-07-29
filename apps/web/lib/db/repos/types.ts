@@ -36,6 +36,9 @@ export interface MembersRepo {
   listByStudio(studioId: string): Promise<Member[]>;
   getById(id: string): Promise<Member | null>;
   findByEmail(studioId: string, email: string): Promise<Member | null>;
+  // Global lookup by the per-member calendar token — the token is the key, so
+  // there is no studio scope. Returns null for an unknown token.
+  findByCalendarToken(token: string): Promise<Member | null>;
   insert(member: Member): Promise<Member>;
   update(id: string, patch: Partial<Member>): Promise<Member>;
 }
@@ -55,6 +58,9 @@ export interface ClassSessionsRepo {
 export interface BookingsRepo {
   listBySessionIds(sessionIds: string[]): Promise<Booking[]>;
   listBySession(sessionId: string): Promise<Booking[]>;
+  // All bookings for a member (any status) — the calendar service filters to
+  // confirmed seats and upcoming sessions.
+  listByMember(memberId: string): Promise<Booking[]>;
   getById(id: string): Promise<Booking | null>;
   insert(booking: Booking): Promise<Booking>;
   update(id: string, patch: Partial<Booking>): Promise<Booking>;

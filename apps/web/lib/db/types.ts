@@ -31,6 +31,10 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  // Per-member secret that authorizes the private iCalendar feed at
+  // /api/ical/[token]. The token alone is the credential (calendar clients
+  // can't send cookies), so it must be unguessable and unique per member.
+  calendarToken: string;
   createdAt: string;
 }
 

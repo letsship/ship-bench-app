@@ -5,3 +5,13 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// An unguessable, URL-safe secret used as the per-member calendar subscription
+// token at /api/ical/[token]. 16 random bytes (128 bits) hex-encoded → 32 chars.
+// The token alone authorizes the feed (calendar clients can't send cookies), so
+// it must be cryptographically random and unique per member. Generated app-side
+// so both repository implementations mint identical tokens.
+export function newCalendarToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
