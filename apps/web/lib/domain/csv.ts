@@ -40,6 +40,31 @@ export function membersToCsv(members: readonly MemberRow[]): string {
   ]);
 }
 
+export interface BookingExportRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+// Session starts are stored as ISO-8601 but not always in UTC (a session can be
+// created with an offset like +02:00); the export contract wants UTC.
+function toUtcIso(value: string): string {
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? value : new Date(ms).toISOString();
+}
+
+export function bookingsToCsv(bookings: readonly BookingExportRow[]): string {
+  return toCsv(bookings, [
+    { header: "Starts", value: (booking) => toUtcIso(booking.startsAt) },
+    { header: "Class", value: (booking) => booking.className },
+    { header: "Member", value: (booking) => booking.memberName },
+    { header: "Email", value: (booking) => booking.email },
+    { header: "Status", value: (booking) => booking.status },
+  ]);
+}
+
 export interface InvoiceRow {
   number: string;
   memberName: string;
