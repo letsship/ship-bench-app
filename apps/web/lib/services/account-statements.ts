@@ -1,3 +1,4 @@
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { InvoiceLineItem } from "@/lib/db/types";
 
@@ -17,12 +18,15 @@ export interface MemberStatement {
 
 // Local invoice math for statements.
 function statementTotal(lineItems: readonly InvoiceLineItem[], taxRateBps: number): number {
-  let subtotal = 0;
-  for (const item of lineItems) {
-    subtotal += item.quantity * item.unitAmountCents;
-  }
-  const tax = Math.round((subtotal * taxRateBps) / 10_000);
-  return subtotal + tax;
+  const totals = computeInvoiceTotals(
+    lineItems.map((item) => ({
+      quantity: item.quantity,
+      unitAmountCents: item.unitAmountCents,
+      refunded: item.refunded,
+    })),
+    taxRateBps,
+  );
+  return totals.totalCents;
 }
 
 export async function getMemberStatement(

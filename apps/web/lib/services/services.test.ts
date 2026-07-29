@@ -275,6 +275,22 @@ describe("invoices service", () => {
     expect(provider.sent.some((m) => m.subject === `Invoice ${detail.invoice.number}`)).toBe(true);
   });
 
+  it("stores the same subtotal/tax/total as computeInvoiceTotals when lines are refunded", async () => {
+    const provider = createFakeProvider();
+    const detail = await createInvoice(repos, provider, studioId, {
+      memberId,
+      lineItems: [
+        { description: "Billable item", quantity: 1, unitAmountCents: 10000 },
+        { description: "Refunded item", quantity: 1, unitAmountCents: 5000 },
+      ],
+    });
+    const { subtotalCents, taxCents, totalCents } = detail.invoice;
+    expect(subtotalCents).toBe(15000);
+    expect(taxCents).toBe(1350);
+    expect(totalCents).toBe(16350);
+    expect(provider.sent.some((m) => m.subject === `Invoice ${detail.invoice.number}`)).toBe(true);
+  });
+
   it("allows a valid status transition and rejects an invalid one", async () => {
     const provider = createFakeProvider();
     const detail = await createInvoice(repos, provider, studioId, {
