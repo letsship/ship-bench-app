@@ -188,14 +188,16 @@ describe("detail route handlers (cross-tenant IDOR)", () => {
     const r = await resolveRepositories();
     const s1 = (await r.studios.getFirst())!.id;
     const ct = (await r.classTypes.listByStudio(s1))[0];
-    // A far-future session so the cancellation window hasn't elapsed.
+    // cancelBooking compares session startsAt against the REAL clock, so the
+    // session must be genuinely in the future — not just past the fixed seed NOW.
+    const futureStart = new Date(Date.now() + 7 * 86_400_000);
     await r.classSessions.insert({
       id: "cs-own",
       studioId: s1,
       classTypeId: ct.id,
       instructor: "I",
-      startsAt: new Date(NOW.getTime() + 7 * 86_400_000).toISOString(),
-      endsAt: new Date(NOW.getTime() + 7 * 86_400_000 + 3_600_000).toISOString(),
+      startsAt: futureStart.toISOString(),
+      endsAt: new Date(futureStart.getTime() + 3_600_000).toISOString(),
       capacity: 10,
       priceCents: 1000,
       status: "scheduled",
