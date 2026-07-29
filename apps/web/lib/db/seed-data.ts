@@ -9,6 +9,7 @@ function seedId(): string {
   __seedIdSeq += 1;
   return `00000000-0000-4000-8000-${__seedIdSeq.toString(16).padStart(12, "0")}`;
 }
+import { computeInvoiceTotals, lineAmountCents } from "@/lib/domain/invoices";
 import type { SeedData } from "./repos/fakes";
 import type {
   Booking,
@@ -263,22 +264,24 @@ function buildInvoices(
   INVOICE_SEED.forEach((seed, index) => {
     const invoiceId = seedId();
     const member = members[seed.memberIndex];
-    let subtotal = 0;
+    const lineInputs = seed.lines.map((line) => ({
+      quantity: line.quantity,
+      unitAmountCents: line.unit,
+      refunded: line.refunded,
+    }));
+    const totals = computeInvoiceTotals(lineInputs, taxRateBps);
     for (const line of seed.lines) {
-      const amount = line.quantity * line.unit;
-      if (!line.refunded) subtotal += amount;
       lineItems.push({
         id: seedId(),
         invoiceId,
         description: line.description,
         quantity: line.quantity,
         unitAmountCents: line.unit,
-        amountCents: amount,
+        amountCents: lineAmountCents({ quantity: line.quantity, unitAmountCents: line.unit }),
         refunded: line.refunded ?? false,
         bookingId: null,
       });
     }
-    const tax = Math.round((subtotal * taxRateBps) / 10_000);
     const issuedAt = monthsAgoIso(now, seed.monthsAgo, seed.day);
     invoices.push({
       id: invoiceId,
@@ -288,9 +291,9 @@ function buildInvoices(
       status: seed.status,
       currency: "EUR",
       taxRateBps,
-      subtotalCents: subtotal,
-      taxCents: tax,
-      totalCents: subtotal + tax,
+      subtotalCents: totals.subtotalCents,
+      taxCents: totals.taxCents,
+      totalCents: totals.totalCents,
       issuedAt,
       dueAt: new Date(new Date(issuedAt).getTime() + 14 * DAY_MS).toISOString(),
       paidAt: seed.status === "paid" ? issuedAt : null,
