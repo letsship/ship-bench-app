@@ -58,6 +58,18 @@ export interface ClassSession {
   createdAt: string;
 }
 
+export interface ClassPack {
+  id: string;
+  studioId: string;
+  memberId: string;
+  creditsTotal: number;
+  creditsRemaining: number;
+  priceCents: number;
+  status: string;
+  purchasedAt: string;
+  createdAt: string;
+}
+
 export interface Booking {
   id: string;
   sessionId: string;
