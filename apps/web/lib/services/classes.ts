@@ -92,6 +92,29 @@ export async function getSessionView(repos: Repositories, id: string): Promise<S
   return toView(session, classType ?? undefined, bookings);
 }
 
+export async function listMemberUpcomingSessions(
+  repos: Repositories,
+  studioId: string,
+  memberId: string,
+  from: string,
+): Promise<SessionView[]> {
+  const sessions = await repos.classSessions.listByStudio(studioId, { from });
+  const sessionIds = sessions.map((s) => s.id);
+  const bookings = await repos.bookings.listBySessionIds(sessionIds);
+  const memberBookedSessionIds = new Set(
+    bookings
+      .filter((b) => b.memberId === memberId && b.status === "booked")
+      .map((b) => b.sessionId),
+  );
+  const filtered = sessions.filter((s) => memberBookedSessionIds.has(s.id));
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const bySession = groupBookings(bookings);
+  return filtered.map((session) =>
+    toView(session, typeById.get(session.classTypeId), bySession.get(session.id) ?? []),
+  );
+}
+
 export async function createSession(
   repos: Repositories,
   studioId: string,
