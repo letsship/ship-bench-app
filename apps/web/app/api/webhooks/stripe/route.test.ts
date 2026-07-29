@@ -136,6 +136,20 @@ describe("POST /api/webhooks/stripe", () => {
     expect(invoice?.status).toBe("open");
     expect(invoice?.paidAt).toBeNull();
   });
+
+  it("acknowledges an other-type event with no metadata field (realistic Stripe shape)", async () => {
+    const body = JSON.stringify({
+      id: "evt_nometa",
+      type: "customer.updated",
+      data: { object: { id: "cus_123" } },
+    });
+    const res = await POST(request(body, await signedHeaders(body)));
+    expect(res.status).toBe(200);
+    const invoice = await (await __repos()).invoices.getById(OPEN_INVOICE_ID);
+    expect(invoice?.status).toBe("open");
+    expect(invoice?.paidAt).toBeNull();
+    expect(await (await __repos()).webhookEvents.getById("evt_nometa")).not.toBeNull();
+  });
 });
 
 // Resolve the currently-injected test repositories (testRepositories is set by

@@ -91,4 +91,16 @@ describe("handleStripeEvent", () => {
     const open = await repos.invoices.getById("inv_open");
     expect(open?.status).toBe("open");
   });
+
+  it("acknowledges an other-type event with no metadata field (realistic Stripe shape)", async () => {
+    const other = {
+      id: "evt_nometa",
+      type: "customer.updated",
+      data: { object: { id: "cus_123" } },
+    } as StripeEvent;
+    await expect(handleStripeEvent(repos, other)).resolves.toBeUndefined();
+    expect(await repos.webhookEvents.getById("evt_nometa")).not.toBeNull();
+    const open = await repos.invoices.getById("inv_open");
+    expect(open?.status).toBe("open");
+  });
 });

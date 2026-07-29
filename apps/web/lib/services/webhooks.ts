@@ -21,7 +21,7 @@ export async function handleStripeEvent(
   if (already) return;
 
   if (event.type === "invoice.paid") {
-    const invoiceId = event.data.object.metadata.invoice_id;
+    const invoiceId = event.data?.object?.metadata?.invoice_id;
     if (invoiceId) {
       const invoice = await repos.invoices.getById(invoiceId);
       if (invoice && invoice.status !== "paid") {

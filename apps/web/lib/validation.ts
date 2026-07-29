@@ -77,13 +77,22 @@ export const updateInvoiceStatusSchema = z.object({
 export const stripeEventSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
-  data: z.object({
-    object: z.object({
-      metadata: z.object({
-        invoice_id: z.string().min(1).optional(),
-      }).passthrough(),
-    }).passthrough(),
-  }).passthrough(),
+  data: z
+    .object({
+      object: z
+        .object({
+          metadata: z
+            .object({
+              invoice_id: z.string().min(1).optional(),
+            })
+            .passthrough()
+            .optional(),
+        })
+        .passthrough()
+        .optional(),
+    })
+    .passthrough()
+    .optional(),
 });
 
 export type StripeEvent = z.infer<typeof stripeEventSchema>;
