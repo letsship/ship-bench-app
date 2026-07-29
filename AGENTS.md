@@ -45,6 +45,11 @@ does not require Supabase, Resend, Docker, or network access.
 - Email goes through `apps/web/lib/notifications/`: message builders, provider
   seam, fake provider, Resend adapter, and outbox. Domain code never calls
   Resend directly.
+- Analytics goes through `apps/web/lib/analytics/`: the `Tracker` contract, a
+  recording fake, a PostHog adapter, and the `resolveTracker()` composition
+  root with a `__setTestTracker()` test seam. Service code captures through the
+  interface only — never a `posthog` package directly; events carry ids, no
+  PII.
 
 ## Coding rules
 

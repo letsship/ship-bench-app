@@ -1,3 +1,4 @@
+import type { AnalyticsEventName, Tracker } from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -55,6 +56,27 @@ async function loadSession(repos: Repositories, sessionId: string): Promise<Clas
   return session;
 }
 
+// Funnel analytics. Events attribute to the member (distinct id = member id)
+// and the class session, and carry ids only — never email, name, or phone.
+// Like the outbox dispatch, a capture failure logs but never blocks the
+// primary response.
+async function trackEvent(
+  tracker: Tracker,
+  event: AnalyticsEventName,
+  member: Member,
+  session: ClassSession,
+): Promise<void> {
+  try {
+    await tracker.capture({
+      event,
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
+  } catch (error) {
+    console.error(`Analytics capture failed (${event})`, error);
+  }
+}
+
 export interface BookingResult {
   bookingId: string;
   status: "booked" | "waitlisted";
@@ -63,6 +85,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -93,6 +116,15 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  // Exactly one funnel event per booking: a confirmed seat is a
+  // booking_created, a waitlist spot is a waitlist_joined — never both.
+  await trackEvent(
+    tracker,
+    decision.status === "booked" ? "booking_created" : "waitlist_joined",
+    member,
+    session,
+  );
+
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
@@ -111,6 +143,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -134,11 +167,15 @@ export async function cancelBooking(
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
+  // One booking_cancelled for the cancelled booking only — a waitlist
+  // promotion it triggers is not a fresh booking conversion.
+  const member = await loadMember(repos, booking.memberId);
+  await trackEvent(tracker, "booking_cancelled", member, session);
+
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
     : null;
 
-  const member = await loadMember(repos, booking.memberId);
   await enqueueAndDispatch(
     repos,
     provider,
