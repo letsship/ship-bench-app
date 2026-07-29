@@ -54,8 +54,8 @@ describe("tailwind v4 setup", () => {
     );
     // A v4 release is resolved when an importer entry of the form
     // `tailwindcss@4.x.y:` is present and no `tailwindcss@3.` entry remains.
-    expect(lockfile).toMatch(/^  tailwindcss@4\.\d+\.\d+:/m);
-    expect(lockfile).not.toMatch(/^  tailwindcss@3\./m);
+    expect(lockfile).toMatch(/^ {2}tailwindcss@4\.\d+\.\d+:/m);
+    expect(lockfile).not.toMatch(/^ {2}tailwindcss@3\./m);
     // Sanity: the files we assert on above actually exist on disk.
     expect(() => statSync(resolve(webRoot, "postcss.config.mjs"))).not.toThrow();
     expect(() => statSync(resolve(webRoot, "app/global.css"))).not.toThrow();
