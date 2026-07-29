@@ -9,6 +9,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import type { Repositories, SessionRange } from "./types";
 
 // In-memory implementation of the repository seam. Used by the test suite
@@ -160,6 +161,17 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        // Mirror the DB partial unique index ux_bookings_session_member_active:
+        // at most one non-cancelled booking per (session_id, member_id). This
+        // keeps the in-memory fake faithful to Postgres so service/storage tests
+        // exercise the double-submit race path.
+        const dupe = store.bookings.some(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            row.status !== "cancelled",
+        );
+        if (dupe) throw new DuplicateActiveBookingError();
         store.bookings.push(clone(booking));
         return clone(booking);
       },

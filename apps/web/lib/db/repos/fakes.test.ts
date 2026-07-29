@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import { DuplicateActiveBookingError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
+import type { Booking } from "../types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -90,5 +92,62 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+});
+
+describe("bookings insert guard (active-row uniqueness)", () => {
+  let repos: Repositories;
+  let studioId: string;
+  let sessionId: string;
+
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(buildSeed(NOW));
+    studioId = (await repos.studios.getFirst())?.id ?? "";
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    sessionId = sessions[0].id;
+  });
+
+  const row = (id: string, memberId: string, over: Partial<Booking> = {}): Booking => ({
+    id,
+    sessionId,
+    memberId,
+    status: "waitlisted",
+    bookedAt: NOW.toISOString(),
+    cancelledAt: null,
+    ...over,
+  });
+
+  it("rejects a second active row for the same session + member", async () => {
+    await repos.bookings.insert(row("b1", "m1", { status: "booked" }));
+    await expect(repos.bookings.insert(row("b2", "m1", { status: "waitlisted" }))).rejects.toBeInstanceOf(
+      DuplicateActiveBookingError,
+    );
+    // The store still holds exactly one active row for that member + session.
+    const rows = (await repos.bookings.listBySession(sessionId)).filter((b) => b.memberId === "m1");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("booked");
+  });
+
+  it("rejects a second waitlisted row for the same session + member", async () => {
+    await repos.bookings.insert(row("b1", "m1", { status: "waitlisted" }));
+    await expect(repos.bookings.insert(row("b2", "m1"))).rejects.toBeInstanceOf(
+      DuplicateActiveBookingError,
+    );
+    const rows = (await repos.bookings.listBySession(sessionId)).filter((b) => b.memberId === "m1");
+    expect(rows).toHaveLength(1);
+  });
+
+  it("allows rebooking after the previous booking was cancelled", async () => {
+    await repos.bookings.insert(row("b1", "m1", { status: "cancelled", cancelledAt: NOW.toISOString() }));
+    const second = await repos.bookings.insert(row("b2", "m1", { status: "booked" }));
+    expect(second.status).toBe("booked");
+    const rows = (await repos.bookings.listBySession(sessionId)).filter((b) => b.memberId === "m1");
+    expect(rows.map((b) => b.status).sort()).toEqual(["booked", "cancelled"]);
+  });
+
+  it("allows different members on the same session", async () => {
+    await repos.bookings.insert(row("b1", "m1"));
+    const second = await repos.bookings.insert(row("b2", "m2"));
+    expect(second.memberId).toBe("m2");
   });
 });
