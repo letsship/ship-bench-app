@@ -324,4 +324,62 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
   });
+
+  it("does not read members or class sessions once per booking (no N+1)", async () => {
+    // Seed a studio with many members and sessions, then book a member into
+    // each session so the booking list has many rows. Counting proxies wrap
+    // the in-memory repositories so we can assert that the number of member
+    // and class-session reads stays bounded regardless of booking count.
+    const classTypes = [classType("ct1")];
+    const members: Member[] = Array.from({ length: 40 }, (_, i) =>
+      member(`m${i}`, { name: `Member ${i}` }),
+    );
+    const sessions: ClassSession[] = Array.from({ length: 40 }, (_, i) =>
+      session(`cs${i + 1}`),
+    );
+    const bookings: Booking[] = sessions.map((s, i) => ({
+      ...booking(`b${s.id}`, `m${i}`, { sessionId: s.id }),
+    }));
+    const base = createInMemoryRepositories(
+      baseSeed({ classTypes, members, sessions, bookings }),
+    );
+
+    let memberReads = 0;
+    let sessionReads = 0;
+    const countingRepos: Repositories = {
+      ...base,
+      members: new Proxy(base.members, {
+        get(target, prop) {
+          if (prop === "getById" || prop === "listByStudio") {
+            return (...args: unknown[]) => {
+              memberReads += 1;
+              return (target[prop] as (...a: unknown[]) => unknown)(...args);
+            };
+          }
+          return target[prop as keyof typeof target];
+        },
+      }),
+      classSessions: new Proxy(base.classSessions, {
+        get(target, prop) {
+          if (prop === "getById" || prop === "listByStudio") {
+            return (...args: unknown[]) => {
+              sessionReads += 1;
+              return (target[prop] as (...a: unknown[]) => unknown)(...args);
+            };
+          }
+          return target[prop as keyof typeof target];
+        },
+      }),
+    };
+
+    const rows = await listBookingRows(countingRepos, "s1");
+    expect(rows.length).toBe(40);
+
+    // With batched reads, each repository is touched a small fixed number of
+    // times (one listByStudio call each) regardless of how many bookings are
+    // returned. Assert a small constant ceiling, well below the booking count.
+    expect(memberReads).toBeLessThanOrEqual(1);
+    expect(sessionReads).toBeLessThanOrEqual(1);
+    expect(memberReads + sessionReads).toBeLessThan(rows.length);
+  });
 });
