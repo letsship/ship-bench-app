@@ -31,6 +31,9 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  // Per-member secret authorizing the private /api/ical/[token] calendar feed.
+  // Global-unique so the feed lookup needs no studio/cookie context.
+  calendarToken: string;
   createdAt: string;
 }
 

@@ -60,6 +60,7 @@ describe("in-memory repositories", () => {
       phone: null,
       status: "active",
       notificationsOptedOut: false,
+      calendarToken: "caltok-mem_new",
       createdAt: NOW.toISOString(),
     };
     await repos.members.insert(member);
@@ -90,5 +91,23 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  it("findByCalendarToken returns the matching member and null for unknown/empty", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    expect(await repos.members.findByCalendarToken(target.calendarToken)).toEqual(target);
+    expect(await repos.members.findByCalendarToken("not-a-real-token")).toBeNull();
+    expect(await repos.members.findByCalendarToken("")).toBeNull();
+  });
+
+  it("listByMember returns only that member's bookings", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const owned = await repos.bookings.listByMember(target.id);
+    expect(owned.length).toBeGreaterThan(0);
+    expect(owned.every((b) => b.memberId === target.id)).toBe(true);
+    const other = members.find((m) => m.id !== target.id)!;
+    expect((await repos.bookings.listByMember(other.id)).every((b) => b.memberId === other.id)).toBe(true);
   });
 });
