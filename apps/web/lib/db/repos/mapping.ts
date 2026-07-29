@@ -1,7 +1,9 @@
-// Column-name mapping between the camelCase entity types and the snake_case
-// Postgres columns. Every entity field is a clean 1:1 with its column
+// Column-name mapping between the camelCase entity types and snake_case
+// database columns. Every entity field is a clean 1:1 with its column
 // (studioId ↔ studio_id, defaultCapacity ↔ default_capacity, …), so a generic
-// key transform is sufficient. Used only by the Supabase repository impl.
+// key transform is sufficient. The Drizzle/D1 repositories map columns in
+// schema.ts instead; this generic transform is used by the Postgres seed
+// emitter (scripts/emit-seed-sql.ts).
 
 export function toSnakeKey(key: string): string {
   return key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
