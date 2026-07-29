@@ -23,14 +23,17 @@ for coding agents working in this repo.
 - Regenerate seed SQL after seed changes: `pnpm --filter @studiobook/web db:seed-sql`
 
 Tests are hermetic. `pnpm test` uses in-memory repositories and fake email; it
-does not require Supabase, Resend, Docker, or network access.
+does not require D1, Resend, Docker, or network access.
 
 ## Architecture seams
 
 - Database access goes through `apps/web/lib/db/repos/`. Route handlers,
-  services, pages, and domain code never import `@supabase/supabase-js`.
-- Production persistence lives in `apps/web/lib/db/repos/supabase.ts`; test and
-  fake-dev persistence lives in `apps/web/lib/db/repos/fakes.ts`. Keep behavior
+  services, pages, and domain code never touch a database binding or driver
+  directly.
+- Production persistence lives in `apps/web/lib/db/repos/d1.ts` (Drizzle ORM
+  over the Cloudflare D1 `DB` binding; table definitions in
+  `apps/web/lib/db/repos/schema.ts`); test and fake-dev persistence lives in
+  `apps/web/lib/db/repos/fakes.ts`. Keep behavior
   symmetric across both implementations.
 - Pure business rules live in `apps/web/lib/domain/`. Keep these modules free of
   framework, database, email, and request concerns.
@@ -98,24 +101,27 @@ response — as the outbox dispatch does.
   runs and passes (0 failed, 0 skipped). Fix the root cause, not the symptom. The
   CI gate is `verify` (lint + typecheck + unit/integration + build) AND `e2e`
   (Playwright journeys); both must be green. Unit/integration tests are hermetic
-  (in-memory repositories + fake email — no Supabase, Resend, Docker, or network).
+  (in-memory repositories + fake email — no D1, Resend, Docker, or network).
 
 ## Data and migrations
 
-- Raw SQL migrations live in `packages/db/migrations/`. `supabase/migrations` is
-  a symlink to that directory.
-- App entities are camelCase TypeScript types in `apps/web/lib/db/types.ts`;
-  Supabase rows are snake_case and mapped only in `apps/web/lib/db/repos/mapping.ts`.
-- Services set ids and timestamps app-side so Supabase and fake repositories
+- The D1 schema ships as raw SQL in `apps/web/migrations/` (the wrangler D1
+  migrations directory, wired via `migrations_dir` in `wrangler.jsonc`). The
+  legacy Postgres schema it mirrors lives in `packages/db/migrations/`.
+- App entities are camelCase TypeScript types in `apps/web/lib/db/types.ts`; D1
+  columns are snake_case, mapped 1:1 by the Drizzle table definitions in
+  `apps/web/lib/db/repos/schema.ts`.
+- Services set ids and timestamps app-side so D1 and fake repositories
   behave the same way.
 - If seed data changes, update `apps/web/lib/db/seed-data.ts` and regenerate
   `supabase/seed.sql`.
 
 ## Environment and deploy
 
-- Env access is Zod-validated and lazy in `apps/web/lib/env.ts`. Fake-backends
-  mode should not need Supabase or email secrets.
-- Never commit secrets. Use `.env.local`, Supabase CLI local config, GitHub
+- Email env vars (`RESEND_API_KEY`, `STUDIOBOOK_FROM_EMAIL`) are read directly
+  via `process.env` in `apps/web/lib/notifications/provider.ts`. Fake-backends
+  mode needs no secrets at all.
+- Never commit secrets. Use `.env.local`, GitHub
   secrets, or Wrangler secrets as appropriate.
 - Cloudflare Worker deploy uses OpenNext with `apps/web/wrangler.jsonc` and
   `apps/web/wrangler.preview.jsonc`. Preview deploy orchestration is in
@@ -127,7 +133,7 @@ Use repo skills in `.agents/skills/` when a task matches their description:
 
 - `studiobook-codebase` for orientation and source maps.
 - `studiobook-feature-workflow` for product/API/UI changes.
-- `studiobook-data-and-migrations` for schema, repository, seed, or Supabase work.
+- `studiobook-data-and-migrations` for schema, repository, seed, or D1 work.
 - `studiobook-notifications` for email/outbox work.
 - `studiobook-deploy-preview` for OpenNext, Wrangler, SHIP, and preview deploys.
 - `posthog-nextjs` for PostHog analytics, flags, and experiments.

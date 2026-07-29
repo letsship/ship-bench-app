@@ -13,7 +13,7 @@ Read `AGENTS.md` first, then use this skill as a compact source map.
 - `apps/web/lib/domain/`: pure business rules. Keep framework, database, request, and email code out.
 - `apps/web/lib/services/`: repository-backed use cases shared by pages and routes.
 - `apps/web/lib/db/types.ts`: camelCase app entity types.
-- `apps/web/lib/db/repos/`: repository seam, Supabase implementation, in-memory fake implementation, mapping.
+- `apps/web/lib/db/repos/`: repository seam, D1 (Drizzle) implementation, in-memory fake implementation, column mapping.
 - `apps/web/lib/notifications/`: message builders, outbox, provider contract, fake provider, Resend provider.
 - `apps/web/lib/http.ts`: shared API response helpers and JSON error envelope.
 - `apps/web/lib/validation.ts`: Zod schemas for API input boundaries.
@@ -30,7 +30,7 @@ Read `AGENTS.md` first, then use this skill as a compact source map.
 ## Guardrails
 
 - Do not edit generated outputs: `.next`, `.open-next`, `.turbo`, `dist`, `next-env.d.ts`, `*.tsbuildinfo`.
-- Do not import Supabase directly outside repository implementations and Supabase client factories.
+- Do not touch a database binding or driver directly outside the repository implementation.
 - Do not import Resend directly outside `apps/web/lib/notifications/resend-provider.ts`.
 - Keep fake-backend behavior aligned with production repository behavior.
 - Prefer focused tests near changed behavior over broad snapshot-style assertions.

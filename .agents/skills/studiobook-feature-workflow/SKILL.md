@@ -37,4 +37,4 @@ Use `studiobook-codebase` first if you are not already oriented.
 - Pure rules: add tests in `apps/web/lib/domain/*.test.ts`.
 - Service behavior: use `createInMemoryRepositories()` and fake notification providers.
 - API routing behavior: extend `apps/web/lib/services/routes.test.ts` when the route contract matters.
-- Avoid real Supabase, Resend, network, or Docker in tests.
+- Avoid real D1, Resend, network, or Docker in tests.
