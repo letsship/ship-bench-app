@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  ProcessedWebhookEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -79,6 +80,11 @@ export interface NotificationOutboxRepo {
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
+export interface WebhookEventsRepo {
+  getById(id: string): Promise<ProcessedWebhookEvent | null>;
+  insert(row: ProcessedWebhookEvent): Promise<ProcessedWebhookEvent>;
+}
+
 export interface Repositories {
   studios: StudioRepo;
   settings: StudioSettingsRepo;
@@ -89,4 +95,5 @@ export interface Repositories {
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
   outbox: NotificationOutboxRepo;
+  webhookEvents: WebhookEventsRepo;
 }

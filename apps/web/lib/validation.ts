@@ -71,6 +71,23 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+// A Stripe webhook event payload. Parsed AFTER signature verification in the
+// webhook route. Tolerant (passthrough) of Stripe's many extra fields — we only
+// ever read id, type, and the invoice id nested under data.object.metadata.
+export const stripeEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  data: z.object({
+    object: z.object({
+      metadata: z.object({
+        invoice_id: z.string().min(1).optional(),
+      }).passthrough(),
+    }).passthrough(),
+  }).passthrough(),
+});
+
+export type StripeEvent = z.infer<typeof stripeEventSchema>;
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
