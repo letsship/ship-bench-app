@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { POST as remindersPost } from "@/app/api/reminders/run/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +45,21 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+});
+
+describe("POST /api/reminders/run (against injected fake repositories)", () => {
+  beforeEach(() => {
+    __setTestRepositories(createInMemoryRepositories(buildSeed(NOW)));
+  });
+  afterEach(() => {
+    __setTestRepositories(null);
+  });
+
+  it("returns an error response without a signed-in session", async () => {
+    const res = await remindersPost();
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toHaveProperty("error");
   });
 });
