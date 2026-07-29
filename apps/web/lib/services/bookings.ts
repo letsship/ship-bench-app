@@ -111,11 +111,17 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  studioId: string,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
   const session = await loadSession(repos, booking.sessionId);
+  // Bookings carry no studioId: ownership is derived from the session, and a
+  // foreign booking must look non-existent before any mutation or promotion.
+  if (session.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Booking not found");
+  }
   const { settings } = await getStudioContext(repos);
 
   const decision = canCancel({
