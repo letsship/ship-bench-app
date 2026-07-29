@@ -18,7 +18,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   let detail: Awaited<ReturnType<typeof getInvoiceDetail>>;
   try {
-    detail = await getInvoiceDetail(repos, id);
+    detail = await getInvoiceDetail(repos, id, ctx.studio.id);
   } catch (error) {
     if (error instanceof HttpError && error.status === 404) notFound();
     throw error;
