@@ -105,6 +105,10 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
+      async getByIcalToken(token) {
+        const found = store.members.find((row) => row.icalToken === token);
+        return found ? clone(found) : null;
+      },
       async insert(member) {
         store.members.push(clone(member));
         return clone(member);
@@ -154,6 +158,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async listBySession(sessionId) {
         return cloneAll(store.bookings.filter((row) => row.sessionId === sessionId));
+      },
+      async listByMember(memberId) {
+        return cloneAll(store.bookings.filter((row) => row.memberId === memberId));
       },
       async getById(id) {
         const found = store.bookings.find((row) => row.id === id);

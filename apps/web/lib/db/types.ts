@@ -31,6 +31,9 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  // Secret bearer token authorizing the member's private calendar feed
+  // (GET /api/ical/[token]). Unique per member.
+  icalToken: string;
   createdAt: string;
 }
 

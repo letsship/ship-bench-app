@@ -31,6 +31,8 @@ export async function createMember(
     phone: input.phone ?? null,
     status: input.status,
     notificationsOptedOut: false,
+    // Every member gets a private calendar token (matches the DB default).
+    icalToken: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   });
 }
