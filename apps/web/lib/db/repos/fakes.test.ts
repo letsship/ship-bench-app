@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import { DuplicateActiveBookingError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -90,5 +91,70 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  describe("bookings.insert active uniqueness", () => {
+    const activeBooking = (status: string) => ({
+      id: "b1",
+      sessionId: "cs1",
+      memberId: "m1",
+      status,
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    it("rejects a second active booking for the same session + member", async () => {
+      const repos = createInMemoryRepositories({
+        studio: { id: "s1", name: "S", slug: "s", timezone: "UTC", createdAt: NOW.toISOString() },
+        settings: {
+          studioId: "s1",
+          currency: "EUR",
+          taxRateBps: 0,
+          cancellationWindowHours: 12,
+          waitlistEnabled: true,
+          notifyBookingConfirmations: true,
+          notifyCancellations: true,
+          notifyWaitlistPromotions: true,
+          notifyInvoices: true,
+        },
+        members: [],
+        classTypes: [],
+        sessions: [],
+        bookings: [activeBooking("waitlisted")],
+        invoices: [],
+        lineItems: [],
+        outbox: [],
+      });
+      await expect(
+        repos.bookings.insert({ ...activeBooking("waitlisted"), id: "b2" }),
+      ).rejects.toBeInstanceOf(DuplicateActiveBookingError);
+    });
+
+    it("allows a new booking after the prior one was cancelled", async () => {
+      const repos = createInMemoryRepositories({
+        studio: { id: "s1", name: "S", slug: "s", timezone: "UTC", createdAt: NOW.toISOString() },
+        settings: {
+          studioId: "s1",
+          currency: "EUR",
+          taxRateBps: 0,
+          cancellationWindowHours: 12,
+          waitlistEnabled: true,
+          notifyBookingConfirmations: true,
+          notifyCancellations: true,
+          notifyWaitlistPromotions: true,
+          notifyInvoices: true,
+        },
+        members: [],
+        classTypes: [],
+        sessions: [],
+        bookings: [activeBooking("cancelled")],
+        invoices: [],
+        lineItems: [],
+        outbox: [],
+      });
+      const inserted = await repos.bookings.insert({ ...activeBooking("booked"), id: "b2" });
+      expect(inserted.id).toBe("b2");
+      expect((await repos.bookings.listBySession("cs1")).length).toBe(2);
+    });
   });
 });
