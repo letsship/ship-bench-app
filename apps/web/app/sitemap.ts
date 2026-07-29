@@ -1,5 +1,9 @@
 import { listPublicStudios, publicBaseUrl } from "@/lib/services/public-studio";
 
+// Dynamically-generated at request time — depends on database data and cannot
+// be prerendered at build time (no Supabase env vars available during build).
+export const dynamic = "force-dynamic";
+
 export default async function sitemap() {
   const baseUrl = publicBaseUrl();
   const studios = await listPublicStudios();
