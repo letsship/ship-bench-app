@@ -35,6 +35,14 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("finds a member by calendar token", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const token = members[0].calendarToken;
+    const found = await repos.members.findByCalendarToken(token);
+    expect(found?.id).toBe(members[0].id);
+    expect(await repos.members.findByCalendarToken("nonexistent-token")).toBeNull();
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
@@ -60,6 +68,7 @@ describe("in-memory repositories", () => {
       phone: null,
       status: "active",
       notificationsOptedOut: false,
+      calendarToken: "new_cal_token",
       createdAt: NOW.toISOString(),
     };
     await repos.members.insert(member);
