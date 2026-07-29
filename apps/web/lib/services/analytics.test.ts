@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __setTestTracker } from "@/lib/analytics/tracker";
 import { createFakeTracker, type RecordedEvent } from "@/lib/analytics/fake-tracker";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
-import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { cancelBooking, createBooking } from "./bookings";
