@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -321,7 +321,77 @@ describe("reports + dashboard + booking list", () => {
   it("lists booking rows joined to member + class", async () => {
     const rows = await listBookingRows(repos, studioId);
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows[0]).toHaveProperty("memberName");
-    expect(rows[0]).toHaveProperty("className");
+    // Lock the exact shape of every row and the startsAt-ascending order so a
+    // refactor of the join stays output-preserving.
+    for (const row of rows) {
+      expect(Object.keys(row).sort()).toEqual(
+        ["id", "memberName", "className", "classColor", "instructor", "startsAt", "status"].sort(),
+      );
+      expect(typeof row.memberName).toBe("string");
+      expect(typeof row.className).toBe("string");
+      expect(typeof row.classColor).toBe("string");
+      expect(typeof row.instructor).toBe("string");
+      expect(typeof row.startsAt).toBe("string");
+      expect(typeof row.status).toBe("string");
+    }
+    const startsAts = rows.map((row) => row.startsAt);
+    expect([...startsAts].sort()).toEqual(startsAts);
+  });
+
+  it("does not read members/class-sessions once per booking (bounded reads)", async () => {
+    // Build a seed with many bookings spread across a few members + sessions.
+    const buildMany = (n: number): SeedData => {
+      const members = [member("m1"), member("m2"), member("m3")];
+      const sessions = [
+        session("cs1", { startsAt: FUTURE, instructor: "A" }),
+        session("cs2", { startsAt: SOON, instructor: "B" }),
+        session("cs3", {
+          startsAt: new Date(NOW.getTime() + 4 * 3_600_000).toISOString(),
+          instructor: "C",
+        }),
+      ];
+      const bookings = Array.from({ length: n }, (_, i) =>
+        booking(`b${i}`, members[i % members.length]!.id, {
+          sessionId: sessions[i % sessions.length]!.id,
+        }),
+      );
+      return baseSeed({
+        members,
+        classTypes: [classType("ct1")],
+        sessions,
+        bookings,
+      });
+    };
+
+    const countReads = (n: number) => {
+      const r = createInMemoryRepositories(buildMany(n));
+      const membersGetById = vi.spyOn(r.members, "getById");
+      const membersListByIds = vi.spyOn(r.members, "listByIds");
+      const sessionsGetById = vi.spyOn(r.classSessions, "getById");
+      const sessionsListByIds = vi.spyOn(r.classSessions, "listByIds");
+      return listBookingRows(r, "s1").then((rows) => ({
+        rows,
+        membersGetById: membersGetById.mock.calls.length,
+        membersListByIds: membersListByIds.mock.calls.length,
+        sessionsGetById: sessionsGetById.mock.calls.length,
+        sessionsListByIds: sessionsListByIds.mock.calls.length,
+      }));
+    };
+
+    const small = await countReads(1);
+    const large = await countReads(50);
+
+    expect(small.rows.length).toBe(1);
+    expect(large.rows.length).toBe(50);
+    // No per-booking single-row reads.
+    expect(small.membersGetById).toBe(0);
+    expect(large.membersGetById).toBe(0);
+    expect(small.sessionsGetById).toBe(0);
+    expect(large.sessionsGetById).toBe(0);
+    // The batched reads are a fixed count independent of N.
+    expect(small.membersListByIds).toBe(1);
+    expect(large.membersListByIds).toBe(1);
+    expect(small.sessionsListByIds).toBe(1);
+    expect(large.sessionsListByIds).toBe(1);
   });
 });

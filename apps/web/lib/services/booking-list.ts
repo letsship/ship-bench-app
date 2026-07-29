@@ -23,11 +23,22 @@ export async function listBookingRows(
   const typeById = new Map(classTypes.map((type) => [type.id, type]));
   const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
 
+  // Batch the member + class-session joins: a single bounded read per repo,
+  // independent of how many bookings we return (the old N+1 read one per row).
+  const memberIds = [...new Set(bookings.map((booking) => booking.memberId))];
+  const sessionIds = [...new Set(bookings.map((booking) => booking.sessionId))];
+  const [members, referencedSessions] = await Promise.all([
+    repos.members.listByIds(memberIds),
+    repos.classSessions.listByIds(sessionIds),
+  ]);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const sessionById = new Map(referencedSessions.map((session) => [session.id, session]));
+
   const rows: BookingRow[] = [];
   for (const booking of bookings) {
-    const session = await repos.classSessions.getById(booking.sessionId);
+    const session = sessionById.get(booking.sessionId);
     const classType = session ? typeById.get(session.classTypeId) : undefined;
-    const member = await repos.members.getById(booking.memberId);
+    const member = memberById.get(booking.memberId);
     rows.push({
       id: booking.id,
       memberName: member?.name ?? "—",

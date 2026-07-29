@@ -91,4 +91,28 @@ describe("in-memory repositories", () => {
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
   });
+
+  it("members.listByIds returns only requested ids and ignores unknowns", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const wanted = [members[0]!.id, members[1]!.id, "does-not-exist"];
+    const found = await repos.members.listByIds(wanted);
+    const foundIds = found.map((m) => m.id).sort();
+    expect(foundIds).toEqual([members[0]!.id, members[1]!.id].sort());
+  });
+
+  it("members.listByIds returns [] for an empty input array", async () => {
+    expect(await repos.members.listByIds([])).toEqual([]);
+  });
+
+  it("classSessions.listByIds returns only requested ids and ignores unknowns", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const wanted = [sessions[0]!.id, sessions[1]!.id, "does-not-exist"];
+    const found = await repos.classSessions.listByIds(wanted);
+    const foundIds = found.map((s) => s.id).sort();
+    expect(foundIds).toEqual([sessions[0]!.id, sessions[1]!.id].sort());
+  });
+
+  it("classSessions.listByIds returns [] for an empty input array", async () => {
+    expect(await repos.classSessions.listByIds([])).toEqual([]);
+  });
 });
