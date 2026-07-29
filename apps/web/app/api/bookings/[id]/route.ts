@@ -10,12 +10,12 @@ export const dynamic = "force-dynamic";
 // was freed. Returns whether the cancellation earned a refund.
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   return handle(async () => {
     await requireSession();
     const { repos } = await resolveStudio();
-    const { id } = params;
+    const { id } = await params;
     return ok(await cancelBooking(repos, createNotificationProvider(), id));
   });
 }
