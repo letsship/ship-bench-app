@@ -60,6 +60,7 @@ describe("in-memory repositories", () => {
       phone: null,
       status: "active",
       notificationsOptedOut: false,
+      icalToken: "ical-token-new",
       createdAt: NOW.toISOString(),
     };
     await repos.members.insert(member);
