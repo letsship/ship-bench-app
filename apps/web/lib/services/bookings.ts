@@ -15,10 +15,26 @@ import {
   type SessionSummary,
   waitlistPromotion,
 } from "@/lib/notifications/messages";
+import { resolveTracker } from "@/lib/analytics/tracker";
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
+
+// Funnel analytics. Routed through the single injectable tracker so the
+// `posthog` package stays out of domain/service code. Captures only the
+// member's id (as the analytics distinct id) and the booked class session id —
+// never any personally-identifying data.
+function captureBookingEvent(
+  event: "booking_created" | "waitlist_joined" | "booking_cancelled",
+  ids: { memberId: string; sessionId: string },
+): void {
+  resolveTracker().capture({
+    event,
+    distinctId: ids.memberId,
+    properties: { session_id: ids.sessionId },
+  });
+}
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -100,6 +116,10 @@ export async function createBooking(
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   }
+  captureBookingEvent(decision.status === "booked" ? "booking_created" : "waitlist_joined", {
+    memberId: member.id,
+    sessionId: session.id,
+  });
   return { bookingId, status: decision.status };
 }
 
@@ -133,6 +153,11 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+
+  captureBookingEvent("booking_cancelled", {
+    memberId: booking.memberId,
+    sessionId: session.id,
+  });
 
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
