@@ -325,3 +325,4 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("className");
   });
 });
+
