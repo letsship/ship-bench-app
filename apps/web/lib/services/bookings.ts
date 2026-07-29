@@ -17,6 +17,12 @@ import {
 } from "@/lib/notifications/messages";
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
+import type { Tracker } from "@/lib/analytics/types";
+import {
+  BOOKING_CANCELLED_EVENT,
+  BOOKING_CREATED_EVENT,
+  WAITLIST_JOINED_EVENT,
+} from "@/lib/analytics/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
@@ -63,6 +69,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -100,6 +107,20 @@ export async function createBooking(
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   }
+
+  // Funnel analytics — exactly one event per booking flow, mutually exclusive.
+  // The member id is the analytics distinct id; the class session id is the
+  // only property. No email/name/phone. A tracking failure logs but never
+  // blocks the booking response.
+  const trackedEvent =
+    decision.status === "booked"
+      ? { event: BOOKING_CREATED_EVENT, distinctId: member.id, properties: { session_id: session.id } }
+      : { event: WAITLIST_JOINED_EVENT, distinctId: member.id, properties: { session_id: session.id } };
+  try {
+    await tracker.capture(trackedEvent);
+  } catch (error) {
+    console.error("analytics capture failed", error);
+  }
   return { bookingId, status: decision.status };
 }
 
@@ -111,6 +132,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -148,6 +170,19 @@ export async function cancelBooking(
       decision.refundEligible,
     ),
   );
+
+  // Funnel analytics — exactly one event per cancellation flow. The cancelled
+  // member's id is the analytics distinct id; the class session id is the only
+  // property. No email/name/phone. A tracking failure logs but never blocks.
+  try {
+    await tracker.capture({
+      event: BOOKING_CANCELLED_EVENT,
+      distinctId: booking.memberId,
+      properties: { session_id: booking.sessionId },
+    });
+  } catch (error) {
+    console.error("analytics capture failed", error);
+  }
   return { refundEligible: decision.refundEligible, promotedMemberId };
 }
 
