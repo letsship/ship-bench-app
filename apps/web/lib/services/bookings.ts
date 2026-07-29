@@ -1,6 +1,7 @@
 import { newId } from "@/lib/db/ids";
+import { DuplicateBookingError } from "@/lib/db/repos/errors";
 import type { Repositories } from "@/lib/db/repos/types";
-import type { ClassSession, Member } from "@/lib/db/types";
+import type { Booking, ClassSession, Member } from "@/lib/db/types";
 import {
   type BookingDenyReason,
   canBook,
@@ -84,14 +85,27 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  await repos.bookings.insert({
-    id: bookingId,
-    sessionId: session.id,
-    memberId: member.id,
-    status: decision.status,
-    bookedAt: nowIso(),
-    cancelledAt: null,
-  });
+  let inserted: Booking;
+  try {
+    inserted = await repos.bookings.insert({
+      id: bookingId,
+      sessionId: session.id,
+      memberId: member.id,
+      status: decision.status,
+      bookedAt: nowIso(),
+      cancelledAt: null,
+    });
+  } catch (error) {
+    // A near-simultaneous double submit can pass the `canBook` fast path on both
+    // requests before either insert lands. The persistence-layer unique
+    // constraint (DB index / in-memory guard) then rejects the second insert as
+    // a duplicate — surface it as the same `booking_already_booked` 409 the
+    // fast path returns, and do not enqueue a confirmation for the rejected row.
+    if (error instanceof DuplicateBookingError) {
+      throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+    }
+    throw error;
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
@@ -100,7 +114,7 @@ export async function createBooking(
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   }
-  return { bookingId, status: decision.status };
+  return { bookingId: inserted.id, status: decision.status };
 }
 
 export interface CancelResult {
