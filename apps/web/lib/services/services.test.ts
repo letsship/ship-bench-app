@@ -11,7 +11,7 @@ import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
-import { getStudioContext } from "./studio";
+import { getStudioContext, resolvePublicStudioPage } from "./studio";
 
 // Anchored to the real clock: the booking/cancellation rules compare against
 // `new Date()` inside the services, so fixtures must be genuinely future/past.
@@ -323,5 +323,37 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("resolvePublicStudioPage", () => {
+  let repos: Repositories;
+  beforeEach(async () => {
+    // Use the real clock so the service's new Date() "from" filter matches.
+    repos = createInMemoryRepositories(buildSeed(new Date()));
+  });
+
+  it("returns studio + upcoming classes for the correct slug", async () => {
+    const result = await resolvePublicStudioPage(repos, "riverbank");
+    expect(result).not.toBeNull();
+    expect(result!.studio.name).toBe("Riverbank Movement");
+    expect(result!.studio.slug).toBe("riverbank");
+    // buildSeed creates sessions offset from now, so at least some are upcoming.
+    expect(result!.classes.length).toBeGreaterThan(0);
+    for (const cls of result!.classes) {
+      expect(cls).toHaveProperty("name");
+      expect(cls).toHaveProperty("startsAt");
+      expect(cls).toHaveProperty("instructor");
+    }
+  });
+
+  it("returns null for a non-matching slug", async () => {
+    const result = await resolvePublicStudioPage(repos, "nonexistent-studio");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the slug does not match the studio slug", async () => {
+    const result = await resolvePublicStudioPage(repos, "wrong-slug");
+    expect(result).toBeNull();
   });
 });

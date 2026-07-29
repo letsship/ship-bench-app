@@ -1,6 +1,8 @@
 import type { Repositories } from "@/lib/db/repos/types";
 import type { Studio, StudioSettings } from "@/lib/db/types";
 import { HttpError } from "@/lib/http";
+import type { PublicClass, PublicStudio } from "@/lib/services/public-studio";
+import { listSessions } from "@/lib/services/classes";
 
 export interface StudioContext {
   studio: Studio;
@@ -37,6 +39,30 @@ export interface UpdateSettingsInput {
   notifyCancellations?: boolean;
   notifyWaitlistPromotions?: boolean;
   notifyInvoices?: boolean;
+}
+
+/**
+ * Resolve a studio by its public slug plus its upcoming classes, or null when
+ * no studio owns that slug (the caller turns null into a 404).
+ *
+ * Accepts Repositories by dependency injection so it can be unit-tested against
+ * the in-memory fakes.
+ */
+export async function resolvePublicStudioPage(
+  repos: Repositories,
+  slug: string,
+): Promise<PublicStudio | null> {
+  const studio = await repos.studios.getBySlug(slug);
+  if (!studio) return null;
+  const sessions = await listSessions(repos, studio.id, { from: new Date().toISOString() });
+  const classes: PublicClass[] = sessions.map((session) => ({
+    id: session.id,
+    name: session.classTypeName,
+    instructor: session.instructor,
+    startsAt: session.startsAt,
+    endsAt: session.endsAt,
+  }));
+  return { studio, classes };
 }
 
 export async function updateSettings(
