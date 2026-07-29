@@ -31,9 +31,18 @@ export interface BookingContext {
   now: string;
 }
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// An active booking blocks another booking attempt for the same member +
+// session: a confirmed seat, a waitlist entry (it holds the member's place in
+// line), or attendance already recorded. Cancelled and no_show rows do not
+// block, so a member whose booking was cancelled can book the class again.
+const ACTIVE_MEMBER_BOOKING = new Set(["booked", "waitlisted", "attended"]);
+
+// Shared definition of "active" so the domain gate (canBook) and the
+// persistence-level duplicate guard (BookingsRepo.insertUniqueActive) agree on
+// what counts as a blocking booking.
+export function isActiveBooking(status: string): boolean {
+  return ACTIVE_MEMBER_BOOKING.has(status);
+}
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
@@ -43,7 +52,7 @@ export function canBook(context: BookingContext): BookingDecision {
     return { ok: false, reason: "session_started" };
   }
   if (context.memberStatus !== "active") return { ok: false, reason: "member_inactive" };
-  if (context.memberBookings.some((booking) => ACTIVE_MEMBER_BOOKING.has(booking.status))) {
+  if (context.memberBookings.some((booking) => isActiveBooking(booking.status))) {
     return { ok: false, reason: "already_booked" };
   }
   if (context.occupancy.isFull) {
