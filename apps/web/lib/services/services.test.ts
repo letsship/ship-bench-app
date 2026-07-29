@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,78 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("listBookingsForExport", () => {
+  const T1 = "2026-06-01T08:00:00.000Z";
+  const T2 = "2026-06-15T12:00:00.000Z";
+  const T3 = "2026-06-30T17:00:00.000Z";
+
+  function exportSeed(): SeedData {
+    return baseSeed({
+      members: [member("m1"), member("m2")],
+      classTypes: [classType("ct1")],
+      sessions: [
+        session("cs1", { startsAt: T1 }),
+        session("cs2", { startsAt: T2 }),
+        session("cs3", { startsAt: T3 }),
+      ],
+      bookings: [
+        booking("b1", "m1", { sessionId: "cs1" }),
+        booking("b2", "m2", { sessionId: "cs2" }),
+        booking("b3", "m1", { sessionId: "cs3" }),
+      ],
+    });
+  }
+
+  it("includes the member email on each row", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1");
+    expect(rows.map((row) => row.email)).toEqual(["m1@e.co", "m2@e.co", "m1@e.co"]);
+  });
+
+  it("filters inclusively on both ends (a session starting exactly at `to` is included)", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", { from: T1, to: T3 });
+    expect(rows.map((row) => row.id)).toEqual(["b1", "b2", "b3"]);
+  });
+
+  it("compares parsed timestamps, so mixed ISO precisions still bound correctly", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", {
+      from: "2026-06-15T12:00:00Z",
+      to: "2026-06-30T17:00:00Z",
+    });
+    expect(rows.map((row) => row.id)).toEqual(["b2", "b3"]);
+  });
+
+  it("treats an omitted bound as unbounded on that side", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const fromOnly = await listBookingsForExport(repos, "s1", { from: T2 });
+    expect(fromOnly.map((row) => row.id)).toEqual(["b2", "b3"]);
+    const toOnly = await listBookingsForExport(repos, "s1", { to: T2 });
+    expect(toOnly.map((row) => row.id)).toEqual(["b1", "b2"]);
+  });
+
+  it("orders rows by session start", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs3", { startsAt: T3 }),
+          session("cs1", { startsAt: T1 }),
+          session("cs2", { startsAt: T2 }),
+        ],
+        bookings: [
+          booking("b3", "m1", { sessionId: "cs3" }),
+          booking("b1", "m1", { sessionId: "cs1" }),
+          booking("b2", "m1", { sessionId: "cs2" }),
+        ],
+      }),
+    );
+    const rows = await listBookingsForExport(repos, "s1");
+    expect(rows.map((row) => row.startsAt)).toEqual([T1, T2, T3]);
   });
 });

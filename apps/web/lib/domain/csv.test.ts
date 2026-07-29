@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -52,6 +52,69 @@ describe("membersToCsv", () => {
     const [header, row] = csv.split("\r\n");
     expect(header).toBe("Name,Email,Phone,Status,Joined");
     expect(row).toBe("Amara,amara@example.com,,active,2026-01-01T00:00:00Z");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits the exact header and column order", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-10T08:00:00.000Z",
+        className: "Vinyasa Flow",
+        memberName: "Amara Okafor",
+        email: "amara@example.com",
+        status: "attended",
+      },
+    ]);
+    const [header, row] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+    expect(row).toBe(
+      "2026-06-10T08:00:00.000Z,Vinyasa Flow,Amara Okafor,amara@example.com,attended",
+    );
+  });
+
+  it("keeps a member named 'Rossi, Chiara' a single quoted column", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-10T08:00:00.000Z",
+        className: "Yin & Restore",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toBe(
+      '2026-06-10T08:00:00.000Z,Yin & Restore,"Rossi, Chiara",chiara@example.com,booked',
+    );
+  });
+
+  it("doubles embedded quotes per RFC 4180", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-10T08:00:00.000Z",
+        className: 'Pottery "Intro"',
+        memberName: "Bram",
+        email: "bram@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Pottery ""Intro"""');
+  });
+
+  it("normalises Starts to a UTC ISO-8601 timestamp", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-10T10:00:00+02:00",
+        className: "Yoga",
+        memberName: "Bram",
+        email: "bram@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row.startsWith("2026-06-10T08:00:00.000Z,")).toBe(true);
   });
 });
 
