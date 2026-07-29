@@ -5,3 +5,10 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Per-member secret for the private calendar subscription (/api/ical/[token]).
+// 32 hex chars (a UUID with dashes stripped): URL-safe and unguessable. Used by
+// createMember; the seed dataset uses a deterministic value (see seed-data.ts).
+export function newCalendarToken(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}

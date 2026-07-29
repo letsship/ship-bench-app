@@ -55,6 +55,7 @@ const member = (id: string, over: Partial<Member> = {}): Member => ({
   phone: null,
   status: "active",
   notificationsOptedOut: false,
+  calendarToken: `caltok-${id}`,
   createdAt: ISO,
   ...over,
 });
