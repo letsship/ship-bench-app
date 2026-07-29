@@ -1,6 +1,6 @@
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
-import type { ClassSession, Member } from "@/lib/db/types";
+import type { ClassPack, ClassSession, Member } from "@/lib/db/types";
 import {
   type BookingDenyReason,
   canBook,
@@ -8,6 +8,7 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import { pickDrawablePack } from "@/lib/domain/packs";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -55,6 +56,14 @@ async function loadSession(repos: Repositories, sessionId: string): Promise<Clas
   return session;
 }
 
+async function drawCredit(repos: Repositories, memberId: string): Promise<ClassPack | null> {
+  const packs = await repos.classPacks.listByMember(memberId);
+  if (packs.length === 0) return null;
+  const drawable = pickDrawablePack(packs);
+  if (!drawable) throw new HttpError(402, "pack_exhausted", "This member has no class credits remaining; buy another pack");
+  return drawable;
+}
+
 export interface BookingResult {
   bookingId: string;
   status: "booked" | "waitlisted";
@@ -83,6 +92,8 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  const drawable = await drawCredit(repos, member.id);
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -100,6 +111,13 @@ export async function createBooking(
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   }
+
+  if (drawable) {
+    await repos.classPacks.update(drawable.id, {
+      creditsRemaining: drawable.creditsRemaining - 1,
+    });
+  }
+
   return { bookingId, status: decision.status };
 }
 
