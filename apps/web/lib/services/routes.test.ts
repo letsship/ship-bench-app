@@ -66,8 +66,11 @@ describe("GET route handlers (against injected fake repositories)", () => {
       { params: Promise.resolve({ id }) },
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { id: string; lineItems: unknown[] };
-    expect(body.id).toBe(id);
+    const body = (await res.json()) as {
+      invoice: { id: string };
+      lineItems: unknown[];
+    };
+    expect(body.invoice.id).toBe(id);
     expect(Array.isArray(body.lineItems)).toBe(true);
   });
 });
