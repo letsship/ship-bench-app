@@ -29,6 +29,28 @@ describe("computeInvoiceTotals", () => {
     expect(totals.totalCents).toBe(1090);
   });
 
+  it("is safe for an invoice with no line items", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("is safe when every line is refunded (fully-refunded invoice)", () => {
+    // Mirrors the seeded "Pottery intensive" invoice for Femke: a single
+    // refunded line of quantity 1 at €90.00.
+    const totals = computeInvoiceTotals(
+      [{ quantity: 1, unitAmountCents: 9000, refunded: true }],
+      2100,
+    );
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+    expect(totals.refundedCents).toBe(9000);
+  });
+
   it("rounds tax half-up", () => {
     // 1000 * 5 / 10000 = 0.5 -> rounds to 1
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 5).taxCents).toBe(1);
