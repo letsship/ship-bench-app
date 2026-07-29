@@ -44,6 +44,47 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("is zero across the board for an empty line-item list", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("yields zero subtotal/tax/total when every line is refunded", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 1200, refunded: true },
+        { quantity: 2, unitAmountCents: 500, refunded: true },
+      ],
+      2100,
+    );
+    expect(totals.subtotalCents).toBe(0);
+    expect(totals.taxCents).toBe(0);
+    expect(totals.totalCents).toBe(0);
+    // Refunded amounts are still summed: 1200 + (2 * 500) = 2200.
+    expect(totals.refundedCents).toBe(2200);
+  });
+
+  it("excludes refunded lines from subtotal and tax in a mixed invoice", () => {
+    const totals = computeInvoiceTotals(
+      [
+        { quantity: 1, unitAmountCents: 3000 },
+        { quantity: 1, unitAmountCents: 800, refunded: true },
+        { quantity: 2, unitAmountCents: 1000 },
+      ],
+      2100,
+    );
+    // Only 3000 + (2 * 1000) = 5000 is billable.
+    expect(totals.subtotalCents).toBe(5000);
+    expect(totals.taxCents).toBe(1050);
+    expect(totals.totalCents).toBe(6050);
+    // Refunded line tracked separately, never touching the tax base.
+    expect(totals.refundedCents).toBe(800);
+  });
 });
 
 describe("formatInvoiceNumber", () => {
