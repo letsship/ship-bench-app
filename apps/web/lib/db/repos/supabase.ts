@@ -10,6 +10,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { DuplicateBookingError } from "./errors";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
 
@@ -18,9 +19,14 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
+
+// Postgres unique-violation SQLSTATE, raised by the
+// `uniq_bookings_session_member_active` partial index when a member tries to
+// hold a second non-cancelled booking for the same session.
+const PG_UNIQUE_VIOLATION = "23505";
 
 function fail(context: string, error: { message: string }): never {
   throw new Error(`Supabase ${context} failed: ${error.message}`);
@@ -49,6 +55,27 @@ export function createSupabaseRepositories(): Repositories {
       .single();
     if (error) fail(`insert into ${table}`, error);
     return toCamelRow<T>(data as Record<string, unknown>);
+  }
+
+  // Booking inserts have a domain-specific conflict: the
+  // `uniq_bookings_session_member_active` partial index rejects a second
+  // non-cancelled booking for the same member + session. Translate that
+  // SQLSTATE 23505 into the shared `DuplicateBookingError` so the service can
+  // return the standard `booking_already_booked` 409 without knowing the
+  // driver. Any other error is still the generic insert failure.
+  async function insertBooking(booking: Booking): Promise<Booking> {
+    const { data, error } = await db
+      .from("bookings")
+      .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+      .select()
+      .single();
+    if (error) {
+      if (error.code === PG_UNIQUE_VIOLATION) {
+        throw new DuplicateBookingError(booking.sessionId, booking.memberId);
+      }
+      fail("insert into bookings", error);
+    }
+    return toCamelRow<Booking>(data as Record<string, unknown>);
   }
 
   async function updateReturning<T>(
@@ -145,7 +172,7 @@ export function createSupabaseRepositories(): Repositories {
           db.from("bookings").select("*").eq("id", id).maybeSingle(),
           "bookings.getById",
         ),
-      insert: (booking) => insertReturning("bookings", booking),
+      insert: (booking) => insertBooking(booking),
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {

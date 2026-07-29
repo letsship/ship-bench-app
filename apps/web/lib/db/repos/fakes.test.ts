@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { ACTIVE_BOOKING_STATUSES } from "@/lib/domain/booking-rules";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
 import { createInMemoryRepositories } from "./fakes";
+import { DuplicateBookingError } from "./errors";
 import type { Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
@@ -90,5 +93,84 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  describe("bookings.insert duplicate guard", () => {
+    let repos: Repositories;
+    let sessionId: string;
+
+    beforeEach(async () => {
+      repos = createInMemoryRepositories(buildSeed(NOW));
+      const sessions = await repos.classSessions.listByStudio(
+        (await repos.studios.getFirst())?.id ?? "",
+      );
+      sessionId = sessions[0].id;
+    });
+
+    const newBooking = (
+      id: string,
+      memberId: string,
+      status: Booking["status"],
+      cancelledAt: string | null = null,
+    ): Booking => ({
+      id,
+      sessionId,
+      memberId,
+      status,
+      bookedAt: NOW.toISOString(),
+      cancelledAt,
+    });
+
+    it("throws DuplicateBookingError when an active booking already exists", async () => {
+      await repos.bookings.insert(newBooking("b1", "m1", "booked"));
+      await expect(
+        repos.bookings.insert(newBooking("b2", "m1", "waitlisted")),
+      ).rejects.toBeInstanceOf(DuplicateBookingError);
+    });
+
+    it("guards every active status that canBook treats as blocking", async () => {
+      for (const status of ACTIVE_BOOKING_STATUSES) {
+        const reposCase = createInMemoryRepositories(buildSeed(NOW));
+        const sessions = await reposCase.classSessions.listByStudio(
+          (await reposCase.studios.getFirst())?.id ?? "",
+        );
+        const sid = sessions[0].id;
+        await reposCase.bookings.insert({
+          id: "x1",
+          sessionId: sid,
+          memberId: "m1",
+          status,
+          bookedAt: NOW.toISOString(),
+          cancelledAt: null,
+        });
+        await expect(
+          reposCase.bookings.insert({
+            id: "x2",
+            sessionId: sid,
+            memberId: "m1",
+            status: "waitlisted",
+            bookedAt: NOW.toISOString(),
+            cancelledAt: null,
+          }),
+        ).rejects.toBeInstanceOf(DuplicateBookingError);
+      }
+    });
+
+    it("does not throw when the prior booking was cancelled", async () => {
+      await repos.bookings.insert(newBooking("b1", "m1", "cancelled", NOW.toISOString()));
+      const inserted = await repos.bookings.insert(newBooking("b2", "m1", "booked"));
+      expect(inserted.status).toBe("booked");
+    });
+
+    it("leaves the store untouched after a rejected insert", async () => {
+      await repos.bookings.insert(newBooking("b1", "m1", "waitlisted"));
+      await expect(
+        repos.bookings.insert(newBooking("b2", "m1", "waitlisted")),
+      ).rejects.toBeInstanceOf(DuplicateBookingError);
+      const forMember = (await repos.bookings.listBySession(sessionId)).filter(
+        (b) => b.memberId === "m1",
+      );
+      expect(forMember).toHaveLength(1);
+    });
   });
 });

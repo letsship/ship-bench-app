@@ -56,6 +56,31 @@ describe("canBook", () => {
     });
   });
 
+  it("rejects a member who is already waitlisted (no double waitlist)", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "waitlisted" }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
+  it("rejects a member who already attended or no-showed", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "attended" }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+    expect(canBook(baseContext({ memberBookings: [{ status: "no_show" }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
+  it("lets a member re-book after their booking was cancelled", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "cancelled" }] }))).toEqual({
+      ok: true,
+      status: "booked",
+    });
+  });
+
   it("rejects when full and the waitlist is closed", () => {
     const occupancy = computeOccupancy(1, [{ status: "booked" }]);
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
