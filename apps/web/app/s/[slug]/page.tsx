@@ -42,7 +42,7 @@ export default async function PublicStudioPage({ params }: PageProps) {
         }}
       />
 
-      <Image src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio`} priority />
+      <Image src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio`} unoptimized priority />
       <div style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</div>
       <div style={{ marginTop: 8, color: "#666" }}>Upcoming classes</div>
 
