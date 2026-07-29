@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
+import { GET as invoiceDetailGet } from "@/app/api/invoices/[id]/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as memberDetailGet } from "@/app/api/members/[id]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +46,37 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  // Next 16 contract: `params` is a Promise that must be awaited. Passing a
+  // real Promise here locks that in — a synchronous `const { id } = params`
+  // would yield `undefined` and the handler would 404 instead of returning 200.
+  it("GET /api/members/[id] awaits its params Promise and returns the member", async () => {
+    const listRes = await membersGet();
+    const members = (await listRes.json()) as Array<{ id: string; name: string }>;
+    const { id, name } = members[0];
+
+    const res = await memberDetailGet(new NextRequest(`http://localhost/api/members/${id}`), {
+      params: Promise.resolve({ id }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; name: string };
+    expect(body.id).toBe(id);
+    expect(body.name).toBe(name);
+  });
+
+  it("GET /api/invoices/[id] awaits its params Promise and returns the invoice", async () => {
+    const listRes = await invoicesGet();
+    const invoices = (await listRes.json()) as Array<{ id: string; number: string }>;
+    const { id, number } = invoices[0];
+
+    const res = await invoiceDetailGet(
+      new NextRequest(`http://localhost/api/invoices/${id}`),
+      { params: Promise.resolve({ id }) },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { invoice: { id: string; number: string } };
+    expect(body.invoice.id).toBe(id);
+    expect(body.invoice.number).toBe(number);
   });
 });
