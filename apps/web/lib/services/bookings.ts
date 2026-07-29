@@ -112,10 +112,17 @@ export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
   bookingId: string,
+  studioId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
   const session = await loadSession(repos, booking.sessionId);
+  // A booking has no studioId of its own; ownership is its session's. Reject a
+  // booking whose session belongs to another studio BEFORE any cancellation,
+  // waitlist promotion, or notification, so a foreign booking is never mutated.
+  if (session.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Booking not found");
+  }
   const { settings } = await getStudioContext(repos);
 
   const decision = canCancel({
