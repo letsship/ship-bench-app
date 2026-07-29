@@ -71,9 +71,31 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+// Minimal Stripe webhook event shape (docs.stripe.com/webhooks). Only the
+// fields the webhook handler reads are modeled; metadata/invoice_id are
+// optional so non-invoice.paid and unknown-invoice events still parse.
+export const stripeEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  data: z
+    .object({
+      object: z
+        .object({
+          metadata: z
+            .object({
+              invoice_id: z.string().min(1).optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+export type StripeEvent = z.infer<typeof stripeEventSchema>;
