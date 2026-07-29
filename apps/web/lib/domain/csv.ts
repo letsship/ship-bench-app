@@ -59,3 +59,25 @@ export function invoicesToCsv(invoices: readonly InvoiceRow[]): string {
     { header: "Currency", value: (invoice) => invoice.currency },
   ]);
 }
+
+export interface BookingExportRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+// Bookings export for accounting: one row per booking joined to its session,
+// class, and member. `Starts` is normalized to a canonical ISO-8601 UTC
+// timestamp so a non-Z input can never leak through. Reuses toCsv so the same
+// RFC 4180 quoting handles names like "Rossi, Chiara".
+export function bookingsToCsv(rows: readonly BookingExportRow[]): string {
+  return toCsv(rows, [
+    { header: "Starts", value: (row) => new Date(row.startsAt).toISOString() },
+    { header: "Class", value: (row) => row.className },
+    { header: "Member", value: (row) => row.memberName },
+    { header: "Email", value: (row) => row.email },
+    { header: "Status", value: (row) => row.status },
+  ]);
+}
