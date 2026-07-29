@@ -3,6 +3,7 @@ import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes"
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -273,6 +274,25 @@ describe("invoices service", () => {
     // buildSeed already has one pending outbox row, so assert our specific
     // invoice notification went out rather than an exact array.
     expect(provider.sent.some((m) => m.subject === `Invoice ${detail.invoice.number}`)).toBe(true);
+  });
+
+  it("stores totals equal to computeInvoiceTotals, even alongside a refunded line", async () => {
+    const provider = createFakeProvider();
+    const lineItems = [{ description: "Pass", quantity: 1, unitAmountCents: 10_000 }];
+    const detail = await createInvoice(repos, provider, studioId, { memberId, lineItems });
+    const { settings } = await getStudioContext(repos);
+    const expected = computeInvoiceTotals(lineItems, settings.taxRateBps);
+    expect(detail.invoice.subtotalCents).toBe(expected.subtotalCents);
+    expect(detail.invoice.taxCents).toBe(expected.taxCents);
+    expect(detail.invoice.totalCents).toBe(expected.totalCents);
+    // A refunded line drops out of the taxable subtotal, so the domain result
+    // for billable + refunded lines matches what the create path stored.
+    const withRefunded = computeInvoiceTotals(
+      [...lineItems, { quantity: 1, unitAmountCents: 5_000, refunded: true }],
+      settings.taxRateBps,
+    );
+    expect(detail.invoice.totalCents).toBe(withRefunded.totalCents);
+    expect(detail.invoice.totalCents).toBe(10_900);
   });
 
   it("allows a valid status transition and rejects an invalid one", async () => {
