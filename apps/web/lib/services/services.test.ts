@@ -249,6 +249,67 @@ describe("bookings service", () => {
       "waitlist_promotion",
     ]);
   });
+
+  it("rejects a sequential repeat submit while already waitlisted with 409", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    const first = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    expect(first.status).toBe("waitlisted");
+    await expect(
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    const all = await repos.bookings.listBySession("cs1");
+    const m2Rows = all.filter((b) => b.memberId === "m2" && b.status !== "cancelled");
+    expect(m2Rows).toHaveLength(1);
+  });
+
+  it("rejects a concurrent double submit (Promise.all) — exactly one waitlisted survives", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    const results = await Promise.allSettled([
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+    ]);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    if (rejected[0].status === "rejected") {
+      expect(rejected[0].reason).toMatchObject({ status: 409, code: "booking_already_booked" });
+    }
+    const all = await repos.bookings.listBySession("cs1");
+    const m2Rows = all.filter((b) => b.memberId === "m2" && b.status !== "cancelled");
+    expect(m2Rows).toHaveLength(1);
+  });
+
+  it("allows rebooking after cancellation", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    await cancelBooking(repos, provider, "b1");
+    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    expect(result.status).toBe("booked");
+  });
 });
 
 describe("invoices service", () => {
