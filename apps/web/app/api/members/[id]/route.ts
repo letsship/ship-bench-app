@@ -11,9 +11,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 // GET /api/members/:id — a single member.
 export async function GET(_request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
-    const { repos } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const { id } = await params;
-    return ok(await getMember(repos, id));
+    return ok(await getMember(repos, ctx.studio.id, id));
   });
 }
 
@@ -21,9 +21,9 @@ export async function GET(_request: Request, { params }: RouteContext): Promise<
 export async function PATCH(request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { repos } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const { id } = await params;
     const input = updateMemberSchema.parse(await request.json());
-    return ok(await updateMember(repos, id, input));
+    return ok(await updateMember(repos, ctx.studio.id, id, input));
   });
 }
