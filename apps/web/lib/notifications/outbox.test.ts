@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
-import { bookingConfirmation } from "./messages";
+import { bookingConfirmation, bookingReminder } from "./messages";
 import { dispatchOutbox, enqueueAndDispatch, enqueueNotification, shouldSend } from "./outbox";
 import type { NotificationMessage, NotificationProvider } from "./types";
 
@@ -25,6 +25,7 @@ function seedWith(
       notifyCancellations: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
+      notifyBookingReminders: true,
       ...settingsOverrides,
     },
     members: [
@@ -68,6 +69,7 @@ describe("shouldSend", () => {
     notifyCancellations: false,
     notifyWaitlistPromotions: true,
     notifyInvoices: false,
+    notifyBookingReminders: true,
   };
 
   it("respects the per-kind studio setting", () => {
@@ -75,10 +77,16 @@ describe("shouldSend", () => {
     expect(shouldSend("booking_cancellation", base)).toBe(false);
     expect(shouldSend("waitlist_promotion", base)).toBe(true);
     expect(shouldSend("invoice_issued", base)).toBe(false);
+    expect(shouldSend("booking_reminder", base)).toBe(true);
   });
 
   it("member opt-out wins over every setting", () => {
     expect(shouldSend("booking_confirmation", { ...base, memberOptedOut: true })).toBe(false);
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: true })).toBe(false);
+  });
+
+  it("the studio reminder flag gates booking_reminder", () => {
+    expect(shouldSend("booking_reminder", { ...base, notifyBookingReminders: false })).toBe(false);
   });
 });
 
@@ -135,5 +143,28 @@ describe("dispatchOutbox", () => {
     const provider = recorder();
     const summary = await enqueueAndDispatch(repos, provider, message());
     expect(summary.sent).toBe(1);
+  });
+
+  const reminder = (): NotificationMessage =>
+    bookingReminder(recipient, { title: "Yoga", startsAt: ISO, instructor: "I" }, "b1");
+
+  it("skips a booking_reminder when the studio reminder flag is off", async () => {
+    const repos = createInMemoryRepositories(seedWith({}, { notifyBookingReminders: false }));
+    const provider = recorder();
+    await enqueueNotification(repos, reminder());
+
+    const summary = await dispatchOutbox(repos, provider);
+    expect(summary).toEqual({ sent: 0, skipped: 1, failed: 0 });
+    expect(provider.sent).toHaveLength(0);
+  });
+
+  it("member opt-out suppresses a booking_reminder at delivery", async () => {
+    const repos = createInMemoryRepositories(seedWith({ notificationsOptedOut: true }));
+    const provider = recorder();
+    await enqueueNotification(repos, reminder());
+
+    const summary = await dispatchOutbox(repos, provider);
+    expect(summary).toEqual({ sent: 0, skipped: 1, failed: 0 });
+    expect(provider.sent).toHaveLength(0);
   });
 });
