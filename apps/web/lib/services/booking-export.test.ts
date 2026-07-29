@@ -80,4 +80,54 @@ describe("listBookingExportRows", () => {
     expect(fromOnly.length).toBe(all.length);
     expect(toOnly.length).toBe(all.length);
   });
+
+  it("includes a boundary session when startsAt is '+00:00' form and from is 'Z' form", async () => {
+    // Supabase returns timestamptz as `...+00:00` while callers pass canonical
+    // `...Z` ISO-8601. Lexical compare would drop the boundary (`+` < `Z`),
+    // so this pins the epoch-based comparison.
+    const repos = withSeed();
+    const studio = await repos.studios.getFirst();
+    const sessions = await repos.classSessions.listByStudio(studio!.id);
+    const earliest = [...sessions].sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+    // Insert a fresh session at the exact same instant but in `+00:00` form,
+    // with a booking so it surfaces in the export.
+    const offsetForm = earliest.startsAt.replace(/\.\d{3}Z$/, "+00:00");
+    const offsetSession = await repos.classSessions.insert({
+      ...earliest,
+      id: "sess-offset",
+      startsAt: offsetForm,
+    });
+    const aMember = (await repos.members.listByStudio(studio!.id))[0];
+    await repos.bookings.insert({
+      id: "bk-offset",
+      sessionId: offsetSession.id,
+      memberId: aMember.id,
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    });
+
+    const zForm = offsetForm.replace("+00:00", "Z");
+    const rows = await listBookingExportRows(repos, studio!.id, { from: zForm });
+    expect(rows.map((r) => r.startsAt)).toContain(offsetForm);
+  });
+
+  it("includes a session at 'to' even when the '+' offset was corrupted to a space", async () => {
+    // URLSearchParams decodes '+' to a space, so a `to` of `...+00:01`
+    // arrives as `... 00:01`. The service must restore it before parsing.
+    const repos = withSeed();
+    const studio = await repos.studios.getFirst();
+    const sessions = await repos.classSessions.listByStudio(studio!.id);
+    const sorted = [...sessions].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    const target = sorted[sorted.length - 1];
+    const targetMs = Date.parse(target.startsAt);
+    // A `to` one minute after the latest session, with a `+00:01` offset that
+    // has been corrupted (`+` -> space) by query decoding. Must still include
+    // the latest session (inclusive upper bound).
+    const corrupted = new Date(targetMs + 60_000)
+      .toISOString()
+      .replace(/(\d{2}:\d{2}:\d{2})\.\d{3}Z$/, "$1 00:01");
+    const rows = await listBookingExportRows(repos, studio!.id, { to: corrupted });
+    expect(rows.map((r) => r.startsAt)).toContain(target.startsAt);
+  });
 });
