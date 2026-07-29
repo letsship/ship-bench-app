@@ -71,4 +71,35 @@ test.describe("operator journeys (fake backends)", () => {
 
     expect(errors).toEqual([]);
   });
+
+  test("buys a 10-class pack for a member and watches the balance decrease as they book", async ({
+    page,
+  }) => {
+    await page.goto("/packages");
+    await expect(page).toHaveURL("/packages");
+
+    // Pick a fresh member with no pack
+    const memberSelect = page.getByLabel("Member");
+    await memberSelect.selectOption(memberSelect.locator("option").first());
+
+    // Initially balance is 0
+    await expect(page.getByText("0 credits remaining")).toBeVisible();
+
+    // Buy a 10-class pack
+    await page.getByRole("button", { name: "Buy 10-class pack" }).click();
+    await expect(page.getByText("10 credits remaining")).toBeVisible();
+
+    // Book that member into a class
+    await page.goto("/bookings");
+    const bookingForm = page.getByRole("form", { name: "New booking" });
+    const memberName = ((await memberSelect.locator("option:checked").textContent()) ?? "").trim();
+    await bookingForm.getByRole("button", { name: "Book" }).click();
+
+    // Go back to packages and check balance decreased
+    await page.goto("/packages");
+    if (memberName) {
+      await memberSelect.selectOption({ label: memberName });
+    }
+    await expect(page.getByText("9 credits remaining")).toBeVisible();
+  });
 });

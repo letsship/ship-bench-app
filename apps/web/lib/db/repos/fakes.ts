@@ -1,5 +1,6 @@
 import type {
   Booking,
+  ClassPack,
   ClassSession,
   ClassType,
   Invoice,
@@ -26,6 +27,7 @@ export interface SeedData {
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  classPacks: ClassPack[];
 }
 
 interface Store {
@@ -38,6 +40,7 @@ interface Store {
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  classPacks: ClassPack[];
 }
 
 const clone = <T>(row: T): T => ({ ...row });
@@ -60,13 +63,14 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
   const store: Store = {
     studios: seed ? [clone(seed.studio)] : [],
     settings: seed ? [clone(seed.settings)] : [],
-    members: seed ? cloneAll(seed.members) : [],
-    classTypes: seed ? cloneAll(seed.classTypes) : [],
-    classSessions: seed ? cloneAll(seed.sessions) : [],
-    bookings: seed ? cloneAll(seed.bookings) : [],
-    invoices: seed ? cloneAll(seed.invoices) : [],
-    invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
-    outbox: seed ? cloneAll(seed.outbox) : [],
+    members: seed ? cloneAll(seed.members ?? []) : [],
+    classTypes: seed ? cloneAll(seed.classTypes ?? []) : [],
+    classSessions: seed ? cloneAll(seed.sessions ?? []) : [],
+    bookings: seed ? cloneAll(seed.bookings ?? []) : [],
+    invoices: seed ? cloneAll(seed.invoices ?? []) : [],
+    invoiceLineItems: seed ? cloneAll(seed.lineItems ?? []) : [],
+    outbox: seed ? cloneAll(seed.outbox ?? []) : [],
+    classPacks: seed ? cloneAll(seed.classPacks ?? []) : [],
   };
 
   return {
@@ -209,6 +213,26 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
+      },
+    },
+    classPacks: {
+      async listActiveByMember(memberId) {
+        return cloneAll(
+          store.classPacks
+            .filter((row) => row.memberId === memberId && row.status === "active")
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+        );
+      },
+      async getById(id) {
+        const found = store.classPacks.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(pack) {
+        store.classPacks.push(clone(pack));
+        return clone(pack);
+      },
+      async update(id, patch) {
+        return patched(store.classPacks, (row) => row.id === id, patch, "Class pack");
       },
     },
   };
