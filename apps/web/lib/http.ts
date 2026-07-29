@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
@@ -48,9 +49,12 @@ export const unauthorized = (message = "Sign in required"): NextResponse =>
 export const conflict = (message: string, details?: unknown): NextResponse =>
   apiError(409, "conflict", message, details);
 
-// Run an async route body, translating known error types into the envelope and
-// logging (never swallowing) anything unexpected. Accepts any Response so
-// handlers can return non-JSON bodies (CSV, iCalendar).
+// Run an async route body, translating known error types into the envelope.
+// Zod validation errors and deliberate HttpErrors (404/409/402/...) are
+// expected outcomes, so they stay silent; anything else is a genuine bug —
+// report it to Sentry and log it (never swallowing) before returning the
+// generic 500. Accepts any Response so handlers can return non-JSON bodies
+// (CSV, iCalendar).
 export async function handle(fn: () => Promise<Response>): Promise<Response> {
   try {
     return await fn();
@@ -61,6 +65,7 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
     if (error instanceof HttpError) {
       return apiError(error.status, error.code, error.message, error.details);
     }
+    captureException(error);
     console.error("Unhandled API error", error);
     return apiError(500, "internal_error", "Something went wrong");
   }
