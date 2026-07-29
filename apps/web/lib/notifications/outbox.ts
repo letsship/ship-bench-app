@@ -8,6 +8,7 @@ const SETTING_FOR_KIND = {
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
+  booking_reminder: "notifyBookingReminders",
 } as const satisfies Record<NotificationKind, string>;
 
 export interface OptOutContext {
@@ -16,6 +17,7 @@ export interface OptOutContext {
   notifyCancellations: boolean;
   notifyWaitlistPromotions: boolean;
   notifyInvoices: boolean;
+  notifyBookingReminders: boolean;
 }
 
 // A member opt-out wins over everything; otherwise the studio-level setting for

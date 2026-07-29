@@ -53,6 +53,22 @@ export function waitlistPromotion(
   };
 }
 
+// The 24-hour reminder. `bookingId` is persisted in `data` so the reminder job
+// can dedupe against already-queued rows (it is the idempotency key).
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} is coming up`,
+    body: `Hi ${recipient.name}, a friendly reminder that you're booked into ${session.title} with ${session.instructor} on ${session.startsAt}. See you on the mat!`,
+    data: { title: session.title, startsAt: session.startsAt, bookingId },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;
