@@ -1,3 +1,4 @@
+import { isActiveBooking } from "../../domain/booking-rules";
 import type {
   Booking,
   ClassSession,
@@ -160,6 +161,20 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        store.bookings.push(clone(booking));
+        return clone(booking);
+      },
+      async insertUniqueActive(booking) {
+        // The scan and the push run in one synchronous tick (no await between
+        // them), so two concurrent createBooking calls cannot interleave here:
+        // the first push lands before the second scan, which then conflicts.
+        const conflict = store.bookings.some(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            isActiveBooking(row.status),
+        );
+        if (conflict) return null;
         store.bookings.push(clone(booking));
         return clone(booking);
       },

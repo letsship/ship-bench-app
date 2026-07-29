@@ -57,6 +57,13 @@ export interface BookingsRepo {
   listBySession(sessionId: string): Promise<Booking[]>;
   getById(id: string): Promise<Booking | null>;
   insert(booking: Booking): Promise<Booking>;
+  // Insert only when no ACTIVE booking (booked / waitlisted / attended — see
+  // isActiveBooking in lib/domain/booking-rules.ts) already exists for the same
+  // sessionId + memberId; returns the inserted row, or null on conflict.
+  // MUST be atomic (a single check-and-write): it is the guard that closes the
+  // check-then-act race that a separate read + `insert` cannot, so two
+  // concurrent booking attempts for the same member + session cannot both land.
+  insertUniqueActive(booking: Booking): Promise<Booking | null>;
   update(id: string, patch: Partial<Booking>): Promise<Booking>;
 }
 

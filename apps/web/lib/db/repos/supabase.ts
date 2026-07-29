@@ -146,6 +146,22 @@ export function createSupabaseRepositories(): Repositories {
           "bookings.getById",
         ),
       insert: (booking) => insertReturning("bookings", booking),
+      insertUniqueActive: async (booking) => {
+        // Backed by the partial unique index `bookings_unique_active` on
+        // (session_id, member_id) WHERE status is active — under real
+        // concurrency one insert wins and the loser raises unique-violation
+        // (23505), which maps to null (the service turns that into a 409).
+        const { data, error } = await db
+          .from("bookings")
+          .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+          .select()
+          .single();
+        if (error) {
+          if (error.code === "23505") return null;
+          fail("insert into bookings", error);
+        }
+        return toCamelRow<Booking>(data as Record<string, unknown>);
+      },
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {

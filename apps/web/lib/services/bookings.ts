@@ -84,7 +84,10 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  await repos.bookings.insert({
+  // Atomic duplicate guard: canBook above reads pre-insert state, so two
+  // concurrent attempts can both pass it. The repo decides the race — the
+  // loser gets null and the same conflict as a sequential repeat.
+  const inserted = await repos.bookings.insertUniqueActive({
     id: bookingId,
     sessionId: session.id,
     memberId: member.id,
@@ -92,6 +95,9 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+  if (!inserted) {
+    throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

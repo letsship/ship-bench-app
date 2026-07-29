@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -90,5 +91,57 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  describe("bookings.insertUniqueActive", () => {
+    const row = (id: string, over: Partial<Booking> = {}): Booking => ({
+      id,
+      sessionId: "sess_x",
+      memberId: "mem_x",
+      status: "waitlisted",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+      ...over,
+    });
+
+    it("inserts the first booking and returns it", async () => {
+      const empty = createInMemoryRepositories();
+      const inserted = await empty.bookings.insertUniqueActive(row("b1"));
+      expect(inserted).toEqual(row("b1"));
+      expect(await empty.bookings.listBySession("sess_x")).toHaveLength(1);
+    });
+
+    it("returns null and adds no row when an active booking already exists", async () => {
+      const empty = createInMemoryRepositories();
+      await empty.bookings.insertUniqueActive(row("b1"));
+      const duplicate = await empty.bookings.insertUniqueActive(row("b2", { status: "booked" }));
+      expect(duplicate).toBeNull();
+      const rows = await empty.bookings.listBySession("sess_x");
+      expect(rows).toHaveLength(1);
+      expect(rows[0].id).toBe("b1");
+    });
+
+    it("blocks on any active status, not just the incoming one", async () => {
+      const empty = createInMemoryRepositories();
+      await empty.bookings.insertUniqueActive(row("b1", { status: "booked" }));
+      expect(await empty.bookings.insertUniqueActive(row("b2"))).toBeNull();
+      expect(await empty.bookings.listBySession("sess_x")).toHaveLength(1);
+    });
+
+    it("does not block a different member on the same session", async () => {
+      const empty = createInMemoryRepositories();
+      await empty.bookings.insertUniqueActive(row("b1"));
+      const other = await empty.bookings.insertUniqueActive(row("b2", { memberId: "mem_y" }));
+      expect(other?.id).toBe("b2");
+    });
+
+    it("allows a fresh insert once the existing booking is cancelled", async () => {
+      const empty = createInMemoryRepositories();
+      await empty.bookings.insertUniqueActive(row("b1"));
+      await empty.bookings.update("b1", { status: "cancelled", cancelledAt: NOW.toISOString() });
+      const rebooked = await empty.bookings.insertUniqueActive(row("b2", { status: "booked" }));
+      expect(rebooked?.id).toBe("b2");
+      expect(await empty.bookings.listBySession("sess_x")).toHaveLength(2);
+    });
   });
 });
