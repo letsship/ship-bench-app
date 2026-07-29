@@ -36,10 +36,15 @@ test.describe("fully-refunded invoice detail (fake backends)", () => {
     await expect(page.getByText("Pottery intensive")).toBeVisible();
     await expect(page.getByText("Pottery intensive").locator("..").getByText(/refunded/i)).toBeVisible();
 
-    // Subtotal, Tax, and Total all read the zero-money value.
-    await expect(page.getByText(/^Subtotal/)).toContainText("€0.00");
-    await expect(page.getByText(/Tax/).first()).toContainText("€0.00");
-    await expect(page.getByText(/^Total/).first()).toContainText("€0.00");
+    // Subtotal, Tax, and Total all read the zero-money value. The page has a
+    // "Total" label card (value in a sibling div) AND a totals summary block
+    // (Subtotal/Tax/Total with their money inline). Scope to the summary block
+    // via the unique "Subtotal" row so we assert the inline "Total €0.00" row,
+    // not the card label.
+    const totalsBlock = page.getByText(/^Subtotal/).locator("..");
+    await expect(totalsBlock.getByText(/^Subtotal/)).toContainText("€0.00");
+    await expect(totalsBlock.getByText(/Tax/)).toContainText("€0.00");
+    await expect(totalsBlock.getByText(/^Total/)).toContainText("€0.00");
 
     expect(errors).toEqual([]);
   });
