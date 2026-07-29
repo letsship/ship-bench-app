@@ -33,6 +33,7 @@ export const AUTHED_PATHS = [
   "/classes",
   "/bookings",
   "/members",
+  "/packages",
   "/invoices",
   "/reports",
   "/settings",
