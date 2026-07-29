@@ -1,4 +1,5 @@
 import { newId } from "@/lib/db/ids";
+import { DuplicateActiveBookingError } from "@/lib/db/repos/errors";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
 import {
@@ -84,14 +85,25 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  await repos.bookings.insert({
-    id: bookingId,
-    sessionId: session.id,
-    memberId: member.id,
-    status: decision.status,
-    bookedAt: nowIso(),
-    cancelledAt: null,
-  });
+  try {
+    await repos.bookings.insert({
+      id: bookingId,
+      sessionId: session.id,
+      memberId: member.id,
+      status: decision.status,
+      bookedAt: nowIso(),
+      cancelledAt: null,
+    });
+  } catch (error) {
+    // The canBook pre-check rejects a sequential duplicate, but two concurrent
+    // submits can both pass it before either inserts. The repository's active
+    // (session_id, member_id) uniqueness invariant is the atomic guard; map its
+    // conflict to the same 409 envelope the sequential path returns.
+    if (error instanceof DuplicateActiveBookingError) {
+      throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+    }
+    throw error;
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(
