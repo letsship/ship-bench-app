@@ -15,15 +15,14 @@ async function createTestDb(): Promise<D1Database> {
     d1Databases: { DB: "test" },
   });
   const db = await mf.getD1Database("DB");
-  const migrationPath = resolve(__dirname, "../../migrations/0001_init.sql");
+  const migrationPath = resolve(__dirname, "../../../migrations/0001_init.sql");
   const sql = readFileSync(migrationPath, "utf-8");
-  const statements = sql
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
-  for (const stmt of statements) {
-    await db.exec(stmt + ";");
-  }
+  const cleaned = sql
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .map((line) => line.trim())
+    .join(" ");
+  await db.exec(cleaned);
   return db;
 }
 
