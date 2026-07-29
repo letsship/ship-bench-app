@@ -38,7 +38,10 @@ does not require Supabase, Resend, Docker, or network access.
   notification dispatch. They accept `Repositories` by dependency injection.
 - API routes in `apps/web/app/api/**/route.ts` use Zod schemas from
   `apps/web/lib/validation.ts`, `handle()` / `HttpError` from
-  `apps/web/lib/http.ts`, and return the shared JSON error envelope.
+  `apps/web/lib/http.ts`, and return the shared JSON error envelope. `handle()`
+  reports unexpected errors (not `ZodError`, not `HttpError`) to Sentry via
+  `@sentry/nextjs`; init lives in `instrumentation.ts` + `sentry.*.config.ts`
+  and is a no-op without `SENTRY_DSN`. Expected 4xx outcomes stay silent.
 - App Router pages under `apps/web/app/(app)/` resolve data through
   `resolveStudio()` and render with the local component patterns in
   `apps/web/app/(app)/_components/`.
