@@ -324,4 +324,78 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
   });
+
+  it("issues a bounded number of member and class-session reads regardless of booking count", async () => {
+    const base = buildSeed(NOW);
+    const bigSeed: SeedData = {
+      ...base,
+      sessions: base.sessions.concat(
+        Array.from({ length: 50 }, (_, i) => {
+          const type = base.classTypes[i % base.classTypes.length];
+          return {
+            id: `big-session-${i}`,
+            studioId: base.studio.id,
+            classTypeId: type.id,
+            instructor: "Test",
+            startsAt: new Date(NOW.getTime() + (i + 10) * 86400000).toISOString(),
+            endsAt: new Date(NOW.getTime() + (i + 10) * 86400000 + 3600000).toISOString(),
+            capacity: 20,
+            priceCents: 1000,
+            status: "scheduled" as const,
+            createdAt: NOW.toISOString(),
+          };
+        }),
+      ),
+      bookings: base.bookings.concat(
+        Array.from({ length: 50 }, (_, i) => ({
+          id: `big-booking-${i}`,
+          sessionId: `big-session-${i}`,
+          memberId: base.members[0].id,
+          status: "booked" as const,
+          bookedAt: NOW.toISOString(),
+          cancelledAt: null,
+        })),
+      ),
+      members: base.members,
+      classTypes: base.classTypes,
+    };
+
+    const smallRepos = createInMemoryRepositories(base);
+    const largeRepos = createInMemoryRepositories(bigSeed);
+    const smallStudioId = (await smallRepos.studios.getFirst())?.id ?? "";
+    const largeStudioId = (await largeRepos.studios.getFirst())?.id ?? "";
+
+    let smallMemberCalls = 0;
+    let smallSessionCalls = 0;
+    let largeMemberCalls = 0;
+    let largeSessionCalls = 0;
+
+    const wrap = (repos: Repositories, label: "small" | "large") => ({
+      ...repos,
+      members: {
+        ...repos.members,
+        listByStudio: async (sid: string) => {
+          if (label === "small") smallMemberCalls++;
+          else largeMemberCalls++;
+          return repos.members.listByStudio(sid);
+        },
+      },
+      classSessions: {
+        ...repos.classSessions,
+        listByStudio: async (sid: string, range?: { from?: string; to?: string }) => {
+          if (label === "small") smallSessionCalls++;
+          else largeSessionCalls++;
+          return repos.classSessions.listByStudio(sid, range);
+        },
+      },
+    });
+
+    await listBookingRows(wrap(smallRepos, "small"), smallStudioId);
+    await listBookingRows(wrap(largeRepos, "large"), largeStudioId);
+
+    expect(smallMemberCalls).toBe(1);
+    expect(smallSessionCalls).toBe(1);
+    expect(largeMemberCalls).toBe(1);
+    expect(largeSessionCalls).toBe(1);
+  });
 });
