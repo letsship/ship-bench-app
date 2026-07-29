@@ -8,6 +8,7 @@ import {
   pickWaitlistPromotion,
 } from "@/lib/domain/booking-rules";
 import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
+import { decidePackDraw } from "@/lib/domain/packs";
 import { HttpError } from "@/lib/http";
 import {
   bookingCancellation,
@@ -55,6 +56,29 @@ async function loadSession(repos: Repositories, sessionId: string): Promise<Clas
   return session;
 }
 
+// Once a member has bought a pack, every booking draws one credit from their
+// oldest pack with credits left. A member who never bought a pack books as a
+// one-off, unchanged.
+async function drawPackCredit(repos: Repositories, memberId: string): Promise<void> {
+  const packs = await repos.classPacks.listByMember(memberId);
+  const decision = decidePackDraw(packs);
+  if (decision.kind === "no_pack") return;
+  if (decision.kind === "exhausted") {
+    throw new HttpError(
+      402,
+      "pack_exhausted",
+      "This member's class packs are used up — buy another pack to book",
+    );
+  }
+  const pack = packs.find((entry) => entry.id === decision.packId);
+  if (!pack) return;
+  const creditsRemaining = pack.creditsRemaining - 1;
+  await repos.classPacks.update(pack.id, {
+    creditsRemaining,
+    status: creditsRemaining === 0 ? "exhausted" : pack.status,
+  });
+}
+
 export interface BookingResult {
   bookingId: string;
   status: "booked" | "waitlisted";
@@ -82,6 +106,8 @@ export async function createBooking(
   if (!decision.ok) {
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
+
+  await drawPackCredit(repos, member.id);
 
   const bookingId = newId();
   await repos.bookings.insert({
