@@ -179,6 +179,7 @@ describe("d1 repositories", () => {
   });
 
   it("lists sessions ordered by starts_at ascending", async () => {
+    for (const ct of seed.classTypes) await repos.classTypes.insert(ct);
     for (const s of seed.sessions) await repos.classSessions.insert(s);
     const list = await repos.classSessions.listByStudio(studioId);
     const starts = list.map((s) => s.startsAt);
@@ -186,6 +187,7 @@ describe("d1 repositories", () => {
   });
 
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
+    for (const ct of seed.classTypes) await repos.classTypes.insert(ct);
     for (const s of seed.sessions) await repos.classSessions.insert(s);
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
@@ -197,6 +199,7 @@ describe("d1 repositories", () => {
 
   it("lists bookings across multiple session ids with an empty-array short-circuit", async () => {
     for (const m of seed.members) await repos.members.insert(m);
+    for (const ct of seed.classTypes) await repos.classTypes.insert(ct);
     for (const s of seed.sessions) await repos.classSessions.insert(s);
     for (const b of seed.bookings) await repos.bookings.insert(b);
     const sessions = await repos.classSessions.listByStudio(studioId);
