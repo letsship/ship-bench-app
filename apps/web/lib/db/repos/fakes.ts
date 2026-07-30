@@ -105,6 +105,12 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
+      async findByToken(token) {
+        // Tokens are studio-independent secrets, so no studio scoping here. An
+        // empty token matches nothing (no member is seeded with one).
+        const found = token ? store.members.find((row) => row.calendarToken === token) : undefined;
+        return found ? clone(found) : null;
+      },
       async insert(member) {
         store.members.push(clone(member));
         return clone(member);

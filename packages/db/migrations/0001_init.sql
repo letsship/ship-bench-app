@@ -38,6 +38,9 @@ create table public.members (
   phone                   text,
   status                  text not null default 'active',
   notifications_opted_out boolean not null default false,
+  -- Secret token authorising the per-member calendar feed. Unique so a token
+  -- resolves to exactly one member; the unique constraint indexes the lookup.
+  calendar_token          text not null unique,
   created_at              timestamptz not null default now(),
   unique (studio_id, email)
 );
