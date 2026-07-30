@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { reportError } from "./monitoring/sentry";
 
 // A consistent JSON error envelope for every API route: { error: { code,
 // message, details? } }. Domain code throws HttpError; the handle() wrapper
@@ -50,7 +51,9 @@ export const conflict = (message: string, details?: unknown): NextResponse =>
 
 // Run an async route body, translating known error types into the envelope and
 // logging (never swallowing) anything unexpected. Accepts any Response so
-// handlers can return non-JSON bodies (CSV, iCalendar).
+// handlers can return non-JSON bodies (CSV, iCalendar). Only that final
+// unexpected branch is reported to Sentry — a Zod 400 or an HttpError
+// (404 / 409 / 402 / ...) is a normal handled outcome, not an incident.
 export async function handle(fn: () => Promise<Response>): Promise<Response> {
   try {
     return await fn();
@@ -62,6 +65,7 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
       return apiError(error.status, error.code, error.message, error.details);
     }
     console.error("Unhandled API error", error);
+    reportError(error);
     return apiError(500, "internal_error", "Something went wrong");
   }
 }
