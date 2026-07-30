@@ -31,6 +31,9 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  // Private, unguessable token authorizing this member's personal calendar
+  // subscription feed at /api/ical/[token] (no session cookie required).
+  icalToken: string;
   createdAt: string;
 }
 

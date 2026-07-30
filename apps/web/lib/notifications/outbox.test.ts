@@ -36,6 +36,7 @@ function seedWith(
         phone: null,
         status: "active",
         notificationsOptedOut: false,
+        icalToken: "ical-m1",
         createdAt: ISO,
         ...memberOverrides,
       },
