@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -323,5 +323,23 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+    // Ordered by startsAt ascending so the page can bucket by day.
+    const startsAts = rows.map((row) => row.startsAt);
+    expect([...startsAts]).toEqual([...startsAts].sort());
+  });
+
+  it("does not read members or class sessions once per booking (no N+1)", async () => {
+    const memberGetById = vi.spyOn(repos.members, "getById");
+    const sessionGetById = vi.spyOn(repos.classSessions, "getById");
+    const rows = await listBookingRows(repos, studioId);
+    expect(rows.length).toBeGreaterThan(1);
+    // The join must use batched list reads, not per-booking getById lookups,
+    // so the read count stays bounded regardless of how many bookings return.
+    expect(memberGetById).not.toHaveBeenCalled();
+    expect(sessionGetById).not.toHaveBeenCalled();
+    // Output is unchanged: ordered by startsAt ascending with joined fields.
+    const startsAts = rows.map((row) => row.startsAt);
+    expect([...startsAts]).toEqual([...startsAts].sort());
+    expect(rows.every((row) => "memberName" in row && "className" in row)).toBe(true);
   });
 });
