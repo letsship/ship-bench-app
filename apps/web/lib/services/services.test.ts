@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -158,6 +158,13 @@ describe("classes service", () => {
 });
 
 describe("bookings service", () => {
+  // The clock is process-global: a test that freezes it must hand back the real
+  // one, or the module-level fixtures above (anchored to the real `new Date()`)
+  // stop lining up with what the services see.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("stamps bookedAt with the current time", async () => {
     // Freeze the clock so the stored timestamp is deterministic to assert on.
     vi.useFakeTimers();
