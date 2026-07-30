@@ -108,14 +108,21 @@ export interface CancelResult {
   promotedMemberId: string | null;
 }
 
+// Scoped to the caller's studio. A booking row has no studioId of its own, so
+// its tenant is its session's; the check runs before any update so another
+// studio's booking is neither read back nor cancelled.
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  studioId: string,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
   if (!booking) throw new HttpError(404, "not_found", "Booking not found");
   const session = await loadSession(repos, booking.sessionId);
+  if (session.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Booking not found");
+  }
   const { settings } = await getStudioContext(repos);
 
   const decision = canCancel({
