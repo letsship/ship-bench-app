@@ -1,4 +1,5 @@
 import { resolveRepositories } from "@/lib/db/repos";
+import type { Repositories } from "@/lib/db/repos/types";
 import type { Studio } from "@/lib/db/types";
 import { listSessions } from "@/lib/services/classes";
 
@@ -7,6 +8,11 @@ import { listSessions } from "@/lib/services/classes";
 // and its upcoming classes (name, time, instructor); never members, invoices,
 // bookings, or occupancy. Shared by the /s/[slug] page, sitemap, and robots so
 // the "what is public" rule lives in exactly one place.
+//
+// Services accept their `Repositories` by dependency injection (per the services
+// seam) so they stay unit-testable against the in-memory fakes; the thin
+// no-arg wrappers below resolve repositories themselves for the route-handler /
+// page / sitemap call sites that don't need to inject them.
 
 export interface PublicClass {
   id: string;
@@ -21,21 +27,14 @@ export interface PublicStudio {
   classes: PublicClass[];
 }
 
-// The site's public origin. Absolute URLs (canonical, Open Graph, sitemap) need
-// one; it comes from NEXT_PUBLIC_SITE_URL in a real deployment and falls back to
-// localhost for dev/build, matching Next's own metadataBase default.
-export function publicBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-}
-
-export function publicStudioUrl(slug: string): string {
-  return `${publicBaseUrl()}/s/${slug}`;
-}
-
 // Resolve a studio by its public slug plus its upcoming classes, or null when no
-// studio owns that slug (the page turns null into a 404).
-export async function resolvePublicStudio(slug: string): Promise<PublicStudio | null> {
-  const repos = await resolveRepositories();
+// studio owns that slug (the page turns null into a 404). Sessions are enriched
+// with the class-type name and instructor, reusing the existing listSessions
+// logic and filtered to startsAt >= now.
+export async function getPublicStudioBySlug(
+  repos: Repositories,
+  slug: string,
+): Promise<PublicStudio | null> {
   const studio = await repos.studios.getBySlug(slug);
   if (!studio) return null;
   const sessions = await listSessions(repos, studio.id, { from: new Date().toISOString() });
@@ -50,7 +49,18 @@ export async function resolvePublicStudio(slug: string): Promise<PublicStudio | 
 }
 
 // Every studio that has a public page — the set the sitemap enumerates.
-export async function listPublicStudios(): Promise<Studio[]> {
-  const repos = await resolveRepositories();
+export async function listPublicStudios(repos: Repositories): Promise<Studio[]> {
   return repos.studios.listAll();
+}
+
+// Thin wrappers that resolve their own repositories, for call sites that don't
+// inject them (the page, sitemap, robots). Unit tests use the DI overloads.
+export async function resolvePublicStudio(slug: string): Promise<PublicStudio | null> {
+  const repos = await resolveRepositories();
+  return getPublicStudioBySlug(repos, slug);
+}
+
+export async function resolvePublicStudios(): Promise<Studio[]> {
+  const repos = await resolveRepositories();
+  return listPublicStudios(repos);
 }
