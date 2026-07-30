@@ -31,6 +31,9 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  // Secret, per-member subscription token for the private calendar feed at
+  // /api/ical/:calendarToken. Never rendered in public listings.
+  calendarToken: string;
   createdAt: string;
 }
 

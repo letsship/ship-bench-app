@@ -86,6 +86,15 @@ function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
   };
 }
 
+// Demo calendar secrets: a fixed random-looking salt plus the member index, so
+// every seeded member gets a distinct non-empty token AND emit-seed-sql stays
+// byte-stable. Runtime members get a real CSPRNG token from newCalendarToken().
+const SEED_CALENDAR_TOKEN_SALT = "8f3c1d9a4b7e2065c1a84f37d05e9b62";
+
+function seedCalendarToken(index: number): string {
+  return `${SEED_CALENDAR_TOKEN_SALT}${String(index + 1).padStart(4, "0")}`;
+}
+
 function buildMembers(now: Date, studioId: string): Member[] {
   return MEMBER_SEED.map((member, index) => ({
     id: seedId(),
@@ -96,6 +105,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    calendarToken: seedCalendarToken(index),
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }
