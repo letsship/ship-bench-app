@@ -106,15 +106,15 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         </table>
       </div>
 
-      <div className="mt-4 flex flex-col items-end gap-1 text-sm">
-        <div>
+      <div className="mt-4 flex flex-col items-end gap-1 text-sm" data-testid="invoice-totals">
+        <div data-testid="invoice-subtotal">
           Subtotal <Money cents={totals.subtotalCents} currency={currency} />
         </div>
-        <div className="text-[var(--color-muted)]">
+        <div className="text-[var(--color-muted)]" data-testid="invoice-tax">
           Tax ({(invoice.taxRateBps / 100).toFixed(1)}%){" "}
           <Money cents={totals.taxCents} currency={currency} />
         </div>
-        <div className="text-lg font-semibold">
+        <div className="text-lg font-semibold" data-testid="invoice-total">
           Total <Money cents={totals.totalCents} currency={currency} />
         </div>
       </div>
