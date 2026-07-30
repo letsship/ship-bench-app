@@ -1,5 +1,6 @@
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
+import type { Tracker } from "@/lib/analytics/types";
 import type { ClassSession, Member } from "@/lib/db/types";
 import {
   type BookingDenyReason,
@@ -63,6 +64,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -93,6 +95,22 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  // Funnel analytics: exactly one event off the booking decision — a confirmed
+  // booking fires `booking_created`, a waitlisted one fires `waitlist_joined`,
+  // never both. The member's id is the analytics distinct id; the class session
+  // id is the only property, so no PII leaves the service. Awaited (never
+  // fire-and-forget) but non-blocking on failure: a tracker error logs and the
+  // booking still succeeds, mirroring the outbox dispatch.
+  try {
+    await tracker.capture({
+      event: decision.status === "booked" ? "booking_created" : "waitlist_joined",
+      distinctId: member.id,
+      properties: { session_id: session.id },
+    });
+  } catch (error) {
+    console.error("Analytics capture failed", error);
+  }
+
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
@@ -111,6 +129,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -133,6 +152,20 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+
+  // Funnel analytics: a member-initiated cancellation fires `booking_cancelled`
+  // exactly once. (Waitlist promotion below deliberately emits nothing so each
+  // event stays tied to its explicit member-initiated flow.) Awaited but
+  // non-blocking on failure, mirroring the outbox dispatch.
+  try {
+    await tracker.capture({
+      event: "booking_cancelled",
+      distinctId: booking.memberId,
+      properties: { session_id: session.id },
+    });
+  } catch (error) {
+    console.error("Analytics capture failed", error);
+  }
 
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
