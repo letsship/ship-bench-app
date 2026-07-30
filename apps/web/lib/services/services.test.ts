@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,84 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("listBookingsForExport joins member email + class for the seeded studio", async () => {
+    const rows = await listBookingsForExport(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("email");
+    expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("startsAt");
+  });
+});
+
+describe("bookings export date range (listBookingsForExport)", () => {
+  // Fixed past timestamps — the export service never compares against the real
+  // clock, so these stay deterministic. Bookings are seeded OUT of startsAt order
+  // so the sort is genuinely exercised.
+  const JUN_01 = "2026-06-01T08:00:00.000Z";
+  const JUN_15 = "2026-06-15T12:00:00.000Z";
+  const JUN_30 = "2026-06-30T17:00:00.000Z";
+
+  function exportSeed(): SeedData {
+    return baseSeed({
+      classTypes: [classType("ct1")],
+      members: [
+        member("m1", { name: "Rossi, Chiara", email: "chiara@example.com" }),
+        member("m2", { name: "Amara Okafor", email: "amara@e.co" }),
+      ],
+      sessions: [
+        session("cs1", { startsAt: JUN_01, endsAt: "2026-06-01T09:00:00.000Z" }),
+        session("cs2", { startsAt: JUN_15, endsAt: "2026-06-15T13:00:00.000Z" }),
+        session("cs3", { startsAt: JUN_30, endsAt: "2026-06-30T18:00:00.000Z" }),
+      ],
+      bookings: [
+        booking("b3", "m1", { sessionId: "cs3", status: "no_show" }),
+        booking("b1", "m1", { status: "attended" }),
+        booking("b2", "m2", { sessionId: "cs2", status: "booked" }),
+      ],
+    });
+  }
+
+  it("joins session start, class name, member name, email, and status", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1");
+    const first = rows.find((row) => row.startsAt === JUN_01);
+    expect(first).toEqual({
+      startsAt: JUN_01,
+      className: "Yoga",
+      memberName: "Rossi, Chiara",
+      email: "chiara@example.com",
+      status: "attended",
+    });
+  });
+
+  it("returns every booking when from and to are omitted (unbounded)", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1");
+    expect(rows).toHaveLength(3);
+    expect(new Set(rows.map((row) => row.startsAt))).toEqual(
+      new Set([JUN_01, JUN_15, JUN_30]),
+    );
+  });
+
+  it("includes a booking whose start equals from (inclusive lower bound)", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", { from: JUN_15 });
+    expect(rows.map((row) => row.startsAt)).toEqual([JUN_15, JUN_30]);
+  });
+
+  it("includes a booking whose start equals to (inclusive upper bound)", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1", { to: JUN_15 });
+    // Guards against the half-open SessionRange, which would drop the JUN_15
+    // booking because startsAt >= to.
+    expect(rows.map((row) => row.startsAt)).toEqual([JUN_01, JUN_15]);
+  });
+
+  it("returns rows ordered by startsAt ascending", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    const rows = await listBookingsForExport(repos, "s1");
+    expect(rows.map((row) => row.startsAt)).toEqual([JUN_01, JUN_15, JUN_30]);
   });
 });

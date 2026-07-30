@@ -59,3 +59,25 @@ export function invoicesToCsv(invoices: readonly InvoiceRow[]): string {
     { header: "Currency", value: (invoice) => invoice.currency },
   ]);
 }
+
+export interface ExportBookingRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+// Quarterly bookkeeper export. `startsAt` is the session start as an ISO-8601
+// UTC timestamp and is emitted verbatim; the other fields reuse the same RFC
+// 4180 escaping as the members/invoices exports, so a name like "Rossi, Chiara"
+// stays a single quoted column.
+export function bookingsToCsv(rows: readonly ExportBookingRow[]): string {
+  return toCsv(rows, [
+    { header: "Starts", value: (row) => row.startsAt },
+    { header: "Class", value: (row) => row.className },
+    { header: "Member", value: (row) => row.memberName },
+    { header: "Email", value: (row) => row.email },
+    { header: "Status", value: (row) => row.status },
+  ]);
+}
