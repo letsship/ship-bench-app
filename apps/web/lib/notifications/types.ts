@@ -3,12 +3,17 @@
 // Resend) implement it.
 
 export type NotificationKind =
-  "booking_confirmation" | "booking_cancellation" | "waitlist_promotion" | "invoice_issued";
+  | "booking_confirmation"
+  | "booking_cancellation"
+  | "waitlist_promotion"
+  | "booking_reminder"
+  | "invoice_issued";
 
 export const NOTIFICATION_KINDS: readonly NotificationKind[] = [
   "booking_confirmation",
   "booking_cancellation",
   "waitlist_promotion",
+  "booking_reminder",
   "invoice_issued",
 ];
 
