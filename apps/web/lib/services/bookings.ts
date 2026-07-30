@@ -18,6 +18,7 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { drawCreditForMember, spendPackCredit } from "./packages";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -83,6 +84,19 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  // Prepaid packs. Once a member owns one, every confirmed seat must be paid
+  // from it; a member who never bought a pack books exactly as before. Drawn
+  // AFTER the canBook decision so a duplicate booking still 409s without
+  // touching credits, and BEFORE the insert so an exhausted member gets no row.
+  const draw = decision.status === "booked" ? await drawCreditForMember(repos, member.id) : null;
+  if (draw?.hasPacks && !draw.drawnPackId) {
+    throw new HttpError(
+      402,
+      "pack_exhausted",
+      "This member has no class credits left. Buy another pack to keep booking.",
+    );
+  }
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +106,7 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+  if (draw?.drawnPackId) await spendPackCredit(repos, draw.drawnPackId);
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

@@ -67,6 +67,18 @@ export interface Booking {
   cancelledAt: string | null;
 }
 
+// A prepaid bundle of class credits. `creditsRemaining` counts down as the
+// member books; `status` is 'active' or 'refunded' (see lib/domain/packs.ts).
+export interface ClassPack {
+  id: string;
+  memberId: string;
+  creditsTotal: number;
+  creditsRemaining: number;
+  priceCents: number;
+  status: string;
+  purchasedAt: string;
+}
+
 export interface Invoice {
   id: string;
   studioId: string;
