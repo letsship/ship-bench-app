@@ -1,12 +1,18 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Mirrors the `content` globs of the former tailwind.config.js. */
+@source "../app/**/*.{ts,tsx}";
+@source "../lib/**/*.{ts,tsx}";
 
 /* Studiobook design tokens — a warm, tactile studio aesthetic: parchment
-   surfaces, espresso ink, clay + sage accents drawn from pottery and yoga. */
-:root {
-  color-scheme: light;
+   surfaces, espresso ink, clay + sage accents drawn from pottery and yoga.
 
+   These replace the `theme.extend` block of the old tailwind.config.js. v4
+   derives the utilities from the variable names, so `--color-clay` still
+   yields `bg-clay`/`text-clay`; the rules below keep consuming the tokens as
+   plain `var(--color-*)`, which works because Tailwind emits every @theme
+   variable into `:root`. */
+@theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
   --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 
@@ -20,6 +26,10 @@
   --color-sage-soft: #dcead9;
   --color-line: #e7ddca;
   --color-danger: #b3402f;
+}
+
+:root {
+  color-scheme: light;
 }
 
 html {
@@ -42,6 +52,17 @@ h3 {
 
 a {
   color: inherit;
+}
+
+/* Tailwind v3's Preflight coloured placeholders gray-400. v4 instead uses
+   currentColor at 50% opacity, which would tint them espresso because
+   .sb-input sets `color: var(--color-ink)`. Restore the v3 colour so the
+   login and invoice forms keep their neutral placeholder grey. */
+@layer base {
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+  }
 }
 
 /* --- Components --- */
@@ -107,6 +128,18 @@ a {
   font-weight: 600;
   color: var(--color-muted);
   margin-bottom: 0.3rem;
+}
+
+/* v3 emitted `space-y-*` as `> :not([hidden]) ~ :not([hidden])`, which never
+   matched a first-child <legend>: the Settings fieldset legend kept
+   .sb-label's 0.3rem and the first checkbox contributed the utility's 0.5rem.
+   v4 emits a zero-specificity `:where(… > :not(:last-child))` rule in
+   @layer utilities that sets margin-bottom instead, and unlayered .sb-label
+   overrides it — which would tighten that gap. Let the utility's margin
+   through and carry the label's own gap as padding so spacing is unchanged. */
+:where([class*="space-y-"]) > legend.sb-label {
+  margin-bottom: revert-layer;
+  padding-bottom: 0.3rem;
 }
 
 .sb-badge {
