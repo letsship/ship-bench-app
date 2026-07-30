@@ -281,9 +281,9 @@ describe("invoices service", () => {
       memberId,
       lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
     });
-    const paid = await updateInvoiceStatus(repos, detail.invoice.id, "paid");
+    const paid = await updateInvoiceStatus(repos, studioId, detail.invoice.id, "paid");
     expect(paid.status).toBe("paid");
-    await expect(updateInvoiceStatus(repos, detail.invoice.id, "open")).rejects.toMatchObject({
+    await expect(updateInvoiceStatus(repos, studioId, detail.invoice.id, "open")).rejects.toMatchObject({
       status: 409,
       code: "invalid_transition",
     });
@@ -391,6 +391,21 @@ describe("cross-tenant scoping (IDOR)", () => {
       status: 404, code: "not_found" });
     const detail = await getInvoiceDetail(repos, "s1", "oi1");
     expect(detail.invoice.id).toBe("oi1");
+  });
+
+  it("rejects advancing a foreign invoice status as 404 but advances an own-studio invoice", async () => {
+    const repos = makeRepos();
+    await expect(updateInvoiceStatus(repos, "s1", "fi1", "paid")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    // foreign invoice must be left unchanged
+    const foreign = await repos.invoices.getById("fi1");
+    expect(foreign?.status).toBe("open");
+    expect(foreign?.paidAt).toBeNull();
+    // own-studio invoice still transitions
+    const paid = await updateInvoiceStatus(repos, "s1", "oi1", "paid");
+    expect(paid.status).toBe("paid");
   });
 
   it("rejects cancelling a foreign booking as 404 and leaves it untouched", async () => {

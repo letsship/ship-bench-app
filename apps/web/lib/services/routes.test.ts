@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { DELETE as bookingDelete } from "@/app/api/bookings/[id]/route";
-import { GET as invoiceDetailGet } from "@/app/api/invoices/[id]/route";
+import { GET as invoiceDetailGet, PATCH as invoiceDetailPatch } from "@/app/api/invoices/[id]/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as memberDetailGet } from "@/app/api/members/[id]/route";
 import { GET as membersGet } from "@/app/api/members/route";
@@ -192,6 +192,32 @@ describe("cross-tenant detail routes (IDOR)", () => {
     const own = await invoiceDetailGet(new NextRequest("http://localhost"), {
       params: Promise.resolve({ id: ownInvoiceId }),
     });
+    expect(own.status).toBe(200);
+  });
+
+  it("PATCH /api/invoices/:id 404s for a foreign invoice, 200s for own", async () => {
+    const { repos, ownInvoiceId } = foreignSeed();
+    __setTestRepositories(repos);
+
+    const foreign = await invoiceDetailPatch(
+      new NextRequest("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ status: "paid" }),
+      }),
+      { params: Promise.resolve({ id: "fi1" }) },
+    );
+    expect(foreign.status).toBe(404);
+    const foreignStill = await repos.invoices.getById("fi1");
+    expect(foreignStill?.status).toBe("open");
+    expect(foreignStill?.paidAt).toBeNull();
+
+    const own = await invoiceDetailPatch(
+      new NextRequest("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ status: "refunded" }),
+      }),
+      { params: Promise.resolve({ id: ownInvoiceId }) },
+    );
     expect(own.status).toBe(200);
   });
 

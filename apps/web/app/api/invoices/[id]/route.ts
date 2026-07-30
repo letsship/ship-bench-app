@@ -21,9 +21,9 @@ export async function GET(_request: Request, { params }: RouteContext): Promise<
 export async function PATCH(request: Request, { params }: RouteContext): Promise<Response> {
   return handle(async () => {
     await requireSession();
-    const { repos } = await resolveStudio();
+    const { repos, ctx } = await resolveStudio();
     const { id } = await params;
     const { status } = updateInvoiceStatusSchema.parse(await request.json());
-    return ok(await updateInvoiceStatus(repos, id, status));
+    return ok(await updateInvoiceStatus(repos, ctx.studio.id, id, status));
   });
 }
