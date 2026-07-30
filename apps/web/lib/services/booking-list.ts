@@ -1,3 +1,4 @@
+import type { ExportBookingRow } from "@/lib/domain/csv";
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 
 export interface BookingRow {
@@ -38,6 +39,72 @@ export async function listBookingRows(
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
         startsAt: session?.startsAt ?? "",
+        status: booking.status,
+      };
+    })
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Date-range bookings for the quarterly bookkeeper CSV. Same in-memory join as
+// listBookingRows (session -> class type -> member), additionally carrying the
+// member's email. The date filter is INCLUSIVE on both ends (from <= startsAt <=
+// to); an omitted bound is unbounded on that side. Deliberately NOT threaded
+// through SessionRange / classSessions.listByStudio(range): the repo's `inRange`
+// treats `to` as exclusive (drops startsAt >= to), which would silently exclude
+// a session starting exactly at the bookkeeper's `to` and break the
+// inclusive-both-ends contract, so we fetch unbounded and filter here instead.
+//
+// Comparisons are done on epoch milliseconds, NOT raw strings: D1 returns
+// timestamps in `+00:00` offset form (e.g. 2026-06-28T17:00:00+00:00) while a
+// bookkeeper may pass the bound in `Z` form (e.g. 2026-06-28T17:00:00.000Z) or
+// vice versa. Lexicographic string comparison across those spellings is
+// unordered and silently drops equality on one or both ends, so we normalize
+// every timestamp through Date.parse() before comparing. The emitted `startsAt`
+// is likewise canonicalized to its `Z` UTC form so the export's own output can
+// be round-tripped back as a bound.
+function toEpochMs(iso: string | undefined): number | undefined {
+  if (!iso) return undefined;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+function toIsoUtc(iso: string): string {
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? iso : new Date(ms).toISOString();
+}
+
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<ExportBookingRow[]> {
+  const fromMs = toEpochMs(range.from);
+  const toMs = toEpochMs(range.to);
+  const sessions = await repos.classSessions.listByStudio(studioId);
+  const inRange = sessions.filter((session) => {
+    const startsMs = toEpochMs(session.startsAt);
+    if (startsMs === undefined) return false;
+    if (fromMs !== undefined && startsMs < fromMs) return false;
+    if (toMs !== undefined && startsMs > toMs) return false;
+    return true;
+  });
+  const sessionById = new Map(inRange.map((session) => [session.id, session]));
+  const classTypes = await repos.classTypes.listByStudio(studioId);
+  const typeById = new Map(classTypes.map((type) => [type.id, type]));
+  const members = await repos.members.listByStudio(studioId);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const bookings = await repos.bookings.listBySessionIds(inRange.map((session) => session.id));
+
+  return bookings
+    .map((booking) => {
+      const session = sessionById.get(booking.sessionId);
+      const classType = session ? typeById.get(session.classTypeId) : undefined;
+      const member = memberById.get(booking.memberId);
+      return {
+        startsAt: session?.startsAt ? toIsoUtc(session.startsAt) : "",
+        className: classType?.name ?? "Class",
+        memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         status: booking.status,
       };
     })

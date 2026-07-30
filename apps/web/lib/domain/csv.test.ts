@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -70,5 +70,65 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits the header in the required column order", () => {
+    expect(bookingsToCsv([])).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("renders Starts as the verbatim ISO-8601 UTC timestamp", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T12:00:00.000Z",
+        className: "Vinyasa Flow",
+        memberName: "Amara Okafor",
+        email: "amara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [header, row] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+    expect(row).toBe("2026-06-15T12:00:00.000Z,Vinyasa Flow,Amara Okafor,amara@example.com,booked");
+  });
+
+  it("keeps a comma in a member name as a single quoted column", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T12:00:00.000Z",
+        className: "Yin & Restore",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "attended",
+      },
+    ]);
+    expect(csv.split("\r\n")[1]).toBe(
+      '2026-06-15T12:00:00.000Z,Yin & Restore,"Rossi, Chiara",chiara@example.com,attended',
+    );
+  });
+
+  it("doubles embedded quotes and joins rows with CRLF", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00.000Z",
+        className: 'Class "A"',
+        memberName: 'He said "hi"',
+        email: "a@e.co",
+        status: "booked",
+      },
+      {
+        startsAt: "2026-06-02T08:00:00.000Z",
+        className: "Class B",
+        memberName: "Bob",
+        email: "b@e.co",
+        status: "attended",
+      },
+    ]);
+    expect(csv).toBe(
+      "Starts,Class,Member,Email,Status\r\n" +
+        '2026-06-01T08:00:00.000Z,"Class ""A""","He said ""hi""",a@e.co,booked\r\n' +
+        "2026-06-02T08:00:00.000Z,Class B,Bob,b@e.co,attended",
+    );
   });
 });
