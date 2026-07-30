@@ -28,10 +28,12 @@ does not require Supabase, Resend, Docker, or network access.
 ## Architecture seams
 
 - Database access goes through `apps/web/lib/db/repos/`. Route handlers,
-  services, pages, and domain code never import `@supabase/supabase-js`.
-- Production persistence lives in `apps/web/lib/db/repos/supabase.ts`; test and
-  fake-dev persistence lives in `apps/web/lib/db/repos/fakes.ts`. Keep behavior
-  symmetric across both implementations.
+  services, pages, and domain code never import a database driver.
+- Production persistence lives in `apps/web/lib/db/repos/d1.ts` (Drizzle ORM over
+  the Cloudflare D1 `DB` binding, tables in `schema.ts`, schema SQL in
+  `apps/web/migrations/`); test and fake-dev persistence lives in
+  `apps/web/lib/db/repos/fakes.ts`. Keep behavior symmetric across both
+  implementations.
 - Pure business rules live in `apps/web/lib/domain/`. Keep these modules free of
   framework, database, email, and request concerns.
 - Services in `apps/web/lib/services/` compose repositories, domain logic, and
