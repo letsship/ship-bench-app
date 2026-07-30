@@ -17,6 +17,7 @@ import {
 } from "@/lib/notifications/messages";
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
+import type { Tracker } from "@/lib/analytics/types";
 import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
@@ -63,6 +64,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -100,6 +102,15 @@ export async function createBooking(
       bookingConfirmation(recipientOf(member), await summaryOf(repos, session)),
     );
   }
+
+  // Funnel analytics: exactly one event per booking — confirmed bookings fire
+  // `booking_created`, waitlisted bookings fire `waitlist_joined`. The member's
+  // id is the distinct id and the class session id is the only property. No PII.
+  await tracker.capture({
+    distinctId: member.id,
+    event: decision.status === "booked" ? "booking_created" : "waitlist_joined",
+    properties: { session_id: session.id },
+  });
   return { bookingId, status: decision.status };
 }
 
@@ -111,6 +122,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -133,6 +145,15 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+
+  // Funnel analytics: a cancellation fires `booking_cancelled`, attributed to
+  // the member whose booking was cancelled, with the class session id only. No
+  // PII. The internal waitlist promotion below fires NO analytics event.
+  await tracker.capture({
+    distinctId: booking.memberId,
+    event: "booking_cancelled",
+    properties: { session_id: session.id },
+  });
 
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
