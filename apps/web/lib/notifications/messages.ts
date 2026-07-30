@@ -53,6 +53,25 @@ export function waitlistPromotion(
   };
 }
 
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  refs: { bookingId: string; sessionId: string },
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} starts soon`,
+    body: `Hi ${recipient.name}, your class ${session.title} with ${session.instructor} on ${session.startsAt} starts within the next 24 hours. See you on the mat!`,
+    data: {
+      title: session.title,
+      startsAt: session.startsAt,
+      bookingId: refs.bookingId,
+      sessionId: refs.sessionId,
+    },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;

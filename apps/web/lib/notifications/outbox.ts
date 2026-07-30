@@ -2,11 +2,14 @@ import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { NotificationKind, NotificationMessage, NotificationProvider } from "./types";
 
-// Which studio setting gates each notification kind.
+// Which studio setting gates each notification kind. `booking_reminder` reuses
+// the booking-confirmation gate so reminders ship under the same studio toggle
+// without a schema/settings migration.
 const SETTING_FOR_KIND = {
   booking_confirmation: "notifyBookingConfirmations",
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
+  booking_reminder: "notifyBookingConfirmations",
   invoice_issued: "notifyInvoices",
 } as const satisfies Record<NotificationKind, string>;
 
