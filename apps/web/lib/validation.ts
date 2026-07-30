@@ -7,6 +7,14 @@ const isoDatetime = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid ISO datetime" });
 
+// Optional ISO-8601 from/to bounds for the bookings export. Each bound is
+// unbounded when absent; when present it is parsed (not clamped) so the
+// service can apply an inclusive comparison via Date.parse.
+export const exportBookingsQuerySchema = z.object({
+  from: isoDatetime.optional(),
+  to: isoDatetime.optional(),
+});
+
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb hex color");
 
 export const createClassTypeSchema = z.object({

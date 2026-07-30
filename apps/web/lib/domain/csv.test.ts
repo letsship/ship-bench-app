@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -70,5 +70,40 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits columns in the order Starts, Class, Member, Email, Status", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00Z",
+        className: "Vinyasa Flow",
+        memberName: "Amara Okafor",
+        email: "amara@example.com",
+        status: "attended",
+      },
+    ]);
+    const [header, row] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+    expect(row).toBe(
+      "2026-06-01T08:00:00Z,Vinyasa Flow,Amara Okafor,amara@example.com,attended",
+    );
+  });
+
+  it("keeps a member name containing a comma as a single quoted column", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00Z",
+        className: "Yin & Restore",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    // The row has exactly five comma-delimited columns: the quoted member name
+    // must not split into two fields when naively split on commas.
+    expect(row).toBe('2026-06-01T08:00:00Z,Yin & Restore,"Rossi, Chiara",chiara@example.com,booked');
   });
 });

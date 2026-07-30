@@ -59,3 +59,24 @@ export function invoicesToCsv(invoices: readonly InvoiceRow[]): string {
     { header: "Currency", value: (invoice) => invoice.currency },
   ]);
 }
+
+export interface BookingExportRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+// Bookings export for the bookkeeper: one row per booking, columns in the order
+// requested by accounting. Reuses the RFC 4180 escaping above, so a member name
+// like "Rossi, Chiara" stays a single quoted column.
+export function bookingsToCsv(bookings: readonly BookingExportRow[]): string {
+  return toCsv(bookings, [
+    { header: "Starts", value: (booking) => booking.startsAt },
+    { header: "Class", value: (booking) => booking.className },
+    { header: "Member", value: (booking) => booking.memberName },
+    { header: "Email", value: (booking) => booking.email },
+    { header: "Status", value: (booking) => booking.status },
+  ]);
+}
