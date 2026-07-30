@@ -18,6 +18,7 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { drawCreditForMember } from "./packages";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -83,6 +84,11 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  // Members who own a pack pay per booking with a credit. Run this AFTER the
+  // duplicate check so a repeated booking 409s without spending a credit, and
+  // BEFORE inserting so an exhausted member is blocked (402) with no booking.
+  const drawablePack = await drawCreditForMember(repos, member.id);
+
   const bookingId = newId();
   await repos.bookings.insert({
     id: bookingId,
@@ -92,6 +98,12 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+
+  if (drawablePack) {
+    await repos.packages.update(drawablePack.id, {
+      creditsRemaining: drawablePack.creditsRemaining - 1,
+    });
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type {
   Booking,
+  ClassPack,
   ClassSession,
   ClassType,
   Invoice,
@@ -191,6 +192,24 @@ export function createSupabaseRepositories(): Repositories {
           toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
         );
       },
+    },
+    packages: {
+      listByMember: (memberId) =>
+        rows<ClassPack>(
+          db
+            .from("class_packs")
+            .select("*")
+            .eq("member_id", memberId)
+            .order("purchased_at", { ascending: false }),
+          "packages.listByMember",
+        ),
+      getById: (id) =>
+        maybeOne<ClassPack>(
+          db.from("class_packs").select("*").eq("id", id).maybeSingle(),
+          "packages.getById",
+        ),
+      insert: (pack) => insertReturning("class_packs", pack),
+      update: (id, patch) => updateReturning<ClassPack>("class_packs", "id", id, patch),
     },
     outbox: {
       insert: (row) => insertReturning("notification_outbox", row),
