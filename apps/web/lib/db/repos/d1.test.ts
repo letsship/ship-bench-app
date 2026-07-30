@@ -134,6 +134,12 @@ describe("D1 repositories", () => {
     const windowed = await repos.classSessions.listByStudio(studioId, { from, to });
     expect(windowed.every((s) => s.startsAt >= from && s.startsAt < to)).toBe(true);
     expect(windowed.length).toBeLessThan(all.length);
+    // The session whose startsAt exactly equals `from` must be included
+    // (inclusive-from boundary).
+    expect(windowed.some((s) => s.startsAt === from)).toBe(true);
+    // The session whose startsAt exactly equals `to` must be excluded
+    // (exclusive-to boundary).
+    expect(windowed.some((s) => s.startsAt === to)).toBe(false);
   });
 
   it("lists bookings across multiple session ids", async () => {

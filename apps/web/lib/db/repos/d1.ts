@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/d1";
-import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   bookings,
@@ -41,7 +41,7 @@ export function createD1Repositories(db: D1Database): Repositories {
 
   function rangeFilter(range: SessionRange | undefined) {
     const conditions = [];
-    if (range?.from) conditions.push(gt(classSessions.startsAt, range.from));
+    if (range?.from) conditions.push(gte(classSessions.startsAt, range.from));
     if (range?.to) conditions.push(lt(classSessions.startsAt, range.to));
     return conditions.length ? and(...conditions) : undefined;
   }
