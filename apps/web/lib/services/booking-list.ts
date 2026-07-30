@@ -53,15 +53,39 @@ export async function listBookingRows(
 // treats `to` as exclusive (drops startsAt >= to), which would silently exclude
 // a session starting exactly at the bookkeeper's `to` and break the
 // inclusive-both-ends contract, so we fetch unbounded and filter here instead.
+//
+// Comparisons are done on epoch milliseconds, NOT raw strings: D1 returns
+// timestamps in `+00:00` offset form (e.g. 2026-06-28T17:00:00+00:00) while a
+// bookkeeper may pass the bound in `Z` form (e.g. 2026-06-28T17:00:00.000Z) or
+// vice versa. Lexicographic string comparison across those spellings is
+// unordered and silently drops equality on one or both ends, so we normalize
+// every timestamp through Date.parse() before comparing. The emitted `startsAt`
+// is likewise canonicalized to its `Z` UTC form so the export's own output can
+// be round-tripped back as a bound.
+function toEpochMs(iso: string | undefined): number | undefined {
+  if (!iso) return undefined;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+function toIsoUtc(iso: string): string {
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? iso : new Date(ms).toISOString();
+}
+
 export async function listBookingsForExport(
   repos: Repositories,
   studioId: string,
   range: SessionRange = {},
 ): Promise<ExportBookingRow[]> {
+  const fromMs = toEpochMs(range.from);
+  const toMs = toEpochMs(range.to);
   const sessions = await repos.classSessions.listByStudio(studioId);
   const inRange = sessions.filter((session) => {
-    if (range.from && session.startsAt < range.from) return false;
-    if (range.to && session.startsAt > range.to) return false;
+    const startsMs = toEpochMs(session.startsAt);
+    if (startsMs === undefined) return false;
+    if (fromMs !== undefined && startsMs < fromMs) return false;
+    if (toMs !== undefined && startsMs > toMs) return false;
     return true;
   });
   const sessionById = new Map(inRange.map((session) => [session.id, session]));
@@ -77,7 +101,7 @@ export async function listBookingsForExport(
       const classType = session ? typeById.get(session.classTypeId) : undefined;
       const member = memberById.get(booking.memberId);
       return {
-        startsAt: session?.startsAt ?? "",
+        startsAt: session?.startsAt ? toIsoUtc(session.startsAt) : "",
         className: classType?.name ?? "Class",
         memberName: member?.name ?? "—",
         email: member?.email ?? "",

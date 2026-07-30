@@ -403,4 +403,58 @@ describe("bookings export date range (listBookingsForExport)", () => {
     const rows = await listBookingsForExport(repos, "s1");
     expect(rows.map((row) => row.startsAt)).toEqual([JUN_01, JUN_15, JUN_30]);
   });
+
+  // D1 returns timestamps in `+00:00` offset form while a bookkeeper may pass the
+  // bound in `Z` form (or vice versa). Lexicographic string comparison across
+  // those spellings is unordered and silently drops equality, so the export
+  // normalizes through Date.parse(). These guard against a regression where the
+  // same instant spelled two ways stops comparing equal.
+  const JUN_15_OFFSET = "2026-06-15T12:00:00.000+00:00";
+  const JUN_30_OFFSET = "2026-06-30T17:00:00.000+00:00";
+  const JUN_01_OFFSET = "2026-06-01T08:00:00.000+00:00";
+
+  function offsetSeed(): SeedData {
+    return baseSeed({
+      classTypes: [classType("ct1")],
+      members: [member("m1", { name: "Rossi, Chiara", email: "chiara@example.com" })],
+      sessions: [
+        session("cs1", { startsAt: JUN_01_OFFSET, endsAt: "2026-06-01T09:00:00.000Z" }),
+        session("cs2", { startsAt: JUN_15_OFFSET, endsAt: "2026-06-15T13:00:00.000Z" }),
+        session("cs3", { startsAt: JUN_30_OFFSET, endsAt: "2026-06-30T18:00:00.000Z" }),
+      ],
+      bookings: [
+        booking("b1", "m1", { status: "attended" }),
+        booking("b2", "m1", { sessionId: "cs2", status: "booked" }),
+        booking("b3", "m1", { sessionId: "cs3", status: "no_show" }),
+      ],
+    });
+  }
+
+  it("canonicalizes emitted startsAt to ISO-8601 UTC Z form", async () => {
+    const repos = createInMemoryRepositories(offsetSeed());
+    const rows = await listBookingsForExport(repos, "s1");
+    expect(rows.map((row) => row.startsAt)).toEqual([JUN_01, JUN_15, JUN_30]);
+  });
+
+  it("includes a booking whose offset start equals a Z-form from (inclusive lower)", async () => {
+    const repos = createInMemoryRepositories(offsetSeed());
+    const rows = await listBookingsForExport(repos, "s1", { from: JUN_15 });
+    expect(rows.map((row) => row.startsAt)).toEqual([JUN_15, JUN_30]);
+  });
+
+  it("includes a booking whose offset start equals a Z-form to (inclusive upper)", async () => {
+    const repos = createInMemoryRepositories(offsetSeed());
+    const rows = await listBookingsForExport(repos, "s1", { to: JUN_15 });
+    expect(rows.map((row) => row.startsAt)).toEqual([JUN_01, JUN_15]);
+  });
+
+  it("treats an offset-form bound as equal to a Z-form start on both ends", async () => {
+    const repos = createInMemoryRepositories(exportSeed());
+    // Stored startsAt are Z-form; bounds are offset-form of the same instants.
+    const rows = await listBookingsForExport(repos, "s1", {
+      from: JUN_15_OFFSET,
+      to: JUN_30_OFFSET,
+    });
+    expect(rows.map((row) => row.startsAt)).toEqual([JUN_15, JUN_30]);
+  });
 });
