@@ -1,3 +1,4 @@
+import { newIcalToken } from "../ids";
 import type {
   Booking,
   ClassSession,
@@ -105,9 +106,15 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         const found = store.members.find((row) => row.studioId === studioId && row.email === email);
         return found ? clone(found) : null;
       },
+      async findByIcalToken(token) {
+        if (!token) return null;
+        const found = store.members.find((row) => row.icalToken === token);
+        return found ? clone(found) : null;
+      },
       async insert(member) {
-        store.members.push(clone(member));
-        return clone(member);
+        const row = member.icalToken ? clone(member) : { ...clone(member), icalToken: newIcalToken() };
+        store.members.push(row);
+        return clone(row);
       },
       async update(id, patch) {
         return patched(store.members, (row) => row.id === id, patch, "Member");
@@ -154,6 +161,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async listBySession(sessionId) {
         return cloneAll(store.bookings.filter((row) => row.sessionId === sessionId));
+      },
+      async listByMember(memberId) {
+        return cloneAll(store.bookings.filter((row) => row.memberId === memberId));
       },
       async getById(id) {
         const found = store.bookings.find((row) => row.id === id);

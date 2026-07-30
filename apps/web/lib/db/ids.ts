@@ -5,3 +5,11 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// High-entropy, URL-safe token authorizing a member's private calendar feed.
+// calendar subscription URLs are bearer-style secrets (the URL *is* the auth),
+// so a fresh UUID v4 is sufficient entropy and survives copy-paste into Apple
+// / Google Calendar without escaping.
+export function newIcalToken(): string {
+  return crypto.randomUUID();
+}

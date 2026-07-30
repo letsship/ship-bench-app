@@ -1,3 +1,4 @@
+import { newIcalToken } from "@/lib/db/ids";
 import { createServiceClient } from "@/lib/supabase/service";
 import type {
   Booking,
@@ -97,7 +98,13 @@ export function createSupabaseRepositories(): Repositories {
           db.from("members").select("*").eq("studio_id", studioId).eq("email", email).maybeSingle(),
           "members.findByEmail",
         ),
-      insert: (member) => insertReturning("members", member),
+      findByIcalToken: (token) =>
+        maybeOne<Member>(
+          db.from("members").select("*").eq("ical_token", token).maybeSingle(),
+          "members.findByIcalToken",
+        ),
+      insert: (member) =>
+        insertReturning("members", member.icalToken ? member : { ...member, icalToken: newIcalToken() }),
       update: (id, patch) => updateReturning<Member>("members", "id", id, patch),
     },
     classTypes: {
@@ -139,6 +146,11 @@ export function createSupabaseRepositories(): Repositories {
         rows<Booking>(
           db.from("bookings").select("*").eq("session_id", sessionId),
           "bookings.listBySession",
+        ),
+      listByMember: (memberId) =>
+        rows<Booking>(
+          db.from("bookings").select("*").eq("member_id", memberId),
+          "bookings.listByMember",
         ),
       getById: (id) =>
         maybeOne<Booking>(
