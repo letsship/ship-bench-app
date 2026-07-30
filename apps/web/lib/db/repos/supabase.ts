@@ -7,6 +7,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  ProcessedStripeEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -201,6 +202,14 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+    },
+    processedStripeEvents: {
+      getById: (id) =>
+        maybeOne<ProcessedStripeEvent>(
+          db.from("processed_stripe_events").select("*").eq("id", id).maybeSingle(),
+          "processedStripeEvents.getById",
+        ),
+      insert: (row) => insertReturning("processed_stripe_events", row),
     },
   };
 }

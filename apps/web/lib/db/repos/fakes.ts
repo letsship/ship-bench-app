@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  ProcessedStripeEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -26,6 +27,9 @@ export interface SeedData {
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  // Optional: existing fixtures predate the Stripe webhook ledger and an empty
+  // ledger is the correct default for them.
+  processedStripeEvents?: ProcessedStripeEvent[];
 }
 
 interface Store {
@@ -38,6 +42,7 @@ interface Store {
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  processedStripeEvents: ProcessedStripeEvent[];
 }
 
 const clone = <T>(row: T): T => ({ ...row });
@@ -67,6 +72,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
+    processedStripeEvents: cloneAll(seed?.processedStripeEvents ?? []),
   };
 
   return {
@@ -209,6 +215,16 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
+      },
+    },
+    processedStripeEvents: {
+      async getById(id) {
+        const found = store.processedStripeEvents.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(row) {
+        store.processedStripeEvents.push(clone(row));
+        return clone(row);
       },
     },
   };

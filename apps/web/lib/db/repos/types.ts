@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  ProcessedStripeEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -79,6 +80,13 @@ export interface NotificationOutboxRepo {
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
+// Idempotency ledger for incoming Stripe webhooks: an event id is inserted the
+// first time it is handled, so a redelivery is recognised and skipped.
+export interface ProcessedStripeEventsRepo {
+  getById(id: string): Promise<ProcessedStripeEvent | null>;
+  insert(row: ProcessedStripeEvent): Promise<ProcessedStripeEvent>;
+}
+
 export interface Repositories {
   studios: StudioRepo;
   settings: StudioSettingsRepo;
@@ -89,4 +97,5 @@ export interface Repositories {
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
   outbox: NotificationOutboxRepo;
+  processedStripeEvents: ProcessedStripeEventsRepo;
 }

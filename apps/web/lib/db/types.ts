@@ -95,6 +95,13 @@ export interface InvoiceLineItem {
   bookingId: string | null;
 }
 
+// A Stripe webhook event id we have already handled. Stripe delivers at least
+// once, so this ledger is what makes processing exactly-once.
+export interface ProcessedStripeEvent {
+  id: string;
+  receivedAt: string;
+}
+
 export interface NotificationOutboxRow {
   id: string;
   memberId: string;
