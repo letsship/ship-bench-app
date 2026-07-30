@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type { Booking, ClassSession, ClassType, Invoice, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -114,12 +114,12 @@ describe("members service", () => {
       email: "new@example.com",
       status: "active",
     });
-    const updated = await updateMember(repos, created.id, { status: "paused" });
+    const updated = await updateMember(repos, studioId, created.id, { status: "paused" });
     expect(updated.status).toBe("paused");
   });
 
   it("getMember 404s for an unknown id", async () => {
-    await expect(getMember(repos, "nope")).rejects.toMatchObject({ status: 404 });
+    await expect(getMember(repos, studioId, "nope")).rejects.toMatchObject({ status: 404 });
   });
 });
 
@@ -210,7 +210,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
     expect(result.refundEligible).toBe(true);
   });
 
@@ -223,7 +223,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
     expect(result.refundEligible).toBe(false);
   });
 
@@ -241,7 +241,7 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const result = await cancelBooking(repos, provider, "s1", "b1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
@@ -281,9 +281,9 @@ describe("invoices service", () => {
       memberId,
       lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
     });
-    const paid = await updateInvoiceStatus(repos, detail.invoice.id, "paid");
+    const paid = await updateInvoiceStatus(repos, studioId, detail.invoice.id, "paid");
     expect(paid.status).toBe("paid");
-    await expect(updateInvoiceStatus(repos, detail.invoice.id, "open")).rejects.toMatchObject({
+    await expect(updateInvoiceStatus(repos, studioId, detail.invoice.id, "open")).rejects.toMatchObject({
       status: 409,
       code: "invalid_transition",
     });
@@ -292,7 +292,7 @@ describe("invoices service", () => {
   it("lists invoices with member names and reads a detail", async () => {
     const list = await listInvoices(repos, studioId);
     expect(list.length).toBeGreaterThan(0);
-    const detail = await getInvoiceDetail(repos, list[0].id);
+    const detail = await getInvoiceDetail(repos, studioId, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
 });
@@ -323,5 +323,107 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("cross-tenant scoping (IDOR)", () => {
+  const foreignMember = member("fm1", { studioId: "s2", email: "fm1@e.co" });
+  const foreignSession = session("fs1", { studioId: "s2" });
+  const foreignBooking = booking("fb1", "fm1", { sessionId: "fs1" });
+  const ownInvoice: Invoice = {
+    id: "oi1",
+    studioId: "s1",
+    memberId: "m1",
+    number: "INV-O-1",
+    status: "open",
+    currency: "EUR",
+    taxRateBps: 900,
+    subtotalCents: 1000,
+    taxCents: 90,
+    totalCents: 1090,
+    issuedAt: ISO,
+    dueAt: null,
+    paidAt: null,
+    createdAt: ISO,
+  };
+  const foreignInvoice: Invoice = {
+    id: "fi1",
+    studioId: "s2",
+    memberId: "fm1",
+    number: "INV-F-1",
+    status: "open",
+    currency: "EUR",
+    taxRateBps: 900,
+    subtotalCents: 1000,
+    taxCents: 90,
+    totalCents: 1090,
+    issuedAt: ISO,
+    dueAt: null,
+    paidAt: null,
+    createdAt: ISO,
+  };
+
+  function makeRepos(): Repositories {
+    return createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1"), foreignSession],
+        members: [member("m1"), foreignMember],
+        bookings: [booking("b1", "m1"), foreignBooking],
+        invoices: [ownInvoice, foreignInvoice],
+      }),
+    );
+  }
+
+  it("rejects a foreign member as 404 but reads an own-studio member", async () => {
+    const repos = makeRepos();
+    await expect(getMember(repos, "s1", "fm1")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    const own = await getMember(repos, "s1", "m1");
+    expect(own.id).toBe("m1");
+  });
+
+  it("rejects a foreign invoice as 404 but reads an own-studio invoice", async () => {
+    const repos = makeRepos();
+    await expect(getInvoiceDetail(repos, "s1", "fi1")).rejects.toMatchObject({
+      status: 404, code: "not_found" });
+    const detail = await getInvoiceDetail(repos, "s1", "oi1");
+    expect(detail.invoice.id).toBe("oi1");
+  });
+
+  it("rejects advancing a foreign invoice status as 404 but advances an own-studio invoice", async () => {
+    const repos = makeRepos();
+    await expect(updateInvoiceStatus(repos, "s1", "fi1", "paid")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    // foreign invoice must be left unchanged
+    const foreign = await repos.invoices.getById("fi1");
+    expect(foreign?.status).toBe("open");
+    expect(foreign?.paidAt).toBeNull();
+    // own-studio invoice still transitions
+    const paid = await updateInvoiceStatus(repos, "s1", "oi1", "paid");
+    expect(paid.status).toBe("paid");
+  });
+
+  it("rejects cancelling a foreign booking as 404 and leaves it untouched", async () => {
+    const repos = makeRepos();
+    await expect(cancelBooking(repos, createFakeProvider(), "s1", "fb1")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    const stillThere = await repos.bookings.getById("fb1");
+    expect(stillThere?.status).toBe("booked");
+    expect(stillThere?.cancelledAt).toBeNull();
+  });
+
+  it("still cancels an own-studio booking", async () => {
+    const repos = makeRepos();
+    const result = await cancelBooking(repos, createFakeProvider(), "s1", "b1");
+    expect(result.refundEligible).toBe(true);
+    const after = await repos.bookings.getById("b1");
+    expect(after?.status).toBe("cancelled");
   });
 });
