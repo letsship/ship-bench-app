@@ -18,7 +18,12 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
+
+// Postgres `unique_violation`. Raised by the partial unique index from
+// `0002_unique_active_booking.sql` when a member already holds an active
+// booking for the session — a conflict, not a failure.
+const UNIQUE_VIOLATION = "23505";
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -146,6 +151,20 @@ export function createSupabaseRepositories(): Repositories {
           "bookings.getById",
         ),
       insert: (booking) => insertReturning("bookings", booking),
+      // Atomicity comes from the partial unique index on
+      // (session_id, member_id) where status is active: a losing concurrent
+      // insert is rejected by Postgres, which we surface as `null` rather than
+      // an error. Any other error still fails loudly.
+      insertUnique: async (booking) => {
+        const { data, error } = await db
+          .from("bookings")
+          .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+          .select()
+          .single();
+        if (error?.code === UNIQUE_VIOLATION) return null;
+        if (error) fail("bookings.insertUnique", error);
+        return toCamelRow<Booking>(data as Record<string, unknown>);
+      },
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {

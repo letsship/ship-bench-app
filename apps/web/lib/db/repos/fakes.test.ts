@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
@@ -90,5 +91,49 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+});
+
+describe("bookings.insertUnique", () => {
+  let repos: Repositories;
+
+  const entry = (id: string, over: Partial<Booking> = {}): Booking => ({
+    id,
+    sessionId: "cs1",
+    memberId: "m1",
+    status: "waitlisted",
+    bookedAt: NOW.toISOString(),
+    cancelledAt: null,
+    ...over,
+  });
+
+  beforeEach(() => {
+    repos = createInMemoryRepositories();
+  });
+
+  it("rejects a second active booking for the same member + session", async () => {
+    expect(await repos.bookings.insertUnique(entry("b1"))).not.toBeNull();
+    expect(await repos.bookings.insertUnique(entry("b2"))).toBeNull();
+    expect((await repos.bookings.listBySession("cs1")).map((row) => row.id)).toEqual(["b1"]);
+  });
+
+  it("allows a booking for the same member on a different session", async () => {
+    await repos.bookings.insertUnique(entry("b1"));
+    expect(await repos.bookings.insertUnique(entry("b2", { sessionId: "cs2" }))).not.toBeNull();
+  });
+
+  it("allows re-booking once the previous booking is cancelled", async () => {
+    await repos.bookings.insertUnique(entry("b1"));
+    await repos.bookings.update("b1", { status: "cancelled", cancelledAt: NOW.toISOString() });
+    expect(await repos.bookings.insertUnique(entry("b2"))).not.toBeNull();
+  });
+
+  it("lets exactly one of two raced inserts win", async () => {
+    const results = await Promise.all([
+      repos.bookings.insertUnique(entry("b1")),
+      repos.bookings.insertUnique(entry("b2")),
+    ]);
+    expect(results.filter((row) => row !== null)).toHaveLength(1);
+    expect(await repos.bookings.listBySession("cs1")).toHaveLength(1);
   });
 });

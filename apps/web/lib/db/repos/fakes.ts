@@ -1,3 +1,4 @@
+import { isActiveMemberBooking } from "../../domain/booking-rules";
 import type {
   Booking,
   ClassSession,
@@ -160,6 +161,22 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        store.bookings.push(clone(booking));
+        return clone(booking);
+      },
+      async insertUnique(booking) {
+        // The scan and the push are one synchronous block with no `await`
+        // between them, so they are atomic within the JS event loop — the
+        // in-memory equivalent of the partial unique index the Postgres impl
+        // relies on. This is what makes a raced double-submit settle to
+        // exactly one row.
+        const conflict = store.bookings.some(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            isActiveMemberBooking(row.status),
+        );
+        if (conflict) return null;
         store.bookings.push(clone(booking));
         return clone(booking);
       },

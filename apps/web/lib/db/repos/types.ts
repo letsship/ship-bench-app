@@ -57,6 +57,13 @@ export interface BookingsRepo {
   listBySession(sessionId: string): Promise<Booking[]>;
   getById(id: string): Promise<Booking | null>;
   insert(booking: Booking): Promise<Booking>;
+  // Insert the booking ONLY if the member has no active (blocking) booking for
+  // that session — `booked`, `waitlisted`, or `attended`, per
+  // `BLOCKING_BOOKING_STATUSES` in `lib/domain/booking-rules`. The check and the
+  // write are ONE atomic operation, so two concurrent submits for the same
+  // member + session can never both succeed. Resolves to the inserted row, or
+  // `null` when a conflicting active booking already exists.
+  insertUnique(booking: Booking): Promise<Booking | null>;
   update(id: string, patch: Partial<Booking>): Promise<Booking>;
 }
 
