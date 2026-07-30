@@ -2,6 +2,8 @@
 // (2100 = 21%). Refunded line items keep contributing history but drop out of
 // the payable subtotal.
 
+import { sumCents } from "./money";
+
 export interface LineItemInput {
   quantity: number;
   unitAmountCents: number;
@@ -20,14 +22,16 @@ export function lineAmountCents(item: LineItemInput): number {
 }
 
 // Tax applies only to the non-refunded subtotal, rounded to the nearest cent.
+// An invoice with zero billable lines (none at all, or every line refunded)
+// totals zero rather than throwing — see `sumCents`, which seeds its accumulator.
 export function computeInvoiceTotals(
   items: readonly LineItemInput[],
   taxRateBps: number,
 ): InvoiceTotals {
   const payable = items.filter((item) => !item.refunded).map(lineAmountCents);
   const refunded = items.filter((item) => item.refunded).map(lineAmountCents);
-  const subtotalCents = payable.reduce((total, cents) => total + cents);
-  const refundedCents = refunded.reduce((total, cents) => total + cents, 0);
+  const subtotalCents = sumCents(payable);
+  const refundedCents = sumCents(refunded);
   const taxCents = Math.round((subtotalCents * taxRateBps) / 10_000);
   return { subtotalCents, refundedCents, taxCents, totalCents: subtotalCents + taxCents };
 }

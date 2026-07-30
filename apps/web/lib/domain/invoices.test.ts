@@ -44,6 +44,32 @@ describe("computeInvoiceTotals", () => {
       totalCents: 0,
     });
   });
+
+  it("is zero across the board with no line items at all", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("is zero-payable but tracks the refund when every line is refunded", () => {
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 9000, refunded: true },
+          { quantity: 2, unitAmountCents: 500, refunded: true },
+        ],
+        2100,
+      ),
+    ).toEqual({
+      subtotalCents: 0,
+      refundedCents: 10_000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
 });
 
 describe("formatInvoiceNumber", () => {

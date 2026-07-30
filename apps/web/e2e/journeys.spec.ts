@@ -43,6 +43,35 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("opens a fully-refunded invoice and reads its zero totals", async ({ page }) => {
+    // Regression: an invoice whose every line is refunded has zero billable
+    // lines, which used to crash the detail page with "Reduce of empty array
+    // with no initial value" instead of rendering.
+    await page.goto("/invoices");
+    const table = page.getByTestId("invoices-table");
+    await expect(table).toBeVisible();
+
+    // Select by content (member + refunded badge), not row order — the in-memory
+    // seed is shared across specs and retries.
+    const row = table
+      .locator("tbody tr")
+      .filter({ hasText: "Femke Jansen" })
+      .filter({ hasText: "refunded" });
+    await row.getByRole("link").click();
+    await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+
+    // The page renders rather than the error screen: heading, the refunded line
+    // still listed and badged, and every money figure at zero.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const line = page.locator("tbody tr").filter({ hasText: "Pottery intensive" });
+    await expect(line).toBeVisible();
+    await expect(line.getByText("refunded")).toBeVisible();
+
+    await expect(page.getByTestId("invoice-subtotal")).toContainText("€0.00");
+    await expect(page.getByTestId("invoice-tax")).toContainText("€0.00");
+    await expect(page.getByTestId("invoice-total")).toContainText("€0.00");
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
