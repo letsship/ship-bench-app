@@ -53,6 +53,22 @@ export function waitlistPromotion(
   };
 }
 
+// `bookingId` is what the reminder job dedups on, so a repeated cron run does
+// not queue a second reminder for the same seat.
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} tomorrow`,
+    body: `Hi ${recipient.name}, this is a reminder that ${session.title} with ${session.instructor} starts on ${session.startsAt}. See you there!`,
+    data: { bookingId, title: session.title, startsAt: session.startsAt },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;

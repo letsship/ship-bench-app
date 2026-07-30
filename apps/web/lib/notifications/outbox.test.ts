@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
-import { bookingConfirmation } from "./messages";
+import { bookingConfirmation, bookingReminder } from "./messages";
 import { dispatchOutbox, enqueueAndDispatch, enqueueNotification, shouldSend } from "./outbox";
 import type { NotificationMessage, NotificationProvider } from "./types";
 
@@ -25,6 +25,7 @@ function seedWith(
       notifyCancellations: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
+      notifyClassReminders: true,
       ...settingsOverrides,
     },
     members: [
@@ -68,6 +69,7 @@ describe("shouldSend", () => {
     notifyCancellations: false,
     notifyWaitlistPromotions: true,
     notifyInvoices: false,
+    notifyClassReminders: true,
   };
 
   it("respects the per-kind studio setting", () => {
@@ -75,10 +77,13 @@ describe("shouldSend", () => {
     expect(shouldSend("booking_cancellation", base)).toBe(false);
     expect(shouldSend("waitlist_promotion", base)).toBe(true);
     expect(shouldSend("invoice_issued", base)).toBe(false);
+    expect(shouldSend("booking_reminder", base)).toBe(true);
+    expect(shouldSend("booking_reminder", { ...base, notifyClassReminders: false })).toBe(false);
   });
 
   it("member opt-out wins over every setting", () => {
     expect(shouldSend("booking_confirmation", { ...base, memberOptedOut: true })).toBe(false);
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: true })).toBe(false);
   });
 });
 
@@ -128,6 +133,20 @@ describe("dispatchOutbox", () => {
     const pending = await repos.outbox.listPending();
     expect(pending).toHaveLength(1);
     expect(pending[0].error).toBe("boom");
+  });
+
+  it("delivers a class reminder, but not when notifyClassReminders is off", async () => {
+    const reminder = (): NotificationMessage =>
+      bookingReminder(recipient, { title: "Yoga", startsAt: ISO, instructor: "I" }, "b1");
+
+    const on = createInMemoryRepositories(seedWith());
+    const provider = recorder();
+    await enqueueNotification(on, reminder());
+    expect(await dispatchOutbox(on, provider)).toEqual({ sent: 1, skipped: 0, failed: 0 });
+
+    const off = createInMemoryRepositories(seedWith({}, { notifyClassReminders: false }));
+    await enqueueNotification(off, reminder());
+    expect(await dispatchOutbox(off, recorder())).toEqual({ sent: 0, skipped: 1, failed: 0 });
   });
 
   it("enqueueAndDispatch enqueues then delivers in one call", async () => {

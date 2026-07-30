@@ -199,6 +199,11 @@ export function createSupabaseRepositories(): Repositories {
           db.from("notification_outbox").select("*").is("sent_at", null),
           "outbox.listPending",
         ),
+      listByKind: (kind) =>
+        rows<NotificationOutboxRow>(
+          db.from("notification_outbox").select("*").eq("kind", kind),
+          "outbox.listByKind",
+        ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
     },
