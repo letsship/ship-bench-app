@@ -2,9 +2,11 @@ import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { badRequest, handle } from "@/lib/http";
 import { resolveStudio } from "@/lib/services/context";
-import { invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
+import { bookingsToCsv, invoicesToCsv, membersToCsv } from "@/lib/domain/csv";
+import { listBookingsForExport } from "@/lib/services/booking-list";
 import { listInvoices } from "@/lib/services/invoices";
 import { listMembers } from "@/lib/services/members";
+import { exportBookingsQuerySchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,15 @@ export async function GET(request: NextRequest): Promise<Response> {
       csv = membersToCsv(await listMembers(repos, ctx.studio.id));
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
+    } else if (type === "bookings") {
+      const parsed = exportBookingsQuerySchema.safeParse({
+        from: request.nextUrl.searchParams.get("from") ?? undefined,
+        to: request.nextUrl.searchParams.get("to") ?? undefined,
+      });
+      if (!parsed.success) {
+        return badRequest("Invalid export query", parsed.error.flatten());
+      }
+      csv = bookingsToCsv(await listBookingsForExport(repos, ctx.studio.id, parsed.data));
     } else {
       return badRequest(`Unknown export type: ${type}`);
     }

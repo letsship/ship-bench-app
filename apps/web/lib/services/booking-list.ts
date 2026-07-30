@@ -1,4 +1,5 @@
 import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import type { BookingExportRow } from "@/lib/domain/csv";
 
 export interface BookingRow {
   id: string;
@@ -8,6 +9,7 @@ export interface BookingRow {
   instructor: string;
   startsAt: string;
   status: string;
+  email: string;
 }
 
 // Flat list of bookings joined (in-memory) to member + session + class type,
@@ -39,7 +41,39 @@ export async function listBookingRows(
         instructor: session?.instructor ?? "",
         startsAt: session?.startsAt ?? "",
         status: booking.status,
+        email: member?.email ?? "",
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Bookings export for accounting: every booking whose session starts within
+// [from, to], INCLUSIVE of both ends. The bounds are compared with Date.parse
+// so differing ISO precision (e.g. millis vs none) cannot drop a boundary row.
+// We deliberately do NOT pass `to` through the repository SessionRange: the
+// repos' `inRange` helper treats `to` as exclusive (startsAt >= to is dropped),
+// which contradicts the inclusive-both-ends criterion the bookkeeper needs.
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: { from?: string; to?: string },
+): Promise<BookingExportRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  const fromMs = range.from ? Date.parse(range.from) : undefined;
+  const toMs = range.to ? Date.parse(range.to) : undefined;
+  return rows
+    .filter((row) => {
+      const startsMs = Date.parse(row.startsAt);
+      if (Number.isNaN(startsMs)) return false;
+      if (fromMs !== undefined && startsMs < fromMs) return false;
+      if (toMs !== undefined && startsMs > toMs) return false;
+      return true;
+    })
+    .map((row) => ({
+      startsAt: row.startsAt,
+      className: row.className,
+      memberName: row.memberName,
+      email: row.email,
+      status: row.status,
+    }));
 }
