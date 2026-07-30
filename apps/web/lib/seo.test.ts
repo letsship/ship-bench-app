@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Studio } from "@/lib/db/types";
 import type { PublicClass } from "@/lib/services/public-studio";
-import { studioEventsJsonLd, studioPageMetadata } from "./seo";
+import { serializeJsonLd, studioEventsJsonLd, studioPageMetadata } from "./seo";
 
 const SITE = "https://studiobook.example";
 
@@ -110,5 +110,43 @@ describe("studioEventsJsonLd", () => {
 
   it("emits nothing when the studio has no upcoming classes", () => {
     expect(studioEventsJsonLd(studio, [])).toEqual([]);
+  });
+});
+
+describe("serializeJsonLd", () => {
+  // Class names, instructors and the studio name are free-form input that ends
+  // up inside a <script> on a page anonymous visitors can open, so a name
+  // carrying markup must not be able to terminate the element.
+  const hostile: PublicClass[] = [
+    {
+      id: "c9",
+      name: '</script><img src=x onerror="alert(1)">',
+      instructor: "<b>Mallory</b>",
+      startsAt: "2026-04-03T08:00:00.000Z",
+      endsAt: "2026-04-03T09:00:00.000Z",
+    },
+  ];
+
+  it("leaves no '<' that could close the surrounding script element", () => {
+    const html = serializeJsonLd(studioEventsJsonLd(studio, hostile));
+    expect(html).not.toContain("<");
+    expect(html).not.toMatch(/<\/script/i);
+  });
+
+  it("keeps the escaped payload parseable back to the original values", () => {
+    const html = serializeJsonLd(studioEventsJsonLd(studio, hostile));
+    const [event] = JSON.parse(html) as Record<string, unknown>[];
+    expect(event.name).toBe('</script><img src=x onerror="alert(1)">');
+    expect(event.performer).toEqual({ "@type": "Person", name: "<b>Mallory</b>" });
+  });
+
+  it("escapes '<' wherever it appears, including in the studio name", () => {
+    const html = serializeJsonLd(studioEventsJsonLd({ ...studio, name: "<Riverbank>" }, classes));
+    expect(html).not.toContain("<");
+    expect(JSON.parse(html)[0].location).toEqual({ "@type": "Place", name: "<Riverbank>" });
+  });
+
+  it("serializes ordinary payloads unchanged", () => {
+    expect(serializeJsonLd({ a: 1, b: "plain" })).toBe('{"a":1,"b":"plain"}');
   });
 });

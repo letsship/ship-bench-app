@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
 import { resolvePublicStudio } from "@/lib/services/public-studio";
-import { studioEventsJsonLd, studioPageMetadata } from "@/lib/seo";
+import { serializeJsonLd, studioEventsJsonLd, studioPageMetadata } from "@/lib/seo";
 
 // Public, no-auth studio page. It lives OUTSIDE the (app) route group so the
 // auth layout never runs — anyone, including a crawler, can open it.
@@ -33,11 +33,13 @@ export default async function PublicStudioPage({ params }: PageProps) {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
       {/* schema.org Event data, one entry per upcoming class, so search engines
-          can surface the schedule as rich results. */}
+          can surface the schedule as rich results. Serialized through
+          serializeJsonLd so class and instructor names — free-form input shown
+          here to anonymous visitors — cannot close the <script> element. */}
       {events.length > 0 && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(events) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(events) }}
         />
       )}
 

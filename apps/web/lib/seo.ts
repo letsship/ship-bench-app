@@ -32,6 +32,19 @@ export function studioPageMetadata(studio: Studio): Metadata {
   };
 }
 
+// Serialize a JSON-LD payload for embedding in a <script> element.
+//
+// A <script> is raw text: the parser ends it at the first "</" sequence, so a
+// class name or instructor containing "</script>" would otherwise close the
+// element early and let the rest of the value run as markup. Class and studio
+// names are free-form user input, and this page is public, so every "<" is
+// rewritten to its JSON unicode escape (what Next's own JSON-LD docs
+// recommend), which keeps the payload inert. JSON parsers decode the escape
+// back, so consumers still read the original characters.
+export function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
 // schema.org Event objects — one per upcoming class — so Google can render the
 // schedule as rich results. Each carries at least name, startDate and location;
 // `@context` is repeated per entry because the array is emitted as a whole.
