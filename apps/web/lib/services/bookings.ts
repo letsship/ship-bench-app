@@ -83,8 +83,13 @@ export async function createBooking(
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
 
+  // `canBook` above read the session's bookings and this insert writes them, so
+  // on its own it is a check-then-act race: two near-simultaneous submits both
+  // pass the guard. `insertUnique` re-checks and writes atomically, and a lost
+  // race returns null — reported as the same conflict a sequential duplicate
+  // gets, so a double-click looks identical to a second click a minute later.
   const bookingId = newId();
-  await repos.bookings.insert({
+  const inserted = await repos.bookings.insertUnique({
     id: bookingId,
     sessionId: session.id,
     memberId: member.id,
@@ -92,6 +97,9 @@ export async function createBooking(
     bookedAt: nowIso(),
     cancelledAt: null,
   });
+  if (!inserted) {
+    throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

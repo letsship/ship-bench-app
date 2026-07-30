@@ -31,9 +31,24 @@ export interface BookingContext {
   now: string;
 }
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// The statuses that count as the member "already having a booking" for a
+// session: a confirmed seat, attendance already recorded, or a waitlist entry.
+// A waitlist entry holds no seat, but it does hold the member's place in the
+// queue, so a second one is a duplicate. Cancelled and no-show rows are spent —
+// they never block a fresh booking.
+//
+// This is the single source of truth for "active booking": the pure `canBook`
+// guard below, the repository-level atomic guard (`insertUnique`), and the
+// partial unique index in `0002_unique_active_booking.sql` all encode this same
+// set, and must stay in sync.
+export const BLOCKING_BOOKING_STATUSES = ["booked", "waitlisted", "attended"] as const;
+
+const BLOCKING = new Set<string>(BLOCKING_BOOKING_STATUSES);
+
+// Does this booking status block the member from booking the session again?
+export function isActiveMemberBooking(status: string): boolean {
+  return BLOCKING.has(status);
+}
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
@@ -43,7 +58,7 @@ export function canBook(context: BookingContext): BookingDecision {
     return { ok: false, reason: "session_started" };
   }
   if (context.memberStatus !== "active") return { ok: false, reason: "member_inactive" };
-  if (context.memberBookings.some((booking) => ACTIVE_MEMBER_BOOKING.has(booking.status))) {
+  if (context.memberBookings.some((booking) => isActiveMemberBooking(booking.status))) {
     return { ok: false, reason: "already_booked" };
   }
   if (context.occupancy.isFull) {
