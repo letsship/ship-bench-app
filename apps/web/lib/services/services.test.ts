@@ -35,6 +35,7 @@ function baseSeed(over: Partial<SeedData> = {}): SeedData {
       notifyCancellations: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
+      notifyClassReminders: true,
     },
     members: [],
     classTypes: [],

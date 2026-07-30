@@ -76,6 +76,9 @@ export interface InvoiceLineItemsRepo {
 export interface NotificationOutboxRepo {
   insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
   listPending(): Promise<NotificationOutboxRow[]>;
+  // Every row of a kind, pending or already delivered — the reminder job dedups
+  // against these so a dispatched reminder is not queued a second time.
+  listByKind(kind: string): Promise<NotificationOutboxRow[]>;
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
