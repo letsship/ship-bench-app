@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -52,6 +52,46 @@ describe("membersToCsv", () => {
     const [header, row] = csv.split("\r\n");
     expect(header).toBe("Name,Email,Phone,Status,Joined");
     expect(row).toBe("Amara,amara@example.com,,active,2026-01-01T00:00:00Z");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  const booking = {
+    startsAt: "2026-06-01T08:00:00.000Z",
+    className: "Vinyasa Flow",
+    memberName: "Amara Okafor",
+    email: "amara@example.com",
+    status: "attended",
+  };
+
+  it("emits the accounting columns in order", () => {
+    const [header, row] = bookingsToCsv([booking]).split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+    expect(row).toBe(
+      "2026-06-01T08:00:00.000Z,Vinyasa Flow,Amara Okafor,amara@example.com,attended",
+    );
+  });
+
+  it("renders Starts as an ISO-8601 UTC timestamp", () => {
+    const csv = bookingsToCsv([{ ...booking, startsAt: "2026-06-01T10:00:00+02:00" }]);
+    expect(csv.split("\r\n")[1].split(",")[0]).toBe("2026-06-01T08:00:00.000Z");
+  });
+
+  it("keeps a member name containing a comma in a single column", () => {
+    const csv = bookingsToCsv([{ ...booking, memberName: "Rossi, Chiara" }]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Rossi, Chiara"');
+    // Header has 5 columns; the quoted name must not add a sixth.
+    expect(row.split('"')[2].startsWith(",amara@example.com")).toBe(true);
+  });
+
+  it("doubles embedded quotes and quotes newlines", () => {
+    const csv = bookingsToCsv([
+      { ...booking, className: 'Yin "Deep" Restore', memberName: "Line1\nLine2" },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Yin ""Deep"" Restore"');
+    expect(row).toContain('"Line1\nLine2"');
   });
 });
 
