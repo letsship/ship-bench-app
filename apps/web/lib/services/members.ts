@@ -8,9 +8,17 @@ export async function listMembers(repos: Repositories, studioId: string): Promis
   return repos.members.listByStudio(studioId);
 }
 
-export async function getMember(repos: Repositories, id: string): Promise<Member> {
+// Scoped to the caller's studio: another studio's member must look like it does
+// not exist, so a foreign id 404s exactly like an unknown one.
+export async function getMember(
+  repos: Repositories,
+  studioId: string,
+  id: string,
+): Promise<Member> {
   const member = await repos.members.getById(id);
-  if (!member) throw new HttpError(404, "not_found", "Member not found");
+  if (!member || member.studioId !== studioId) {
+    throw new HttpError(404, "not_found", "Member not found");
+  }
   return member;
 }
 
@@ -37,9 +45,10 @@ export async function createMember(
 
 export async function updateMember(
   repos: Repositories,
+  studioId: string,
   id: string,
   input: UpdateMemberInput,
 ): Promise<Member> {
-  await getMember(repos, id);
+  await getMember(repos, studioId, id);
   return repos.members.update(id, input);
 }
