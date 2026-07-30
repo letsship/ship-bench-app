@@ -80,6 +80,22 @@ describe("shouldSend", () => {
   it("member opt-out wins over every setting", () => {
     expect(shouldSend("booking_confirmation", { ...base, memberOptedOut: true })).toBe(false);
   });
+
+  it("sends booking_reminder unless the member opted out (no studio toggle)", () => {
+    expect(shouldSend("booking_reminder", base)).toBe(true);
+    // Not gated by any of the studio-level switches being off...
+    expect(
+      shouldSend("booking_reminder", {
+        ...base,
+        notifyBookingConfirmations: false,
+        notifyCancellations: false,
+        notifyWaitlistPromotions: false,
+        notifyInvoices: false,
+      }),
+    ).toBe(true);
+    // ...but the member opt-out still wins.
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: true })).toBe(false);
+  });
 });
 
 describe("dispatchOutbox", () => {

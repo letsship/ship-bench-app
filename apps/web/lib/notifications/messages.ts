@@ -53,6 +53,22 @@ export function waitlistPromotion(
   };
 }
 
+// The day-before class reminder. `bookingId` is the stable dedupe key the
+// reminders job reads back out of the outbox to stay idempotent.
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Tomorrow: ${session.title}`,
+    body: `Hi ${recipient.name}, this is a reminder that ${session.title} with ${session.instructor} starts at ${session.startsAt}. See you there!`,
+    data: { title: session.title, startsAt: session.startsAt, bookingId },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;
