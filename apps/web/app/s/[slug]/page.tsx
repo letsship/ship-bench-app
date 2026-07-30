@@ -2,21 +2,23 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { formatDateTime } from "@/lib/format";
 import { resolvePublicStudio } from "@/lib/services/public-studio";
+import { serializeJsonLd, studioEventsJsonLd, studioPageMetadata } from "@/lib/seo";
 
 // Public, no-auth studio page. It lives OUTSIDE the (app) route group so the
-// auth layout never runs — anyone can open it.
+// auth layout never runs — anyone, including a crawler, can open it.
 export const dynamic = "force-dynamic";
-
-// Scaffolded quickly to get the page live while it was still "not ready for
-// launch", so it was left out of search with a blanket noindex and a hardcoded
-// generic title. No description, canonical, social tags, or structured data.
-export const metadata: Metadata = {
-  title: "Studio",
-  robots: { index: false, follow: false },
-};
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+// Studio-specific <head> metadata. A slug with no studio gets no metadata at
+// all; the page itself renders the 404, so there is nothing to describe.
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const data = await resolvePublicStudio(slug);
+  if (!data) return {};
+  return studioPageMetadata(data.studio);
 }
 
 export default async function PublicStudioPage({ params }: PageProps) {
@@ -26,12 +28,26 @@ export default async function PublicStudioPage({ params }: PageProps) {
 
   const { studio, classes } = data;
   const timeZone = studio.timezone;
+  const events = studioEventsJsonLd(studio, classes);
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
-      <img src="/studio-cover.svg" width={96} height={96} />
-      <div style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</div>
-      <div style={{ marginTop: 8, color: "#666" }}>Upcoming classes</div>
+      {/* schema.org Event data, one entry per upcoming class, so search engines
+          can surface the schedule as rich results. Serialized through
+          serializeJsonLd so class and instructor names — free-form input shown
+          here to anonymous visitors — cannot close the <script> element. */}
+      {events.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(events) }}
+        />
+      )}
+
+      <img src="/studio-cover.svg" width={96} height={96} alt={`${studio.name} studio logo`} />
+      <h1 style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>{studio.name}</h1>
+      <h2 style={{ marginTop: 8, color: "#666", fontSize: 16, fontWeight: 400 }}>
+        Upcoming classes
+      </h2>
 
       <div style={{ marginTop: 24 }}>
         {classes.length === 0 ? (
@@ -48,7 +64,7 @@ export default async function PublicStudioPage({ params }: PageProps) {
       </div>
 
       <div style={{ marginTop: 32 }}>
-        <a href="/login">Click here</a>
+        <a href="/login">Book a class at {studio.name}</a>
       </div>
     </div>
   );

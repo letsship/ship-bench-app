@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { __setTestRepositories } from "@/lib/db/repos";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -10,6 +11,7 @@ import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
+import { listPublicStudios, resolvePublicStudio } from "./public-studio";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
 
@@ -323,5 +325,43 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+// The public studio surface resolves repositories itself (it is called from a
+// page and from sitemap.ts, neither of which has a Repositories to inject), so
+// these use the __setTestRepositories seam instead of direct injection.
+describe("public studio surface", () => {
+  beforeEach(() => {
+    __setTestRepositories(createInMemoryRepositories(buildSeed(NOW)));
+  });
+  afterEach(() => {
+    __setTestRepositories(null);
+  });
+
+  it("resolves the studio and its upcoming classes for a matching slug", async () => {
+    const data = await resolvePublicStudio("riverbank");
+    expect(data?.studio.slug).toBe("riverbank");
+    expect(data?.studio.name).toBe("Riverbank Movement");
+    expect(data?.classes.length).toBeGreaterThan(0);
+    expect(data?.classes[0]).toHaveProperty("name");
+    expect(data?.classes[0]).toHaveProperty("startsAt");
+    expect(data?.classes[0]).toHaveProperty("instructor");
+  });
+
+  it("returns null for a slug no studio owns, so the page can 404", async () => {
+    expect(await resolvePublicStudio("does-not-exist")).toBeNull();
+  });
+
+  it("exposes only future classes", async () => {
+    const data = await resolvePublicStudio("riverbank");
+    const now = Date.now();
+    for (const cls of data?.classes ?? []) {
+      expect(new Date(cls.startsAt).getTime()).toBeGreaterThanOrEqual(now);
+    }
+  });
+
+  it("enumerates the studios the sitemap should list", async () => {
+    expect((await listPublicStudios()).map((studio) => studio.slug)).toContain("riverbank");
   });
 });
