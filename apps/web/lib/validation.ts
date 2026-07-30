@@ -9,6 +9,10 @@ const isoDatetime = z
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb hex color");
 
+// Normalize before validating: the trim/lowercase transforms must run *ahead* of
+// the email format check, so " Foo@Bar.COM " is accepted and stored lower-cased.
+const email = z.string().trim().toLowerCase().pipe(z.email());
+
 export const createClassTypeSchema = z.object({
   name: z.string().trim().min(1).max(100),
   description: z.string().trim().max(500).optional(),
@@ -35,14 +39,14 @@ export const createSessionSchema = z
 
 export const createMemberSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  email: z.string().trim().toLowerCase().email(),
+  email,
   phone: z.string().trim().max(40).optional(),
   status: z.enum(["active", "paused", "cancelled"]).default("active"),
 });
 
 export const updateMemberSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  email: z.string().trim().toLowerCase().email().optional(),
+  email: email.optional(),
   phone: z.string().trim().max(40).nullable().optional(),
   status: z.enum(["active", "paused", "cancelled"]).optional(),
   notificationsOptedOut: z.boolean().optional(),
