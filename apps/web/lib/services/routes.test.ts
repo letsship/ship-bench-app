@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as membersGetById } from "@/app/api/members/[id]/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +45,15 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/members/:id awaits promised params and returns the member", async () => {
+    const seed = buildSeed(NOW);
+    const id = seed.members[0].id;
+    const res = await membersGetById(new NextRequest(`http://localhost/api/members/${id}`), {
+      params: Promise.resolve({ id }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id });
   });
 });
