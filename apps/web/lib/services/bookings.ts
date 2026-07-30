@@ -1,3 +1,9 @@
+import {
+  BOOKING_CANCELLED,
+  BOOKING_CREATED,
+  type Tracker,
+  WAITLIST_JOINED,
+} from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -55,6 +61,22 @@ async function loadSession(repos: Repositories, sessionId: string): Promise<Clas
   return session;
 }
 
+// Capture one funnel event. Analytics is a non-critical side effect: a tracker
+// failure is logged, never allowed to fail the booking it describes. Only ids
+// cross this boundary — no email, name, or phone number ever reaches PostHog.
+async function track(
+  tracker: Tracker,
+  event: string,
+  memberId: string,
+  sessionId: string,
+): Promise<void> {
+  try {
+    await tracker.capture({ event, distinctId: memberId, properties: { session_id: sessionId } });
+  } catch (error) {
+    console.error("analytics capture failed", { event, error });
+  }
+}
+
 export interface BookingResult {
   bookingId: string;
   status: "booked" | "waitlisted";
@@ -63,6 +85,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -93,6 +116,14 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  // Exactly one funnel event per booking: confirmed or waitlisted, never both.
+  await track(
+    tracker,
+    decision.status === "booked" ? BOOKING_CREATED : WAITLIST_JOINED,
+    member.id,
+    session.id,
+  );
+
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
@@ -111,6 +142,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -133,7 +165,10 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+  await track(tracker, BOOKING_CANCELLED, booking.memberId, session.id);
 
+  // The waitlist promotion below is a side effect of this cancellation, not a
+  // member-initiated booking, so it deliberately captures no booking_created.
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
     : null;
