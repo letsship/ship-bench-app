@@ -24,13 +24,5 @@
     "prettier": "^3.4.2",
     "supabase": "^2.20.0",
     "turbo": "^2.8.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp",
-      "supabase",
-      "workerd"
-    ]
   }
 }

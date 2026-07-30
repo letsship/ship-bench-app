@@ -7,3 +7,9 @@ onlyBuiltDependencies:
   - sharp
   - supabase
   - workerd
+
+# CVE-2022-25883 (GHSA-c2qf-rxjj-qqgw): ReDoS in the semver range parser,
+# affecting >=7.0.0 <7.5.2. Force any resolution landing in that range onto a
+# patched release, so a transitive dependency cannot reintroduce it.
+overrides:
+  semver@>=7.0.0 <7.5.2: ">=7.5.2"
