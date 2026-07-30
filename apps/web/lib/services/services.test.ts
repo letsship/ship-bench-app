@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type { Booking, ClassPack, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -91,6 +91,19 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   status: "booked",
   bookedAt: ISO,
   cancelledAt: null,
+  ...over,
+});
+
+const pack = (id: string, memberId: string, over: Partial<ClassPack> = {}): ClassPack => ({
+  id,
+  studioId: "s1",
+  memberId,
+  creditsTotal: 5,
+  creditsRemaining: 5,
+  priceCents: 5000,
+  status: "active",
+  purchasedAt: ISO,
+  createdAt: ISO,
   ...over,
 });
 
@@ -199,6 +212,77 @@ describe("bookings service", () => {
     await expect(
       createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("spends one credit from the oldest pack when a member with a pack books", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packs: [
+          pack("p-new", "m1", { purchasedAt: "2026-06-01T00:00:00.000Z", creditsRemaining: 5 }),
+          pack("p-old", "m1", { purchasedAt: "2026-01-01T00:00:00.000Z", creditsRemaining: 2 }),
+        ],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+    expect((await repos.packages.getById("p-old"))?.creditsRemaining).toBe(1);
+    expect((await repos.packages.getById("p-new"))?.creditsRemaining).toBe(5);
+  });
+
+  it("books unchanged when the member has never bought a pack", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), {
+      sessionId: "cs1",
+      memberId: "m1",
+    });
+    expect(result.status).toBe("booked");
+    expect(await repos.packages.listByMember("m1")).toEqual([]);
+  });
+
+  it("rejects with 402 pack_exhausted when every pack is spent or refunded", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packs: [
+          pack("p1", "m1", { creditsRemaining: 0 }),
+          pack("p2", "m1", { status: "refunded", creditsRemaining: 4 }),
+        ],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
+    expect(await repos.bookings.listBySession("cs1")).toEqual([]);
+  });
+
+  it("does not spend a credit on a duplicate booking (409 first)", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+        packs: [pack("p1", "m1", { creditsRemaining: 5 })],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    expect((await repos.packages.getById("p1"))?.creditsRemaining).toBe(5);
   });
 
   it("marks a far-off cancellation refund-eligible", async () => {
