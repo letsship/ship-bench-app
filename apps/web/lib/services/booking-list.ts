@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  email: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        email: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,19 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+export async function listBookingsForExport(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId);
+  const from = range.from ? Date.parse(range.from) : null;
+  const to = range.to ? Date.parse(range.to) : null;
+
+  return rows.filter((row) => {
+    const startsAt = Date.parse(row.startsAt);
+    return (from === null || startsAt >= from) && (to === null || startsAt <= to);
+  });
 }
