@@ -256,6 +256,8 @@ insert into public.invoice_line_items (id, invoice_id, description, quantity, un
 insert into public.invoice_line_items (id, invoice_id, description, quantity, unit_amount_cents, amount_cents, refunded, booking_id) values ('00000000-0000-4000-8000-0000000000f4', '00000000-0000-4000-8000-0000000000f3', 'Pottery intensive', 1, 9000, 9000, TRUE, NULL);
 insert into public.invoice_line_items (id, invoice_id, description, quantity, unit_amount_cents, amount_cents, refunded, booking_id) values ('00000000-0000-4000-8000-0000000000f6', '00000000-0000-4000-8000-0000000000f5', 'Hand building x2', 2, 3600, 7200, FALSE, NULL);
 
+insert into public.packages (id, studio_id, member_id, credits_total, credits_remaining, price_cents, status, purchased_at, created_at) values ('00000000-0000-4000-8000-0000000000f9', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', 10, 6, 10000, 'active', '2026-06-08T09:00:00.000Z', '2026-06-08T09:00:00.000Z');
+
 insert into public.notification_outbox (id, member_id, kind, payload, created_at, sent_at, provider_message_id, error) values ('00000000-0000-4000-8000-0000000000f7', '00000000-0000-4000-8000-000000000002', 'booking_confirmation', '{"subject":"You''re booked","body":"See you soon!","data":{}}', '2026-06-29T12:00:00.000Z', '2026-06-30T12:00:00.000Z', 're_seededdelivery0001', NULL);
 insert into public.notification_outbox (id, member_id, kind, payload, created_at, sent_at, provider_message_id, error) values ('00000000-0000-4000-8000-0000000000f8', '00000000-0000-4000-8000-000000000003', 'invoice_issued', '{"subject":"Invoice ready","body":"Your invoice is ready.","data":{}}', '2026-06-29T12:00:00.000Z', NULL, NULL, NULL);
 

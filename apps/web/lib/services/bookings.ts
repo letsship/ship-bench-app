@@ -18,6 +18,7 @@ import {
 import { enqueueAndDispatch } from "@/lib/notifications/outbox";
 import type { NotificationProvider } from "@/lib/notifications/types";
 import type { CreateBookingInput } from "@/lib/validation";
+import { spendCreditForMember } from "./packages";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
@@ -82,6 +83,11 @@ export async function createBooking(
   if (!decision.ok) {
     throw new HttpError(409, `booking_${decision.reason}`, DENY_MESSAGES[decision.reason]);
   }
+
+  // Draw a prepaid class-pack credit AFTER the booking rules pass (a duplicate
+  // still 409s first and spends nothing) and BEFORE the booking exists, so an
+  // exhausted pack owner is blocked with 402 and no partial state.
+  await spendCreditForMember(repos, member.id);
 
   const bookingId = newId();
   await repos.bookings.insert({
