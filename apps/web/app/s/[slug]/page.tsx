@@ -1,55 +1,99 @@
+import Image from "next/image";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
+import { resolveRepositories } from "@/lib/db/repos";
 import { formatDateTime } from "@/lib/format";
-import { resolvePublicStudio } from "@/lib/services/public-studio";
+import {
+  buildStudioEventJsonLd,
+  buildStudioMetadata,
+  siteBaseUrl,
+} from "@/lib/seo/studio-seo";
+import { listSessions } from "@/lib/services/classes";
 
-// Public, no-auth studio page. It lives OUTSIDE the (app) route group so the
-// auth layout never runs — anyone can open it.
 export const dynamic = "force-dynamic";
-
-// Scaffolded quickly to get the page live while it was still "not ready for
-// launch", so it was left out of search with a blanket noindex and a hardcoded
-// generic title. No description, canonical, social tags, or structured data.
-export const metadata: Metadata = {
-  title: "Studio",
-  robots: { index: false, follow: false },
-};
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export default async function PublicStudioPage({ params }: PageProps) {
+const resolveStudioPage = cache(async (slug: string) => {
+  const repos = await resolveRepositories();
+  const studio = await repos.studios.getFirst();
+  if (!studio || studio.slug !== slug) return null;
+
+  const sessions = await listSessions(repos, studio.id, { from: new Date().toISOString() });
+  return { studio, sessions };
+});
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const data = await resolvePublicStudio(slug);
+  const data = await resolveStudioPage(slug);
   if (!data) notFound();
 
-  const { studio, classes } = data;
-  const timeZone = studio.timezone;
+  return buildStudioMetadata(data.studio, siteBaseUrl());
+}
+
+export default async function PublicStudioPage({ params }: PageProps) {
+  const { slug } = await params;
+  const data = await resolveStudioPage(slug);
+  if (!data) notFound();
+
+  const { studio, sessions } = data;
+  const eventJsonLd = buildStudioEventJsonLd(studio, sessions, siteBaseUrl());
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px" }}>
-      <img src="/studio-cover.svg" width={96} height={96} />
-      <div style={{ fontSize: 32, fontWeight: 700 }}>{studio.name}</div>
-      <div style={{ marginTop: 8, color: "#666" }}>Upcoming classes</div>
+    <main className="mx-auto max-w-3xl px-6 py-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(eventJsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
 
-      <div style={{ marginTop: 24 }}>
-        {classes.length === 0 ? (
-          <div>No upcoming classes are scheduled right now.</div>
+      <header className="flex items-center gap-5">
+        <Image
+          src="/studio-cover.svg"
+          width={96}
+          height={96}
+          alt={`${studio.name} studio`}
+          priority
+        />
+        <div>
+          <h1 className="text-4xl font-bold">{studio.name}</h1>
+          <p className="mt-2 text-[var(--color-muted)]">Upcoming classes</p>
+        </div>
+      </header>
+
+      <section className="mt-8" aria-labelledby="upcoming-classes-heading">
+        <h2 id="upcoming-classes-heading" className="sr-only">
+          Upcoming classes at {studio.name}
+        </h2>
+        {sessions.length === 0 ? (
+          <p>No upcoming classes are scheduled right now.</p>
         ) : (
-          classes.map((cls) => (
-            <div key={cls.id} style={{ padding: "12px 0", borderBottom: "1px solid #eee" }}>
-              <div style={{ fontSize: 18 }}>{cls.name}</div>
-              <div>{formatDateTime(cls.startsAt, timeZone)}</div>
-              <div style={{ color: "#666" }}>with {cls.instructor}</div>
-            </div>
+          sessions.map((session) => (
+            <article
+              id={`class-${session.id}`}
+              key={session.id}
+              className="border-b border-[var(--color-line)] py-4"
+            >
+              <h3 className="text-lg font-semibold">{session.classTypeName}</h3>
+              <time dateTime={session.startsAt}>
+                {formatDateTime(session.startsAt, studio.timezone)}
+              </time>
+              <p className="text-[var(--color-muted)]">with {session.instructor}</p>
+            </article>
           ))
         )}
-      </div>
+      </section>
 
-      <div style={{ marginTop: 32 }}>
-        <a href="/login">Click here</a>
+      <div className="mt-8">
+        <Link href="/login" className="sb-btn sb-btn-primary">
+          Book a class at {studio.name}
+        </Link>
       </div>
-    </div>
+    </main>
   );
 }
