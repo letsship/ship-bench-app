@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type { Booking, ClassSession, ClassType, Invoice, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -92,6 +92,68 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   bookedAt: ISO,
   cancelledAt: null,
   ...over,
+});
+
+const invoice = (id: string, studioId: string, memberId: string): Invoice => ({
+  id,
+  studioId,
+  memberId,
+  number: id,
+  status: "open",
+  currency: "EUR",
+  taxRateBps: 900,
+  subtotalCents: 1000,
+  taxCents: 90,
+  totalCents: 1090,
+  issuedAt: ISO,
+  dueAt: FUTURE,
+  paidAt: null,
+  createdAt: ISO,
+});
+
+function isolationRepos(): Repositories {
+  return createInMemoryRepositories(
+    baseSeed({
+      members: [member("m1"), member("m2", { studioId: "s2" })],
+      classTypes: [classType("ct1"), { ...classType("ct2"), studioId: "s2" }],
+      sessions: [session("cs1"), session("cs2", { studioId: "s2", classTypeId: "ct2" })],
+      bookings: [booking("b1", "m1"), booking("b2", "m2", { sessionId: "cs2" })],
+      invoices: [invoice("i1", "s1", "m1"), invoice("i2", "s2", "m2")],
+    }),
+  );
+}
+
+describe("service tenant isolation", () => {
+  it("hides foreign invoices and members while allowing own records", async () => {
+    const repos = isolationRepos();
+
+    await expect(getInvoiceDetail(repos, "s1", "i2")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+      message: "Invoice not found",
+    });
+    await expect(getMember(repos, "s1", "m2")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+      message: "Member not found",
+    });
+    expect((await getInvoiceDetail(repos, "s1", "i1")).invoice.id).toBe("i1");
+    expect((await getMember(repos, "s1", "m1")).id).toBe("m1");
+  });
+
+  it("does not cancel a foreign booking and cancels an own booking", async () => {
+    const repos = isolationRepos();
+    const provider = createFakeProvider();
+
+    await expect(cancelBooking(repos, provider, "s1", "b2")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+      message: "Booking not found",
+    });
+    expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
+    await cancelBooking(repos, provider, "s1", "b1");
+    expect((await repos.bookings.getById("b1"))?.status).toBe("cancelled");
+  });
 });
 
 describe("members service", () => {
