@@ -9,6 +9,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import type { Repositories, SessionRange } from "./types";
 
 // In-memory implementation of the repository seam. Used by the test suite
@@ -42,6 +43,11 @@ interface Store {
 
 const clone = <T>(row: T): T => ({ ...row });
 const cloneAll = <T>(rows: T[]): T[] => rows.map(clone);
+
+// Mirrors the partial unique index in 0002_unique_active_booking.sql: at most
+// one active booking per member per session. Cancelled/no_show rows don't
+// count, so a member can rebook after a cancellation.
+const ACTIVE_BOOKING_STATUSES = new Set(["booked", "waitlisted", "attended"]);
 
 function inRange(startsAt: string, range: SessionRange): boolean {
   if (range.from && startsAt < range.from) return false;
@@ -160,6 +166,13 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        const duplicate = store.bookings.some(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            ACTIVE_BOOKING_STATUSES.has(row.status),
+        );
+        if (duplicate) throw new DuplicateActiveBookingError(booking.sessionId, booking.memberId);
         store.bookings.push(clone(booking));
         return clone(booking);
       },
