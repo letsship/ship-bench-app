@@ -11,8 +11,7 @@ export interface BookingRow {
 }
 
 // Flat list of bookings joined (in-memory) to member + session + class type,
-// ordered by session start. The /bookings page buckets these by day. The join
-// happens here in the service so repositories stay single-entity.
+// ordered by session start. The /bookings page buckets these by day.
 export async function listBookingRows(
   repos: Repositories,
   studioId: string,
