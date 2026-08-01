@@ -1,6 +1,7 @@
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
+import type { AnalyticsTracker } from "@/lib/analytics/types";
 import {
   type BookingDenyReason,
   canBook,
@@ -63,6 +64,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -93,6 +95,12 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  await tracker.capture({
+    event: decision.status === "booked" ? "booking_created" : "waitlist_joined",
+    distinctId: member.id,
+    properties: { session_id: session.id },
+  });
+
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
@@ -111,6 +119,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -134,11 +143,17 @@ export async function cancelBooking(
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
+  const member = await loadMember(repos, booking.memberId);
+  await tracker.capture({
+    event: "booking_cancelled",
+    distinctId: member.id,
+    properties: { session_id: session.id },
+  });
+
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
     : null;
 
-  const member = await loadMember(repos, booking.memberId);
   await enqueueAndDispatch(
     repos,
     provider,
