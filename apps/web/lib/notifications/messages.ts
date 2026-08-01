@@ -23,6 +23,20 @@ export function bookingConfirmation(
   };
 }
 
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} tomorrow`,
+    body: `Hi ${recipient.name}, this is a reminder that your ${session.title} class with ${session.instructor} starts on ${session.startsAt}. See you on the mat!`,
+    data: { bookingId, title: session.title, startsAt: session.startsAt },
+  };
+}
+
 export function bookingCancellation(
   recipient: NotificationRecipient,
   session: SessionSummary,

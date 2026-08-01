@@ -8,6 +8,8 @@ const SETTING_FOR_KIND = {
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
+  // Reminders reuse the booking confirmation toggle until they have a setting of their own.
+  booking_reminder: "notifyBookingConfirmations",
 } as const satisfies Record<NotificationKind, string>;
 
 export interface OptOutContext {
