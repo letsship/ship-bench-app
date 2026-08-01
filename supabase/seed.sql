@@ -3,7 +3,7 @@
 
 insert into public.studios (id, name, slug, timezone, created_at) values ('00000000-0000-4000-8000-000000000001', 'Riverbank Movement', 'riverbank', 'Europe/Amsterdam', '2026-01-01T09:00:00.000Z');
 
-insert into public.studio_settings (studio_id, currency, tax_rate_bps, cancellation_window_hours, waitlist_enabled, notify_booking_confirmations, notify_cancellations, notify_waitlist_promotions, notify_invoices) values ('00000000-0000-4000-8000-000000000001', 'EUR', 900, 12, TRUE, TRUE, TRUE, TRUE, TRUE);
+insert into public.studio_settings (studio_id, currency, tax_rate_bps, cancellation_window_hours, waitlist_enabled, notify_booking_confirmations, notify_cancellations, notify_booking_reminders, notify_waitlist_promotions, notify_invoices) values ('00000000-0000-4000-8000-000000000001', 'EUR', 900, 12, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE);
 
 insert into public.members (id, studio_id, name, email, phone, status, notifications_opted_out, created_at) values ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Amara Okafor', 'amara@example.com', '+31 6 1200 0001', 'active', FALSE, '2026-06-16T12:00:00.000Z');
 insert into public.members (id, studio_id, name, email, phone, status, notifications_opted_out, created_at) values ('00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000001', 'Bram de Vries', 'bram@example.com', '+31 6 1200 0002', 'active', FALSE, '2026-06-01T12:00:00.000Z');
