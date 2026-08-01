@@ -53,6 +53,22 @@ export function waitlistPromotion(
   };
 }
 
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} is coming up`,
+    body: `Hi ${recipient.name}, a quick reminder that ${session.title} with ${session.instructor} starts on ${session.startsAt}. See you there!`,
+    // bookingId is the idempotency key: the reminder job skips bookings that
+    // already have a booking_reminder row carrying the same id.
+    data: { bookingId, title: session.title, startsAt: session.startsAt },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;

@@ -76,6 +76,8 @@ export interface InvoiceLineItemsRepo {
 export interface NotificationOutboxRepo {
   insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
   listPending(): Promise<NotificationOutboxRow[]>;
+  // Every row of the kind, pending AND sent — idempotency checks need both.
+  listByKind(kind: string): Promise<NotificationOutboxRow[]>;
   update(id: string, patch: Partial<NotificationOutboxRow>): Promise<NotificationOutboxRow>;
 }
 
