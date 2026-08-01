@@ -32,25 +32,49 @@ async function findFullBooking(repos: ReturnType<typeof createInMemoryRepositori
   const studio = await repos.studios.getFirst();
   if (!studio) throw new Error("Seed studio is missing");
   const sessions = await repos.classSessions.listByStudio(studio.id);
+  const session = sessions.find(isFuture);
+  if (!session) throw new Error("Seed has no future session");
 
-  for (const session of sessions.filter(isFuture)) {
-    const bookings = await repos.bookings.listBySession(session.id);
-    if (bookings.filter((booking) => booking.status === "booked").length >= session.capacity) {
-      const member: Member = {
-        id: `analytics-member-${session.id}`,
+  const bookings = await repos.bookings.listBySession(session.id);
+  const bookedCount = bookings.filter((booking) => booking.status === "booked").length;
+  const seatsToFill = Math.max(0, session.capacity - bookedCount);
+
+  await Promise.all(
+    Array.from({ length: seatsToFill }, async (_, index) => {
+      const memberId = `analytics-filler-${session.id}-${index}`;
+      await repos.members.insert({
+        id: memberId,
         studioId: studio.id,
-        name: "Analytics member",
-        email: "analytics-member@example.com",
-        phone: "+1 555 0100",
+        name: `Analytics filler ${index}`,
+        email: `analytics-filler-${index}@example.com`,
+        phone: null,
         status: "active",
         notificationsOptedOut: false,
         createdAt: NOW.toISOString(),
-      };
-      await repos.members.insert(member);
-      return { member, session };
-    }
-  }
-  throw new Error("Seed has no full future session");
+      });
+      await repos.bookings.insert({
+        id: `analytics-filler-booking-${session.id}-${index}`,
+        sessionId: session.id,
+        memberId,
+        status: "booked",
+        bookedAt: NOW.toISOString(),
+        cancelledAt: null,
+      });
+    }),
+  );
+
+  const member: Member = {
+    id: `analytics-member-${session.id}`,
+    studioId: studio.id,
+    name: "Analytics member",
+    email: "analytics-member@example.com",
+    phone: "+1 555 0100",
+    status: "active",
+    notificationsOptedOut: false,
+    createdAt: NOW.toISOString(),
+  };
+  await repos.members.insert(member);
+  return { member, session };
 }
 
 function expectEventWithoutPii(
