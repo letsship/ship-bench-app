@@ -4,6 +4,12 @@ import type { Member } from "@/lib/db/types";
 import { HttpError } from "@/lib/http";
 import type { CreateMemberInput, UpdateMemberInput } from "@/lib/validation";
 
+export type MemberView = Omit<Member, "calendarToken">;
+
+export function toMemberView({ calendarToken: _calendarToken, ...member }: Member): MemberView {
+  return member;
+}
+
 export async function listMembers(repos: Repositories, studioId: string): Promise<Member[]> {
   return repos.members.listByStudio(studioId);
 }
@@ -31,6 +37,7 @@ export async function createMember(
     phone: input.phone ?? null,
     status: input.status,
     notificationsOptedOut: false,
+    calendarToken: newId(),
     createdAt: new Date().toISOString(),
   });
 }

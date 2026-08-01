@@ -36,6 +36,7 @@ function seedWith(
         phone: null,
         status: "active",
         notificationsOptedOut: false,
+        calendarToken: "calendar-m1",
         createdAt: ISO,
         ...memberOverrides,
       },
