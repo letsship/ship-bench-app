@@ -12,6 +12,7 @@ function seedId(): string {
 import type { SeedData } from "./repos/fakes";
 import type {
   Booking,
+  ClassPack,
   ClassSession,
   ClassType,
   Invoice,
@@ -339,5 +340,17 @@ export function buildSeed(now: Date = new Date()): SeedData {
   const bookings = buildBookings(now, members, sessions);
   const { invoices, lineItems } = buildInvoices(now, studio.id, members, settings.taxRateBps);
   const outbox = buildOutbox(now, members);
-  return { studio, settings, members, classTypes, sessions, bookings, invoices, lineItems, outbox };
+  const classPacks: ClassPack[] = [];
+  return {
+    studio,
+    settings,
+    members,
+    classTypes,
+    sessions,
+    bookings,
+    invoices,
+    lineItems,
+    outbox,
+    classPacks,
+  };
 }
