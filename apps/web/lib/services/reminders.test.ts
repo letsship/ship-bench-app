@@ -12,7 +12,7 @@ describe("runReminders", () => {
     const rows = await repos.outbox.listByKind("booking_reminder");
     const second = await runReminders(repos, { now: NOW });
 
-    expect(first.queued).toBeGreaterThan(0);
+    expect(first).toEqual({ queued: 8, skipped: 3 });
     expect(rows).toHaveLength(first.queued);
     expect(rows.every((row) => row.sentAt === null)).toBe(true);
     expect(second.queued).toBe(0);
