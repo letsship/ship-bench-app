@@ -187,6 +187,37 @@ describe("bookings service", () => {
     expect(provider.sent).toHaveLength(0);
   });
 
+  it("rejects a concurrent repeat waitlist booking and keeps one active row", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    const input = { sessionId: "cs1", memberId: "m2" };
+
+    const results = await Promise.allSettled([
+      createBooking(repos, provider, input),
+      createBooking(repos, provider, input),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results).toContainEqual(
+      expect.objectContaining({
+        status: "rejected",
+        reason: expect.objectContaining({ status: 409, code: "booking_already_booked" }),
+      }),
+    );
+    expect(
+      (await repos.bookings.listBySession("cs1")).filter(
+        (row) => row.memberId === "m2" && row.status === "waitlisted",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("rejects a double booking with 409", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
@@ -199,6 +230,21 @@ describe("bookings service", () => {
     await expect(
       createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("allows a member to rebook after cancellation", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1", { status: "cancelled", cancelledAt: ISO })],
+      }),
+    );
+
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).resolves.toMatchObject({ status: "booked" });
   });
 
   it("marks a far-off cancellation refund-eligible", async () => {
