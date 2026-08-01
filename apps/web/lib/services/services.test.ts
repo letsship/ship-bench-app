@@ -295,6 +295,25 @@ describe("invoices service", () => {
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
+
+  it("opens the seeded fully-refunded invoice with zero totals", async () => {
+    const femke = (await repos.members.listByStudio(studioId))[5];
+    const invoice = (await repos.invoices.listByStudio(studioId)).find(
+      (candidate) => candidate.memberId === femke.id,
+    );
+    expect(invoice).toBeDefined();
+
+    const detailPromise = getInvoiceDetail(repos, invoice?.id ?? "");
+    await expect(detailPromise).resolves.toBeDefined();
+    const detail = await detailPromise;
+
+    expect(detail.invoice.subtotalCents).toBe(0);
+    expect(detail.invoice.taxCents).toBe(0);
+    expect(detail.invoice.totalCents).toBe(0);
+    expect(detail.lineItems).toContainEqual(
+      expect.objectContaining({ description: "Pottery intensive", refunded: true }),
+    );
+  });
 });
 
 describe("reports + dashboard + booking list", () => {
