@@ -11,24 +11,26 @@ export interface BookingRow {
 }
 
 // Flat list of bookings joined (in-memory) to member + session + class type,
-// ordered by session start. The /bookings page buckets these by day. The join
-// happens here in the service so repositories stay single-entity.
+// ordered by session start. The /bookings page buckets these by day.
 export async function listBookingRows(
   repos: Repositories,
   studioId: string,
   range: SessionRange = {},
 ): Promise<BookingRow[]> {
   const sessions = await repos.classSessions.listByStudio(studioId, range);
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
   const classTypes = await repos.classTypes.listByStudio(studioId);
   const typeById = new Map(classTypes.map((type) => [type.id, type]));
-  const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
+  const members = await repos.members.listByStudio(studioId);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const sessionIds = sessions.map((session) => session.id);
+  const bookings = await repos.bookings.listBySessionIds(sessionIds);
 
-  const rows: BookingRow[] = [];
-  for (const booking of bookings) {
-    const session = await repos.classSessions.getById(booking.sessionId);
+  const rows = bookings.map((booking) => {
+    const session = sessionById.get(booking.sessionId);
     const classType = session ? typeById.get(session.classTypeId) : undefined;
-    const member = await repos.members.getById(booking.memberId);
-    rows.push({
+    const member = memberById.get(booking.memberId);
+    return {
       id: booking.id,
       memberName: member?.name ?? "—",
       className: classType?.name ?? "Class",
@@ -36,7 +38,7 @@ export async function listBookingRows(
       instructor: session?.instructor ?? "",
       startsAt: session?.startsAt ?? "",
       status: booking.status,
-    });
-  }
+    };
+  });
   return rows.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }

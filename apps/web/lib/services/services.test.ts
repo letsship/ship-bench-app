@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -323,5 +323,44 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("keeps booking-list single-row reads bounded as bookings grow", async () => {
+    const seed = buildSeed(NOW);
+    const sourceBookings = seed.bookings.slice(0, 8);
+    const makeRepos = (copies: number) => {
+      const bookings = Array.from({ length: copies }, (_, copy) =>
+        sourceBookings.map((booking, index) => ({
+          ...booking,
+          id: `${booking.id}-${copy}-${index}`,
+        })),
+      ).flat();
+      const testRepos = createInMemoryRepositories({ ...seed, bookings });
+      const memberGetById = vi.spyOn(testRepos.members, "getById");
+      const sessionGetById = vi.spyOn(testRepos.classSessions, "getById");
+      return { testRepos, memberGetById, sessionGetById };
+    };
+
+    const oneCopy = makeRepos(1);
+    const twoCopies = makeRepos(2);
+    const rows = await listBookingRows(oneCopy.testRepos, studioId);
+    const doubledRows = await listBookingRows(twoCopies.testRepos, studioId);
+    const copyOneIdByCopyZeroId = new Map(
+      sourceBookings.map((booking, index) => [
+        `${booking.id}-0-${index}`,
+        `${booking.id}-1-${index}`,
+      ]),
+    );
+    const expectedDoubledRows = [
+      ...rows,
+      ...rows.map((row) => ({ ...row, id: copyOneIdByCopyZeroId.get(row.id) ?? row.id })),
+    ];
+
+    expect(oneCopy.memberGetById).toHaveBeenCalledTimes(0);
+    expect(oneCopy.sessionGetById).toHaveBeenCalledTimes(0);
+    expect(twoCopies.memberGetById).toHaveBeenCalledTimes(0);
+    expect(twoCopies.sessionGetById).toHaveBeenCalledTimes(0);
+    expect(doubledRows).toEqual(expectedDoubledRows);
+    expect(rows).toEqual([...rows].sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
   });
 });
