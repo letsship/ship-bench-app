@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
+import { GET as memberCalendarGet } from "@/app/api/ical/[token]/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
 import { __setTestRepositories } from "@/lib/db/repos";
@@ -11,10 +12,13 @@ const NOW = new Date("2026-03-15T12:00:00.000Z");
 
 describe("GET route handlers (against injected fake repositories)", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
     __setTestRepositories(createInMemoryRepositories(buildSeed(NOW)));
   });
   afterEach(() => {
     __setTestRepositories(null);
+    vi.useRealTimers();
   });
 
   it("GET /api/classes returns sessions with occupancy", async () => {
@@ -44,5 +48,39 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("GET /api/ical/:token returns only the member's upcoming booked sessions", async () => {
+    const seed = buildSeed(NOW);
+    const member = seed.members[0];
+    const bookedSessionIds = new Set(
+      seed.bookings
+        .filter((booking) => booking.memberId === member.id && booking.status === "booked")
+        .map((booking) => booking.sessionId),
+    );
+    const expectedUids = seed.sessions
+      .filter((session) => session.startsAt > NOW.toISOString() && bookedSessionIds.has(session.id))
+      .map((session) => `UID:${session.id}@studiobook`);
+
+    const res = await memberCalendarGet(new Request("http://localhost/api/ical/token"), {
+      params: Promise.resolve({ token: member.calendarToken }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/calendar");
+    const body = await res.text();
+    expect(body.match(/^UID:/gm)?.sort()).toEqual(expectedUids.sort());
+  });
+
+  it("GET /api/ical/:token returns 404 for unknown and empty tokens", async () => {
+    const unknown = await memberCalendarGet(new Request("http://localhost/api/ical/nope"), {
+      params: Promise.resolve({ token: "not-a-token" }),
+    });
+    const empty = await memberCalendarGet(new Request("http://localhost/api/ical/"), {
+      params: Promise.resolve({ token: "" }),
+    });
+
+    expect(unknown.status).toBe(404);
+    expect(empty.status).toBe(404);
   });
 });

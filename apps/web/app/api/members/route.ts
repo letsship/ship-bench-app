@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
   return handle(async () => {
     const { repos, ctx } = await resolveStudio();
-    return ok(await listMembers(repos, ctx.studio.id));
+    const members = await listMembers(repos, ctx.studio.id);
+    return ok(members.map(({ calendarToken: _calendarToken, ...member }) => member));
   });
 }
 

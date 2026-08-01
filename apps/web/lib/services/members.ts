@@ -31,6 +31,7 @@ export async function createMember(
     phone: input.phone ?? null,
     status: input.status,
     notificationsOptedOut: false,
+    calendarToken: newId(),
     createdAt: new Date().toISOString(),
   });
 }
