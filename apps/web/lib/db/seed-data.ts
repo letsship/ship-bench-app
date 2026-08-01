@@ -18,6 +18,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  Package,
   Studio,
   StudioSettings,
 } from "./types";
@@ -300,6 +301,25 @@ function buildInvoices(
   return { invoices, lineItems };
 }
 
+// One partially-used class pack for the first member, so fake-dev and the
+// generated seed exercise the credit-drawing booking path.
+function buildPackages(now: Date, studioId: string, members: Member[]): Package[] {
+  const purchasedAt = monthsAgoIso(now, 1, 8);
+  return [
+    {
+      id: seedId(),
+      studioId,
+      memberId: members[0].id,
+      creditsTotal: 10,
+      creditsRemaining: 6,
+      priceCents: 10000,
+      status: "active",
+      purchasedAt,
+      createdAt: purchasedAt,
+    },
+  ];
+}
+
 function buildOutbox(now: Date, members: Member[]): NotificationOutboxRow[] {
   const createdAt = new Date(now.getTime() - 2 * DAY_MS).toISOString();
   return [
@@ -339,5 +359,18 @@ export function buildSeed(now: Date = new Date()): SeedData {
   const bookings = buildBookings(now, members, sessions);
   const { invoices, lineItems } = buildInvoices(now, studio.id, members, settings.taxRateBps);
   const outbox = buildOutbox(now, members);
-  return { studio, settings, members, classTypes, sessions, bookings, invoices, lineItems, outbox };
+  // Built last so every pre-existing seed id stays stable (seedId is sequential).
+  const packages = buildPackages(now, studio.id, members);
+  return {
+    studio,
+    settings,
+    members,
+    classTypes,
+    sessions,
+    bookings,
+    invoices,
+    lineItems,
+    packages,
+    outbox,
+  };
 }

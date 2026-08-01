@@ -6,6 +6,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  Package,
   Studio,
   StudioSettings,
 } from "../types";
@@ -73,6 +74,13 @@ export interface InvoiceLineItemsRepo {
   insertMany(items: InvoiceLineItem[]): Promise<InvoiceLineItem[]>;
 }
 
+export interface PackagesRepo {
+  listByMember(memberId: string): Promise<Package[]>;
+  getById(id: string): Promise<Package | null>;
+  insert(pack: Package): Promise<Package>;
+  update(id: string, patch: Partial<Package>): Promise<Package>;
+}
+
 export interface NotificationOutboxRepo {
   insert(row: NotificationOutboxRow): Promise<NotificationOutboxRow>;
   listPending(): Promise<NotificationOutboxRow[]>;
@@ -88,5 +96,6 @@ export interface Repositories {
   bookings: BookingsRepo;
   invoices: InvoicesRepo;
   invoiceLineItems: InvoiceLineItemsRepo;
+  packages: PackagesRepo;
   outbox: NotificationOutboxRepo;
 }
