@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -52,6 +52,53 @@ describe("membersToCsv", () => {
     const [header, row] = csv.split("\r\n");
     expect(header).toBe("Name,Email,Phone,Status,Joined");
     expect(row).toBe("Amara,amara@example.com,,active,2026-01-01T00:00:00Z");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits the columns Starts,Class,Member,Email,Status with an ISO start", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T08:00:00.000Z",
+        className: "Yoga",
+        memberName: "Amara",
+        email: "amara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [header, row] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+    expect(row).toBe("2026-06-15T08:00:00.000Z,Yoga,Amara,amara@example.com,booked");
+  });
+
+  it("quotes a member name containing a comma so it stays one column", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T08:00:00.000Z",
+        className: "Yoga",
+        memberName: "Rossi, Chiara",
+        email: "chiara@example.com",
+        status: "attended",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toBe('2026-06-15T08:00:00.000Z,Yoga,"Rossi, Chiara",chiara@example.com,attended');
+  });
+
+  it("doubles embedded quotes and quotes fields containing newlines", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-15T08:00:00.000Z",
+        className: 'The "Core" Hour',
+        memberName: "Line\nBreak",
+        email: "line@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n").slice(1).join("\r\n");
+    expect(row).toBe(
+      '2026-06-15T08:00:00.000Z,"The ""Core"" Hour","Line\nBreak",line@example.com,booked',
+    );
   });
 });
 
