@@ -69,7 +69,7 @@ describe("GET route handlers (against injected fake repositories)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/calendar");
     const body = await res.text();
-    expect(body.match(/^UID:/gm)?.sort()).toEqual(expectedUids.sort());
+    expect(body.match(/^UID:.*$/gm)?.sort()).toEqual(expectedUids.sort());
   });
 
   it("GET /api/ical/:token returns 404 for unknown and empty tokens", async () => {
