@@ -6,10 +6,13 @@ import { z } from "zod";
 // Parsing is lazy + cached, and only happens when a Supabase/email client is
 // actually constructed — so the fake-backends mode needs none of these set.
 
+const sentryDsnSchema = z.string().url().optional();
+
 const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: sentryDsnSchema,
 });
 
 const serverSchema = clientSchema.extend({
@@ -32,6 +35,7 @@ const getClientVars = () => ({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
 });
 
 const getServerVars = () => ({
@@ -51,3 +55,6 @@ export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
 };
+
+export const sentryDsn = (): string | undefined =>
+  sentryDsnSchema.parse(process.env.NEXT_PUBLIC_SENTRY_DSN);
