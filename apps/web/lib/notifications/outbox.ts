@@ -6,6 +6,7 @@ import type { NotificationKind, NotificationMessage, NotificationProvider } from
 const SETTING_FOR_KIND = {
   booking_confirmation: "notifyBookingConfirmations",
   booking_cancellation: "notifyCancellations",
+  booking_reminder: "notifyBookingConfirmations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
 } as const satisfies Record<NotificationKind, string>;

@@ -37,6 +37,7 @@ function recipientOf(member: Member): { memberId: string; email: string; name: s
 async function summaryOf(repos: Repositories, session: ClassSession): Promise<SessionSummary> {
   const classType = await repos.classTypes.getById(session.classTypeId);
   return {
+    sessionId: session.id,
     title: classType?.name ?? "Class",
     startsAt: session.startsAt,
     instructor: session.instructor,

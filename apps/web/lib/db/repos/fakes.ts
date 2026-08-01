@@ -204,6 +204,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         store.outbox.push(clone(row));
         return clone(row);
       },
+      async listByKind(kind) {
+        return cloneAll(store.outbox.filter((row) => row.kind === kind));
+      },
       async listPending() {
         return cloneAll(store.outbox.filter((row) => row.sentAt === null));
       },

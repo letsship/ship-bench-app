@@ -5,6 +5,7 @@ import type { NotificationMessage, NotificationRecipient } from "./types";
 // outbox and the route handlers stay free of templating.
 
 export interface SessionSummary {
+  sessionId: string;
   title: string;
   startsAt: string;
   instructor: string;
@@ -37,6 +38,25 @@ export function bookingCancellation(
     subject: `Cancelled: ${session.title}`,
     body: `Hi ${recipient.name}, your booking for ${session.title} on ${session.startsAt} is cancelled. ${refundLine}`,
     data: { title: session.title, startsAt: session.startsAt, refundEligible },
+  };
+}
+
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  bookingId: string,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} is tomorrow`,
+    body: `Hi ${recipient.name}, this is a reminder that ${session.title} with ${session.instructor} starts at ${session.startsAt}. See you soon!`,
+    data: {
+      bookingId,
+      sessionId: session.sessionId,
+      startsAt: session.startsAt,
+      title: session.title,
+    },
   };
 }
 

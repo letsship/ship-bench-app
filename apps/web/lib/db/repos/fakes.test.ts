@@ -86,6 +86,34 @@ describe("in-memory repositories", () => {
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
   });
 
+  it("listByKind returns pending and sent rows of only the requested kind", async () => {
+    await repos.outbox.insert({
+      id: "reminder_pending",
+      memberId: "member_1",
+      kind: "booking_reminder",
+      payload: "{}",
+      createdAt: NOW.toISOString(),
+      sentAt: null,
+      providerMessageId: null,
+      error: null,
+    });
+    await repos.outbox.insert({
+      id: "reminder_sent",
+      memberId: "member_1",
+      kind: "booking_reminder",
+      payload: "{}",
+      createdAt: NOW.toISOString(),
+      sentAt: NOW.toISOString(),
+      providerMessageId: "provider_1",
+      error: null,
+    });
+
+    const reminders = await repos.outbox.listByKind("booking_reminder");
+
+    expect(reminders.map((row) => row.id)).toEqual(["reminder_pending", "reminder_sent"]);
+    expect(reminders.every((row) => row.kind === "booking_reminder")).toBe(true);
+  });
+
   it("empty repositories return nulls / empty lists", async () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
