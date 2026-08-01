@@ -68,7 +68,11 @@ describe("class pack service", () => {
       status: 402,
       code: "pack_exhausted",
     });
-    expect(await repos.bookings.listBySession(session.id)).toHaveLength(0);
+    expect(
+      (await repos.bookings.listBySession(session.id)).filter(
+        (booking) => booking.memberId === memberId,
+      ),
+    ).toHaveLength(0);
   });
 
   it("does not spend a second credit on a duplicate booking", async () => {

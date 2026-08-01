@@ -43,7 +43,12 @@ export async function createPack(
     throw new HttpError(400, "bad_request", "Unknown member for this package");
   }
 
-  const purchasedAt = new Date().toISOString();
+  const existingPacks = await repos.classPacks.listByMember(member.id);
+  const latestPurchasedAt = existingPacks.reduce(
+    (latest, pack) => Math.max(latest, new Date(pack.purchasedAt).getTime()),
+    0,
+  );
+  const purchasedAt = new Date(Math.max(Date.now(), latestPurchasedAt + 1)).toISOString();
   const pack = await repos.classPacks.insert({
     id: newId(),
     studioId,
