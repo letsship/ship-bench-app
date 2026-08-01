@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as memberCalendarGet } from "@/app/api/ical/[token]/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
+import { GET as memberGet } from "@/app/api/members/[id]/route";
 import { GET as membersGet } from "@/app/api/members/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
@@ -47,7 +48,19 @@ describe("GET route handlers (against injected fake repositories)", () => {
   it("GET /api/members returns the studio's members", async () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
-    expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+    const members = (await res.json()) as Record<string, unknown>[];
+    expect(members.length).toBeGreaterThan(0);
+    expect(members[0]).not.toHaveProperty("calendarToken");
+  });
+
+  it("GET /api/members/:id does not expose the calendar token", async () => {
+    const seed = buildSeed(NOW);
+    const res = await memberGet(new Request("http://localhost/api/members/member"), {
+      params: Promise.resolve({ id: seed.members[0].id }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).not.toHaveProperty("calendarToken");
   });
 
   it("GET /api/ical/:token returns only the member's upcoming booked sessions", async () => {
