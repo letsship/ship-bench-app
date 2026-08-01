@@ -18,8 +18,7 @@
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.16.5",
-    "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.47.0",
+    "drizzle-orm": "^0.44.5",
     "next": "^16.1.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -38,6 +37,7 @@
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^6.1.0",
+    "miniflare": "^4.20250718.0",
     "tailwindcss": "^4.1.8",
     "tsx": "^4.19.2",
     "typescript": "^5.9.2",

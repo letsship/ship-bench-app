@@ -3,7 +3,7 @@
   // Deploys apps/web as a Cloudflare Worker via @opennextjs/cloudflare.
   //
   // NEXT_PUBLIC_* vars are public (inlined into the client bundle at build time).
-  // The secrets SUPABASE_SECRET_KEY and RESEND_API_KEY are set out-of-band with
+  // Worker secrets such as RESEND_API_KEY are set out-of-band with
   // `wrangler secret put <NAME>` — never commit them.
   "name": "studiobook",
   "main": ".open-next/worker.js",
@@ -13,9 +13,15 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS",
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "studiobook",
+      "database_id": "<placeholder-to-fill-on-create>",
+      "migrations_dir": "migrations",
+    },
+  ],
   "vars": {
-    "NEXT_PUBLIC_SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_REPLACE_ME",
     "NEXT_PUBLIC_SITE_URL": "https://studiobook.example",
   },
   "observability": {
