@@ -29,6 +29,32 @@ describe("computeInvoiceTotals", () => {
     expect(totals.totalCents).toBe(1090);
   });
 
+  it("returns zero payable totals when every line is refunded", () => {
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 9000, refunded: true },
+          { quantity: 2, unitAmountCents: 1500, refunded: true },
+        ],
+        900,
+      ),
+    ).toEqual({
+      subtotalCents: 0,
+      refundedCents: 12000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("returns zero totals for an invoice with no lines", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
   it("rounds tax half-up", () => {
     // 1000 * 5 / 10000 = 0.5 -> rounds to 1
     expect(computeInvoiceTotals([{ quantity: 1, unitAmountCents: 1000 }], 5).taxCents).toBe(1);
