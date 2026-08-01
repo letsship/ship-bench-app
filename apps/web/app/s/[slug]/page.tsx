@@ -41,7 +41,10 @@ export default async function PublicStudioPage({ params }: PageProps) {
             <div key={cls.id} style={{ padding: "12px 0", borderBottom: "1px solid #eee" }}>
               <div style={{ fontSize: 18 }}>{cls.name}</div>
               <div>{formatDateTime(cls.startsAt, timeZone)}</div>
-              <div style={{ color: "#666" }}>with {cls.instructor}</div>
+              <div style={{ color: "#666" }}>
+                <span>with </span>
+                <span>{cls.instructor}</span>
+              </div>
             </div>
           ))
         )}
