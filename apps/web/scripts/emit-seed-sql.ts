@@ -32,6 +32,7 @@ const sections: [string, readonly object[]][] = [
   ["class_types", seed.classTypes],
   ["class_sessions", seed.sessions],
   ["bookings", seed.bookings],
+  ["class_packs", seed.packs ?? []],
   ["invoices", seed.invoices],
   ["invoice_line_items", seed.lineItems],
   ["notification_outbox", seed.outbox],
@@ -43,6 +44,8 @@ const lines: string[] = [
   "",
 ];
 for (const [table, records] of sections) {
+  // Skip empty sections (e.g. class_packs) so they add no blank-line churn.
+  if (records.length === 0) continue;
   lines.push(...insertStatements(table, records), "");
 }
 
