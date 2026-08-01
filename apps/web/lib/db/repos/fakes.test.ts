@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
 import { createInMemoryRepositories } from "./fakes";
-import type { Repositories } from "./types";
+import { DuplicateActiveBookingError, type Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
 
@@ -64,6 +65,46 @@ describe("in-memory repositories", () => {
     };
     await repos.members.insert(member);
     expect(await repos.members.getById("mem_new")).toEqual(member);
+  });
+
+  it("rejects a second active booking for the same session and member", async () => {
+    const first: Booking = {
+      id: "booking_active_1",
+      sessionId: "session_duplicate",
+      memberId: "member_duplicate",
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(first);
+
+    await expect(
+      repos.bookings.insert({ ...first, id: "booking_active_2", status: "waitlisted" }),
+    ).rejects.toBeInstanceOf(DuplicateActiveBookingError);
+  });
+
+  it("allows a new active booking after the prior booking is cancelled", async () => {
+    const first: Booking = {
+      id: "booking_cancelled_1",
+      sessionId: "session_rebook",
+      memberId: "member_rebook",
+      status: "booked",
+      bookedAt: NOW.toISOString(),
+      cancelledAt: null,
+    };
+    await repos.bookings.insert(first);
+    await repos.bookings.update(first.id, {
+      status: "cancelled",
+      cancelledAt: NOW.toISOString(),
+    });
+
+    const rebooked = await repos.bookings.insert({
+      ...first,
+      id: "booking_cancelled_2",
+      bookedAt: new Date(NOW.getTime() + 1_000).toISOString(),
+    });
+
+    expect(rebooked.status).toBe("booked");
   });
 
   it("update returns an isolated clone (store not mutated by reference)", async () => {

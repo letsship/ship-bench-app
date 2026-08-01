@@ -10,6 +10,13 @@ import type {
   StudioSettings,
 } from "../types";
 
+export class DuplicateActiveBookingError extends Error {
+  constructor() {
+    super("Member already has an active booking for this class session");
+    this.name = "DuplicateActiveBookingError";
+  }
+}
+
 // The repository seam. Route handlers, services, and the outbox depend ONLY on
 // these interfaces — never on supabase-js (or any driver) directly. Two
 // implementations exist: `supabase/` (the production Postgres impl) and
