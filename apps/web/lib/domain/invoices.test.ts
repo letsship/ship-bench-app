@@ -15,18 +15,46 @@ describe("lineAmountCents", () => {
 });
 
 describe("computeInvoiceTotals", () => {
-  it("excludes refunded lines from the subtotal but tracks them", () => {
-    const totals = computeInvoiceTotals(
-      [
-        { quantity: 1, unitAmountCents: 1000 },
-        { quantity: 2, unitAmountCents: 500, refunded: true },
-      ],
-      900,
-    );
-    expect(totals.subtotalCents).toBe(1000);
-    expect(totals.refundedCents).toBe(1000);
-    expect(totals.taxCents).toBe(90);
-    expect(totals.totalCents).toBe(1090);
+  it("returns zero payable totals for an empty list", () => {
+    expect(() => computeInvoiceTotals([], 2100)).not.toThrow();
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("returns zero payable totals when every line is refunded", () => {
+    const items = [
+      { quantity: 1, unitAmountCents: 1000, refunded: true },
+      { quantity: 2, unitAmountCents: 500, refunded: true },
+    ];
+
+    expect(() => computeInvoiceTotals(items, 900)).not.toThrow();
+    expect(computeInvoiceTotals(items, 900)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 2000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("excludes refunded lines from the subtotal and tax but tracks them", () => {
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 1000 },
+          { quantity: 2, unitAmountCents: 500, refunded: true },
+        ],
+        900,
+      ),
+    ).toEqual({
+      subtotalCents: 1000,
+      refundedCents: 1000,
+      taxCents: 90,
+      totalCents: 1090,
+    });
   });
 
   it("rounds tax half-up", () => {
