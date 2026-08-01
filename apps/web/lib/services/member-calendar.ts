@@ -34,7 +34,7 @@ export async function getMemberCalendar(
       } satisfies CalendarEvent;
     }),
   );
-  return events.filter((event): event is CalendarEvent => event !== null).sort((a, b) =>
-    a.startsAt.localeCompare(b.startsAt),
-  );
+  return events
+    .flatMap((event): CalendarEvent[] => (event ? [event] : []))
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
