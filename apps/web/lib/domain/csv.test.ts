@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import { bookingsToCsv, escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -70,5 +70,46 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("uses the accounting export columns in order", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00.000Z",
+        className: "Morning Flow",
+        memberName: "Rossi, Chiara",
+        memberEmail: "chiara@example.com",
+        status: "attended",
+      },
+    ]);
+
+    expect(csv).toBe(
+      "Starts,Class,Member,Email,Status\r\n2026-06-01T08:00:00.000Z,Morning Flow,\"Rossi, Chiara\",chiara@example.com,attended",
+    );
+  });
+
+  it("escapes quotes and newlines with CRLF-delimited rows", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00.000Z",
+        className: 'Pilates "Power"',
+        memberName: "Chiara\nRossi",
+        memberEmail: "chiara@example.com",
+        status: "booked",
+      },
+      {
+        startsAt: "2026-06-02T08:00:00.000Z",
+        className: "Yoga",
+        memberName: "Amara",
+        memberEmail: "amara@example.com",
+        status: "attended",
+      },
+    ]);
+
+    expect(csv).toContain('"Pilates ""Power"""');
+    expect(csv).toContain('"Chiara\nRossi"');
+    expect(csv).toContain("booked\r\n2026-06-02T08:00:00.000Z");
   });
 });
