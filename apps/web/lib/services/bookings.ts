@@ -1,3 +1,10 @@
+import {
+  type AnalyticsTracker,
+  BOOKING_CANCELLED,
+  BOOKING_CREATED,
+  type CaptureEvent,
+  WAITLIST_JOINED,
+} from "@/lib/analytics/types";
 import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
@@ -34,6 +41,16 @@ function recipientOf(member: Member): { memberId: string; email: string; name: s
   return { memberId: member.id, email: member.email, name: member.name };
 }
 
+// Analytics is a non-critical side effect: a capture failure is logged and
+// never blocks the booking flow.
+async function captureSafely(tracker: AnalyticsTracker, event: CaptureEvent): Promise<void> {
+  try {
+    await tracker.capture(event);
+  } catch (error) {
+    console.error("Analytics capture failed", error);
+  }
+}
+
 async function summaryOf(repos: Repositories, session: ClassSession): Promise<SessionSummary> {
   const classType = await repos.classTypes.getById(session.classTypeId);
   return {
@@ -63,6 +80,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -93,6 +111,12 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  await captureSafely(tracker, {
+    distinctId: member.id,
+    event: decision.status === "booked" ? BOOKING_CREATED : WAITLIST_JOINED,
+    properties: { session_id: session.id },
+  });
+
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
@@ -111,6 +135,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: AnalyticsTracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -133,6 +158,12 @@ export async function cancelBooking(
   }
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
+
+  await captureSafely(tracker, {
+    distinctId: booking.memberId,
+    event: BOOKING_CANCELLED,
+    properties: { session_id: session.id },
+  });
 
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
