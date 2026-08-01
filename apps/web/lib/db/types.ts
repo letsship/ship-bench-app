@@ -95,6 +95,15 @@ export interface InvoiceLineItem {
   bookingId: string | null;
 }
 
+// Ledger of processed payment-provider webhook events. The id is the
+// provider's event id (e.g. Stripe "evt_..."), so replays of the same event
+// are detected and skipped.
+export interface WebhookEvent {
+  id: string;
+  type: string;
+  receivedAt: string;
+}
+
 export interface NotificationOutboxRow {
   id: string;
   memberId: string;

@@ -9,6 +9,7 @@ import type {
   NotificationOutboxRow,
   Studio,
   StudioSettings,
+  WebhookEvent,
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
@@ -191,6 +192,14 @@ export function createSupabaseRepositories(): Repositories {
           toCamelRow<InvoiceLineItem>(row as Record<string, unknown>),
         );
       },
+    },
+    webhookEvents: {
+      getById: (id) =>
+        maybeOne<WebhookEvent>(
+          db.from("webhook_events").select("*").eq("id", id).maybeSingle(),
+          "webhookEvents.getById",
+        ),
+      insert: (row) => insertReturning("webhook_events", row),
     },
     outbox: {
       insert: (row) => insertReturning("notification_outbox", row),

@@ -71,9 +71,25 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+// Stripe webhook event envelope. Deliberately lenient: only the fields the
+// webhook service reads are declared, and the payload object passes through so
+// events of any type (with arbitrary objects) still parse.
+export const stripeWebhookEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  data: z.object({
+    object: z
+      .object({
+        metadata: z.object({ invoice_id: z.string() }).partial().optional(),
+      })
+      .passthrough(),
+  }),
+});
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+export type StripeWebhookEvent = z.infer<typeof stripeWebhookEventSchema>;
