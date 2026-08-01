@@ -36,6 +36,9 @@ export interface MembersRepo {
   listByStudio(studioId: string): Promise<Member[]>;
   getById(id: string): Promise<Member | null>;
   findByEmail(studioId: string, email: string): Promise<Member | null>;
+  // Resolve the private calendar feed's secret; null for an empty or unknown
+  // token — the caller turns that into a 404, never a different member's data.
+  findByCalendarToken(token: string): Promise<Member | null>;
   insert(member: Member): Promise<Member>;
   update(id: string, patch: Partial<Member>): Promise<Member>;
 }
@@ -55,6 +58,7 @@ export interface ClassSessionsRepo {
 export interface BookingsRepo {
   listBySessionIds(sessionIds: string[]): Promise<Booking[]>;
   listBySession(sessionId: string): Promise<Booking[]>;
+  listByMember(memberId: string): Promise<Booking[]>;
   getById(id: string): Promise<Booking | null>;
   insert(booking: Booking): Promise<Booking>;
   update(id: string, patch: Partial<Booking>): Promise<Booking>;

@@ -97,6 +97,13 @@ export function createSupabaseRepositories(): Repositories {
           db.from("members").select("*").eq("studio_id", studioId).eq("email", email).maybeSingle(),
           "members.findByEmail",
         ),
+      findByCalendarToken: async (token) => {
+        if (!token) return null;
+        return maybeOne<Member>(
+          db.from("members").select("*").eq("calendar_token", token).maybeSingle(),
+          "members.findByCalendarToken",
+        );
+      },
       insert: (member) => insertReturning("members", member),
       update: (id, patch) => updateReturning<Member>("members", "id", id, patch),
     },
@@ -139,6 +146,11 @@ export function createSupabaseRepositories(): Repositories {
         rows<Booking>(
           db.from("bookings").select("*").eq("session_id", sessionId),
           "bookings.listBySession",
+        ),
+      listByMember: (memberId) =>
+        rows<Booking>(
+          db.from("bookings").select("*").eq("member_id", memberId),
+          "bookings.listByMember",
         ),
       getById: (id) =>
         maybeOne<Booking>(
