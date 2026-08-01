@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getInvoiceDetail } from "@/lib/services/invoices";
 import { Money, StatusBadge } from "../../_components/ui";
+import { LineItemDescription } from "./LineItemDescription";
 import { InvoiceStatusControls } from "./invoice-status-controls";
 
 export const dynamic = "force-dynamic";
@@ -79,8 +80,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             {lineItems.map((line) => (
               <tr key={line.id}>
                 <td>
-                  {/* Line descriptions can carry light formatting entered by staff. */}
-                  <span dangerouslySetInnerHTML={{ __html: line.description }} />
+                  <LineItemDescription description={line.description} />
                   {line.refunded ? (
                     <span className="ml-2">
                       <StatusBadge status="refunded" />
