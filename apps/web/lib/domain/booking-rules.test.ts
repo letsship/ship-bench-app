@@ -56,6 +56,20 @@ describe("canBook", () => {
     });
   });
 
+  it.each(["waitlisted", "attended"])('rejects a member with an active "%s" booking', (status) => {
+    expect(canBook(baseContext({ memberBookings: [{ status }] }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
+  it.each(["cancelled", "no_show"])('allows re-booking after a "%s" booking', (status) => {
+    expect(canBook(baseContext({ memberBookings: [{ status }] }))).toEqual({
+      ok: true,
+      status: "booked",
+    });
+  });
+
   it("rejects when full and the waitlist is closed", () => {
     const occupancy = computeOccupancy(1, [{ status: "booked" }]);
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
