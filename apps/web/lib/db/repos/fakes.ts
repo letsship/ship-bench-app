@@ -27,7 +27,7 @@ export interface SeedData {
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
-  webhookEvents: StripeWebhookEvent[];
+  webhookEvents?: StripeWebhookEvent[];
 }
 
 interface Store {
@@ -70,7 +70,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
-    webhookEvents: seed ? cloneAll(seed.webhookEvents) : [],
+    webhookEvents: seed ? cloneAll(seed.webhookEvents ?? []) : [],
   };
 
   return {
