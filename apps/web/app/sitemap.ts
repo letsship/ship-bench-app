@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { listPublicStudios, publicBaseUrl } from "@/lib/services/public-studio";
 
+export const dynamic = "force-dynamic";
+
 export function buildSitemapEntries(
   studios: { slug: string; createdAt: string }[],
   baseUrl: string,
