@@ -51,6 +51,14 @@ describe("in-memory repositories", () => {
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
   });
 
+  it("lists bookings for a single member", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const target = members[0];
+    const bookings = await repos.bookings.listByMember(target.id);
+    expect(bookings.length).toBeGreaterThan(0);
+    expect(bookings.every((b) => b.memberId === target.id)).toBe(true);
+  });
+
   it("inserts then reads back by id", async () => {
     const member = {
       id: "mem_new",
@@ -60,10 +68,13 @@ describe("in-memory repositories", () => {
       phone: null,
       status: "active",
       notificationsOptedOut: false,
+      calendarToken: "caltok-mem-new",
       createdAt: NOW.toISOString(),
     };
     await repos.members.insert(member);
     expect(await repos.members.getById("mem_new")).toEqual(member);
+    expect(await repos.members.findByCalendarToken("caltok-mem-new")).toEqual(member);
+    expect(await repos.members.findByCalendarToken("caltok-nope")).toBeNull();
   });
 
   it("update returns an isolated clone (store not mutated by reference)", async () => {

@@ -5,3 +5,10 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Secret per-member calendar token: 122 bits of randomness, dash-stripped so
+// the value is a single opaque URL segment. Distinct from newId() so call
+// sites read as "mint a secret", not "mint a primary key".
+export function newCalendarToken(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}

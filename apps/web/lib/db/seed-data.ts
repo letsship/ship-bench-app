@@ -96,6 +96,9 @@ function buildMembers(now: Date, studioId: string): Member[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    // Deterministic (this is the frozen demo seed, not a real secret); real
+    // members get a random newCalendarToken() app-side.
+    calendarToken: `caltok-${member.email.split("@")[0]}-${String(index + 1).padStart(4, "0")}`,
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }

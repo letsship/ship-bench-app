@@ -31,6 +31,9 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  // Secret for the member's private iCalendar feed (/api/ical/[token]). The
+  // token in the URL is the sole authorization — treat it like a credential.
+  calendarToken: string;
   createdAt: string;
 }
 

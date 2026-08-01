@@ -55,6 +55,7 @@ const member = (id: string, over: Partial<Member> = {}): Member => ({
   phone: null,
   status: "active",
   notificationsOptedOut: false,
+  calendarToken: `caltok-${id}`,
   createdAt: ISO,
   ...over,
 });
@@ -114,6 +115,7 @@ describe("members service", () => {
       email: "new@example.com",
       status: "active",
     });
+    expect(created.calendarToken).not.toBe("");
     const updated = await updateMember(repos, created.id, { status: "paused" });
     expect(updated.status).toBe("paused");
   });

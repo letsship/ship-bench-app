@@ -6,6 +6,7 @@ describe("key mapping", () => {
     expect(toSnakeKey("studioId")).toBe("studio_id");
     expect(toSnakeKey("defaultCapacity")).toBe("default_capacity");
     expect(toSnakeKey("notificationsOptedOut")).toBe("notifications_opted_out");
+    expect(toSnakeKey("calendarToken")).toBe("calendar_token");
     expect(toSnakeKey("id")).toBe("id");
   });
 
@@ -13,6 +14,7 @@ describe("key mapping", () => {
     expect(toCamelKey("studio_id")).toBe("studioId");
     expect(toCamelKey("default_price_cents")).toBe("defaultPriceCents");
     expect(toCamelKey("provider_message_id")).toBe("providerMessageId");
+    expect(toCamelKey("calendar_token")).toBe("calendarToken");
     expect(toCamelKey("id")).toBe("id");
   });
 
