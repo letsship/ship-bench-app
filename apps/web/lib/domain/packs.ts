@@ -1,4 +1,5 @@
 interface ClassPack {
+  id: string;
   status: string;
   creditsRemaining: number;
   purchasedAt: string;
