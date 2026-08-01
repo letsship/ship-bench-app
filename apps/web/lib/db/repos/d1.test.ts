@@ -6,14 +6,18 @@ import type { Repositories } from "./types";
 
 const NOW = "2026-03-15T12:00:00.000Z";
 const migrationUrl = new URL("../../../migrations/0001_init.sql", import.meta.url);
+const workerScript = "addEventListener('fetch', (event) => event.respondWith(new Response('ok')));";
 
 describe("D1 repositories", () => {
-  let miniflare: Miniflare;
+  let miniflare: Miniflare | undefined;
   let database: D1Database;
   let repos: Repositories;
 
   beforeEach(async () => {
-    miniflare = new Miniflare({ d1Databases: { DB: "studiobook-test" } });
+    miniflare = new Miniflare({
+      script: workerScript,
+      d1Databases: { DB: "studiobook-test" },
+    });
     database = await miniflare.getD1Database("DB");
     await database.exec(await readFile(migrationUrl, "utf8"));
     repos = createD1Repositories(database);
@@ -34,7 +38,7 @@ describe("D1 repositories", () => {
   });
 
   afterEach(async () => {
-    await miniflare.dispose();
+    await miniflare?.dispose();
   });
 
   it("reads rows and round-trips boolean fields", async () => {
