@@ -2,6 +2,8 @@
 // (2100 = 21%). Refunded line items keep contributing history but drop out of
 // the payable subtotal.
 
+import { sumCents } from "./money";
+
 export interface LineItemInput {
   quantity: number;
   unitAmountCents: number;
@@ -24,10 +26,10 @@ export function computeInvoiceTotals(
   items: readonly LineItemInput[],
   taxRateBps: number,
 ): InvoiceTotals {
-  const payable = items.filter((item) => !item.refunded).map(lineAmountCents);
-  const refunded = items.filter((item) => item.refunded).map(lineAmountCents);
-  const subtotalCents = payable.reduce((total, cents) => total + cents);
-  const refundedCents = refunded.reduce((total, cents) => total + cents, 0);
+  const payable = items.filter((item) => !item.refunded);
+  const refunded = items.filter((item) => item.refunded);
+  const subtotalCents = sumCents(payable.map(lineAmountCents));
+  const refundedCents = sumCents(refunded.map(lineAmountCents));
   const taxCents = Math.round((subtotalCents * taxRateBps) / 10_000);
   return { subtotalCents, refundedCents, taxCents, totalCents: subtotalCents + taxCents };
 }

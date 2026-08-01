@@ -295,6 +295,22 @@ describe("invoices service", () => {
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
+
+  it("reads the seeded fully-refunded invoice with zero payable totals", async () => {
+    const invoices = await listInvoices(repos, studioId);
+    const femkeInvoice = invoices.find(
+      (invoice) => invoice.memberName === "Femke Jansen" && invoice.status === "refunded",
+    );
+    expect(femkeInvoice).toBeDefined();
+
+    const detail = await getInvoiceDetail(repos, femkeInvoice!.id);
+    expect(detail.invoice.subtotalCents).toBe(0);
+    expect(detail.invoice.taxCents).toBe(0);
+    expect(detail.invoice.totalCents).toBe(0);
+    expect(detail.lineItems).toEqual([
+      expect.objectContaining({ description: "Pottery intensive", refunded: true }),
+    ]);
+  });
 });
 
 describe("reports + dashboard + booking list", () => {
