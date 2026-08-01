@@ -294,6 +294,64 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+    expect(detail.totals.subtotalCents).toBe(detail.invoice.subtotalCents);
+  });
+
+  it("derives zero totals with the refunded sum for a fully-refunded invoice", async () => {
+    const seeded = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m1")],
+        invoices: [
+          {
+            id: "inv1",
+            studioId: "s1",
+            memberId: "m1",
+            number: "INV-2026-0001",
+            status: "refunded",
+            currency: "EUR",
+            taxRateBps: 900,
+            subtotalCents: 3000,
+            taxCents: 270,
+            totalCents: 3270,
+            issuedAt: ISO,
+            dueAt: null,
+            paidAt: ISO,
+            createdAt: ISO,
+          },
+        ],
+        lineItems: [
+          {
+            id: "li1",
+            invoiceId: "inv1",
+            description: "Pottery intensive",
+            quantity: 1,
+            unitAmountCents: 2000,
+            amountCents: 2000,
+            refunded: true,
+            bookingId: null,
+          },
+          {
+            id: "li2",
+            invoiceId: "inv1",
+            description: "Clay",
+            quantity: 2,
+            unitAmountCents: 500,
+            amountCents: 1000,
+            refunded: true,
+            bookingId: null,
+          },
+        ],
+      }),
+    );
+    const detail = await getInvoiceDetail(seeded, "inv1");
+    expect(detail.totals).toEqual({
+      subtotalCents: 0,
+      refundedCents: 3000,
+      taxCents: 0,
+      totalCents: 0,
+    });
+    expect(detail.lineItems).toHaveLength(2);
+    expect(detail.lineItems.every((line) => line.refunded)).toBe(true);
   });
 });
 
