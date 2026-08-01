@@ -11,6 +11,7 @@ import type {
   StudioSettings,
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
+import { DuplicateActiveBookingError } from "./errors";
 import type { Repositories } from "./types";
 
 // The production repository implementation over supabase-js (service role).
@@ -18,7 +19,7 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -145,7 +146,20 @@ export function createSupabaseRepositories(): Repositories {
           db.from("bookings").select("*").eq("id", id).maybeSingle(),
           "bookings.getById",
         ),
-      insert: (booking) => insertReturning("bookings", booking),
+      insert: async (booking) => {
+        const { data, error } = await db
+          .from("bookings")
+          .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+          .select()
+          .single();
+        if (error) {
+          if (error.code === "23505" && error.message.includes("idx_bookings_active_member_unique")) {
+            throw new DuplicateActiveBookingError();
+          }
+          fail("insert into bookings", error);
+        }
+        return toCamelRow<Booking>(data as Record<string, unknown>);
+      },
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {
