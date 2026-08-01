@@ -1,4 +1,5 @@
 import { newId } from "@/lib/db/ids";
+import { DuplicateActiveBookingError } from "@/lib/db/repos/errors";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
 import {
@@ -84,14 +85,24 @@ export async function createBooking(
   }
 
   const bookingId = newId();
-  await repos.bookings.insert({
-    id: bookingId,
-    sessionId: session.id,
-    memberId: member.id,
-    status: decision.status,
-    bookedAt: nowIso(),
-    cancelledAt: null,
-  });
+  try {
+    await repos.bookings.insert({
+      id: bookingId,
+      sessionId: session.id,
+      memberId: member.id,
+      status: decision.status,
+      bookedAt: nowIso(),
+      cancelledAt: null,
+    });
+  } catch (error) {
+    // Two near-simultaneous submits can both pass canBook before either row
+    // lands; the repo-level uniqueness guard turns the loser into the same
+    // conflict the sequential check produces.
+    if (error instanceof DuplicateActiveBookingError) {
+      throw new HttpError(409, "booking_already_booked", DENY_MESSAGES.already_booked);
+    }
+    throw error;
+  }
 
   if (decision.status === "booked") {
     await enqueueAndDispatch(

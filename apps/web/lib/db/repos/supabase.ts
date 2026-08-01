@@ -10,6 +10,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { DuplicateActiveBookingError } from "./errors";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
 
@@ -18,7 +19,10 @@ import type { Repositories } from "./types";
 // the other way. This is the ONE file a Supabase→other-database migration
 // rewrites — nothing above the repository interface changes.
 
-type PgError = { message: string } | null;
+type PgError = { message: string; code?: string } | null;
+
+// Postgres SQLSTATE for a unique-constraint violation.
+const UNIQUE_VIOLATION = "23505";
 type ListResponse = PromiseLike<{ data: unknown[] | null; error: PgError }>;
 type SingleResponse = PromiseLike<{ data: Record<string, unknown> | null; error: PgError }>;
 
@@ -145,7 +149,20 @@ export function createSupabaseRepositories(): Repositories {
           db.from("bookings").select("*").eq("id", id).maybeSingle(),
           "bookings.getById",
         ),
-      insert: (booking) => insertReturning("bookings", booking),
+      insert: async (booking) => {
+        const { data, error } = await db
+          .from("bookings")
+          .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+          .select()
+          .single();
+        // The partial unique index uniq_bookings_active_member_session rejects
+        // a second active booking for the same member + session.
+        if (error?.code === UNIQUE_VIOLATION) {
+          throw new DuplicateActiveBookingError(booking.sessionId, booking.memberId);
+        }
+        if (error) fail("insert into bookings", error);
+        return toCamelRow<Booking>(data as Record<string, unknown>);
+      },
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {
