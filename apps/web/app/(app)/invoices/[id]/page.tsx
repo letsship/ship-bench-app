@@ -79,8 +79,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             {lineItems.map((line) => (
               <tr key={line.id}>
                 <td>
-                  {/* Line descriptions can carry light formatting entered by staff. */}
-                  <span dangerouslySetInnerHTML={{ __html: line.description }} />
+                  {/* Staff-entered free text — render as a text child so React escapes it. */}
+                  {line.description}
                   {line.refunded ? (
                     <span className="ml-2">
                       <StatusBadge status="refunded" />
