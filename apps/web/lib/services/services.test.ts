@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type { Booking, ClassSession, ClassType, Invoice, InvoiceLineItem, Member } from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
+import { getMemberStatement } from "./account-statements";
 import { createMember, getMember, updateMember } from "./members";
 import { getRevenueReport } from "./reports";
 import { getStudioContext } from "./studio";
@@ -263,13 +265,15 @@ describe("invoices service", () => {
 
   it("computes subtotal + tax + total and sends invoice_issued", async () => {
     const provider = createFakeProvider();
-    const detail = await createInvoice(repos, provider, studioId, {
+    const input = {
       memberId,
       lineItems: [{ description: "Pass", quantity: 2, unitAmountCents: 1000 }],
-    });
-    expect(detail.invoice.subtotalCents).toBe(2000);
-    expect(detail.invoice.taxCents).toBe(180);
-    expect(detail.invoice.totalCents).toBe(2180);
+    };
+    const detail = await createInvoice(repos, provider, studioId, input);
+    const totals = computeInvoiceTotals(input.lineItems, 900);
+    expect(detail.invoice.subtotalCents).toBe(totals.subtotalCents);
+    expect(detail.invoice.taxCents).toBe(totals.taxCents);
+    expect(detail.invoice.totalCents).toBe(totals.totalCents);
     // buildSeed already has one pending outbox row, so assert our specific
     // invoice notification went out rather than an exact array.
     expect(provider.sent.some((m) => m.subject === `Invoice ${detail.invoice.number}`)).toBe(true);
@@ -294,6 +298,117 @@ describe("invoices service", () => {
     expect(list.length).toBeGreaterThan(0);
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+});
+
+describe("account statements service", () => {
+  it("uses canonical totals that exclude refunded lines", async () => {
+    const studioId = "s1";
+    const memberId = "m1";
+    const invoice = {
+      id: "i1",
+      studioId,
+      memberId,
+      number: "INV-2026-0001",
+      status: "paid",
+      currency: "EUR",
+      taxRateBps: 900,
+      subtotalCents: 10000,
+      taxCents: 900,
+      totalCents: 10900,
+      issuedAt: ISO,
+      dueAt: FUTURE,
+      paidAt: ISO,
+      createdAt: ISO,
+    } satisfies Invoice;
+    const lineItems = [
+      {
+        id: "li1",
+        invoiceId: invoice.id,
+        description: "Billable",
+        quantity: 1,
+        unitAmountCents: 10000,
+        amountCents: 10000,
+        refunded: false,
+        bookingId: null,
+      },
+      {
+        id: "li2",
+        invoiceId: invoice.id,
+        description: "Refunded",
+        quantity: 1,
+        unitAmountCents: 5000,
+        amountCents: 5000,
+        refunded: true,
+        bookingId: null,
+      },
+    ] satisfies InvoiceLineItem[];
+    const repos = createInMemoryRepositories(
+      baseSeed({ members: [member(memberId)], invoices: [invoice], lineItems }),
+    );
+
+    const statement = await getMemberStatement(repos, studioId, memberId);
+    const expected = computeInvoiceTotals(
+      lineItems.map(({ quantity, unitAmountCents, refunded }) => ({
+        quantity,
+        unitAmountCents,
+        refunded,
+      })),
+      invoice.taxRateBps,
+    );
+
+    expect(statement.lines[0].totalCents).toBe(expected.totalCents);
+    expect(statement.lines[0].totalCents).toBe(invoice.totalCents);
+    expect(statement.balanceCents).toBe(10900);
+  });
+
+  it("keeps all-billable invoice totals unchanged", async () => {
+    const invoice = {
+      id: "i2",
+      studioId: "s1",
+      memberId: "m1",
+      number: "INV-2026-0002",
+      status: "paid",
+      currency: "EUR",
+      taxRateBps: 900,
+      subtotalCents: 15000,
+      taxCents: 1350,
+      totalCents: 16350,
+      issuedAt: ISO,
+      dueAt: FUTURE,
+      paidAt: ISO,
+      createdAt: ISO,
+    } satisfies Invoice;
+    const lineItems = [
+      {
+        id: "li3",
+        invoiceId: invoice.id,
+        description: "First",
+        quantity: 1,
+        unitAmountCents: 10000,
+        amountCents: 10000,
+        refunded: false,
+        bookingId: null,
+      },
+      {
+        id: "li4",
+        invoiceId: invoice.id,
+        description: "Second",
+        quantity: 1,
+        unitAmountCents: 5000,
+        amountCents: 5000,
+        refunded: false,
+        bookingId: null,
+      },
+    ] satisfies InvoiceLineItem[];
+    const repos = createInMemoryRepositories(
+      baseSeed({ members: [member("m1")], invoices: [invoice], lineItems }),
+    );
+
+    const statement = await getMemberStatement(repos, "s1", "m1");
+
+    expect(statement.lines[0].totalCents).toBe(invoice.totalCents);
+    expect(statement.balanceCents).toBe(invoice.totalCents);
   });
 });
 
