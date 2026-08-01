@@ -23,7 +23,8 @@ export async function listBookingRows(
   const typeById = new Map(classTypes.map((type) => [type.id, type]));
   const members = await repos.members.listByStudio(studioId);
   const memberById = new Map(members.map((member) => [member.id, member]));
-  const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
+  const sessionIds = sessions.map((session) => session.id);
+  const bookings = await repos.bookings.listBySessionIds(sessionIds);
 
   const rows = bookings.map((booking) => {
     const session = sessionById.get(booking.sessionId);

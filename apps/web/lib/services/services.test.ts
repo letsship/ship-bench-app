@@ -345,14 +345,16 @@ describe("reports + dashboard + booking list", () => {
     const twoCopies = makeRepos(2);
     const rows = await listBookingRows(oneCopy.testRepos, studioId);
     const doubledRows = await listBookingRows(twoCopies.testRepos, studioId);
-    const expectedDoubledRows = sourceBookings
-      .flatMap((booking, index) => {
-        const firstCopy = rows.find((row) => row.id === `${booking.id}-0-${index}`);
-        return firstCopy
-          ? [firstCopy, { ...firstCopy, id: `${booking.id}-1-${index}` }]
-          : [];
-      })
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    const copyOneIdByCopyZeroId = new Map(
+      sourceBookings.map((booking, index) => [
+        `${booking.id}-0-${index}`,
+        `${booking.id}-1-${index}`,
+      ]),
+    );
+    const expectedDoubledRows = [
+      ...rows,
+      ...rows.map((row) => ({ ...row, id: copyOneIdByCopyZeroId.get(row.id) ?? row.id })),
+    ];
 
     expect(oneCopy.memberGetById).toHaveBeenCalledTimes(0);
     expect(oneCopy.sessionGetById).toHaveBeenCalledTimes(0);
