@@ -35,6 +35,7 @@ function seedWith(
         email: "m1@e.co",
         phone: null,
         status: "active",
+        calendarToken: "cal-m1",
         notificationsOptedOut: false,
         createdAt: ISO,
         ...memberOverrides,

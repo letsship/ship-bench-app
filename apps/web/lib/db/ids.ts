@@ -5,3 +5,7 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+export function newCalendarToken(): string {
+  return crypto.randomUUID().replaceAll("-", "");
+}

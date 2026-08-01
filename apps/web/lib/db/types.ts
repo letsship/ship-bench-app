@@ -30,6 +30,7 @@ export interface Member {
   email: string;
   phone: string | null;
   status: string;
+  calendarToken: string;
   notificationsOptedOut: boolean;
   createdAt: string;
 }
