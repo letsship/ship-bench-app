@@ -9,6 +9,7 @@ import type {
   NotificationOutboxRow,
   Studio,
   StudioSettings,
+  WebhookEvent,
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
 import type { Repositories } from "./types";
@@ -201,6 +202,14 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+    },
+    webhookEvents: {
+      getById: (id) =>
+        maybeOne<WebhookEvent>(
+          db.from("stripe_webhook_events").select("*").eq("id", id).maybeSingle(),
+          "webhookEvents.getById",
+        ),
+      insert: (row) => insertReturning("stripe_webhook_events", row),
     },
   };
 }
