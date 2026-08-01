@@ -7,7 +7,12 @@ import type { NotificationMessage, NotificationProvider } from "./types";
 const ISO = "2026-03-15T12:00:00.000Z";
 const recipient = { memberId: "m1", email: "m1@e.co", name: "M1" };
 const message = (): NotificationMessage =>
-  bookingConfirmation(recipient, { title: "Yoga", startsAt: ISO, instructor: "I" });
+  bookingConfirmation(recipient, {
+    sessionId: "cs1",
+    title: "Yoga",
+    startsAt: ISO,
+    instructor: "I",
+  });
 
 function seedWith(
   memberOverrides: Partial<SeedData["members"][number]> = {},
