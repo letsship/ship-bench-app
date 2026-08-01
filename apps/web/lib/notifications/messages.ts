@@ -53,6 +53,32 @@ export function waitlistPromotion(
   };
 }
 
+export interface ReminderIds {
+  bookingId: string;
+  sessionId: string;
+}
+
+// `data` carries bookingId + sessionId so the reminder service can detect an
+// already-queued reminder for a booking (idempotency key).
+export function bookingReminder(
+  recipient: NotificationRecipient,
+  session: SessionSummary,
+  ids: ReminderIds,
+): NotificationMessage {
+  return {
+    kind: "booking_reminder",
+    recipient,
+    subject: `Reminder: ${session.title} starts soon`,
+    body: `Hi ${recipient.name}, just a reminder that ${session.title} with ${session.instructor} starts on ${session.startsAt}. See you on the mat!`,
+    data: {
+      bookingId: ids.bookingId,
+      sessionId: ids.sessionId,
+      title: session.title,
+      startsAt: session.startsAt,
+    },
+  };
+}
+
 export interface InvoiceSummary {
   number: string;
   totalCents: number;

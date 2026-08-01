@@ -80,6 +80,11 @@ describe("shouldSend", () => {
   it("member opt-out wins over every setting", () => {
     expect(shouldSend("booking_confirmation", { ...base, memberOptedOut: true })).toBe(false);
   });
+
+  it("allows a kind with no studio-level toggle unless the member opted out", () => {
+    expect(shouldSend("booking_reminder", base)).toBe(true);
+    expect(shouldSend("booking_reminder", { ...base, memberOptedOut: true })).toBe(false);
+  });
 });
 
 describe("dispatchOutbox", () => {

@@ -207,6 +207,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       async listPending() {
         return cloneAll(store.outbox.filter((row) => row.sentAt === null));
       },
+      async listByKind(kind) {
+        return cloneAll(store.outbox.filter((row) => row.kind === kind));
+      },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
       },
