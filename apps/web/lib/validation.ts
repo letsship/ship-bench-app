@@ -53,6 +53,15 @@ export const createBookingSchema = z.object({
   memberId: z.string().min(1),
 });
 
+export const createPackageSchema = z.object({
+  memberId: z.string().min(1),
+  credits: z.union([z.literal(5), z.literal(10)]),
+});
+
+export const listPackagesQuerySchema = z.object({
+  memberId: z.string().min(1),
+});
+
 export const createInvoiceSchema = z.object({
   memberId: z.string().min(1),
   dueAt: isoDatetime.optional(),
@@ -76,4 +85,5 @@ export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
+export type CreatePackageInput = z.infer<typeof createPackageSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
