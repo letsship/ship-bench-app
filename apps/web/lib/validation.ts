@@ -7,6 +7,24 @@ const isoDatetime = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid ISO datetime" });
 
+const isoDateOrTimestamp = z.string().refine(
+  (value) => {
+    const match = value.match(
+      /^(\d{4})-(\d{2})-(\d{2})(?:T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d))?$/,
+    );
+    if (!match || Number.isNaN(Date.parse(value))) return false;
+
+    const [year, month, day] = match.slice(1, 4).map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
+  },
+  { message: "Invalid ISO timestamp" },
+);
+
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb hex color");
 
 export const createClassTypeSchema = z.object({
@@ -51,6 +69,11 @@ export const updateMemberSchema = z.object({
 export const createBookingSchema = z.object({
   sessionId: z.string().min(1),
   memberId: z.string().min(1),
+});
+
+export const bookingExportRangeSchema = z.object({
+  from: isoDateOrTimestamp.optional(),
+  to: isoDateOrTimestamp.optional(),
 });
 
 export const createInvoiceSchema = z.object({

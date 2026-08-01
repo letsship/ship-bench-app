@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
 import { listBookingExportRows } from "./booking-export";
@@ -48,5 +48,22 @@ describe("listBookingExportRows", () => {
 
     expect(toRows.some((row) => row.startsAt === startsAt)).toBe(true);
     expect(fromRows.some((row) => row.startsAt === startsAt)).toBe(true);
+  });
+
+  it("filters parsed instants without passing bounds to the repository", async () => {
+    const { repos, seed } = createSeededRepositories();
+    const startsAt = seed.sessions[10]?.startsAt;
+
+    if (!startsAt) throw new Error("Expected seeded session");
+
+    const offsetStartsAt = startsAt.replace("Z", "+00:00");
+    const listByStudio = vi.spyOn(repos.classSessions, "listByStudio");
+    const rows = await listBookingExportRows(repos, seed.studio.id, {
+      from: offsetStartsAt,
+      to: offsetStartsAt,
+    });
+
+    expect(listByStudio).toHaveBeenCalledWith(seed.studio.id);
+    expect(rows.some((row) => row.startsAt === startsAt)).toBe(true);
   });
 });

@@ -14,7 +14,14 @@ export interface BookingExportRow {
 }
 
 function isWithinRange(startsAt: string, range: BookingExportRange): boolean {
-  return (!range.from || startsAt >= range.from) && (!range.to || startsAt <= range.to);
+  const sessionTime = Date.parse(startsAt);
+  const fromTime = range.from ? Date.parse(range.from) : undefined;
+  const toTime = range.to ? Date.parse(range.to) : undefined;
+
+  return (
+    (fromTime === undefined || sessionTime >= fromTime) &&
+    (toTime === undefined || sessionTime <= toTime)
+  );
 }
 
 export async function listBookingExportRows(
@@ -22,10 +29,7 @@ export async function listBookingExportRows(
   studioId: string,
   range: BookingExportRange = {},
 ): Promise<BookingExportRow[]> {
-  const sessions = await repos.classSessions.listByStudio(
-    studioId,
-    range.from ? { from: range.from } : {},
-  );
+  const sessions = await repos.classSessions.listByStudio(studioId);
   const filteredSessions = sessions.filter((session) => isWithinRange(session.startsAt, range));
   const sessionById = new Map(filteredSessions.map((session) => [session.id, session]));
   const classTypes = await repos.classTypes.listByStudio(studioId);
@@ -49,5 +53,5 @@ export async function listBookingExportRows(
         status: booking.status,
       };
     })
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 }
