@@ -15,6 +15,34 @@ describe("lineAmountCents", () => {
 });
 
 describe("computeInvoiceTotals", () => {
+  it("is zero across the board for no line items", () => {
+    expect(computeInvoiceTotals([], 2100)).toEqual({
+      subtotalCents: 0,
+      refundedCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
+  it("is zero billable totals when every line is refunded", () => {
+    const calculate = () =>
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 1200, refunded: true },
+          { quantity: 2, unitAmountCents: 800, refunded: true },
+        ],
+        2100,
+      );
+
+    expect(calculate).not.toThrow();
+    expect(calculate()).toEqual({
+      subtotalCents: 0,
+      refundedCents: 2800,
+      taxCents: 0,
+      totalCents: 0,
+    });
+  });
+
   it("excludes refunded lines from the subtotal but tracks them", () => {
     const totals = computeInvoiceTotals(
       [

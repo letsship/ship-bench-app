@@ -30,8 +30,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   const { invoice, member, lineItems } = detail;
   const currency = invoice.currency;
-  // Derive the money box from the line items so a line-level refund shows up
-  // immediately, not only after the stored totals are rewritten.
+  // Derive the money box from the line items so line-level refunds show up
+  // immediately, including when no billable lines remain.
   const totals = computeInvoiceTotals(lineItems, invoice.taxRateBps);
   const allowed = ALL_STATUSES.filter((status) =>
     canTransitionInvoice(invoice.status as InvoiceStatus, status),
