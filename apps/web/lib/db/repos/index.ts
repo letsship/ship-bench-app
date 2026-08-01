@@ -22,6 +22,11 @@ function fakeBackendsEnabled(): boolean {
 // writes and a page that reads) see the SAME in-memory store.
 const globalForFakes = globalThis as unknown as { __studiobookFakeRepos?: Repositories };
 
+export function __resetTestRepositories(): void {
+  testRepositories = null;
+  delete globalForFakes.__studiobookFakeRepos;
+}
+
 export async function resolveRepositories(): Promise<Repositories> {
   if (testRepositories) return testRepositories;
   if (fakeBackendsEnabled()) {

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
-import { __setTestRepositories } from "@/lib/db/repos";
+import { __resetTestRepositories, __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
 
@@ -14,7 +14,7 @@ describe("GET route handlers (against injected fake repositories)", () => {
     __setTestRepositories(createInMemoryRepositories(buildSeed(NOW)));
   });
   afterEach(() => {
-    __setTestRepositories(null);
+    __resetTestRepositories();
   });
 
   it("GET /api/classes returns sessions with occupancy", async () => {
