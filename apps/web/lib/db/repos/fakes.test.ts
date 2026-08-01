@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
-import { createInMemoryRepositories } from "./fakes";
+import { type SeedData, createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
@@ -90,5 +90,14 @@ describe("in-memory repositories", () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();
     expect(await empty.members.listByStudio("x")).toEqual([]);
+  });
+
+  it("defaults webhook events for legacy seed fixtures", async () => {
+    const seed: SeedData = buildSeed(NOW);
+    delete seed.webhookEvents;
+
+    const legacyRepos = createInMemoryRepositories(seed);
+
+    expect(await legacyRepos.webhookEvents.getById("evt_missing")).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import type {
   InvoiceLineItem,
   Member,
   NotificationOutboxRow,
+  StripeWebhookEvent,
   Studio,
   StudioSettings,
 } from "../types";
@@ -201,6 +202,14 @@ export function createSupabaseRepositories(): Repositories {
         ),
       update: (id, patch) =>
         updateReturning<NotificationOutboxRow>("notification_outbox", "id", id, patch),
+    },
+    webhookEvents: {
+      getById: (id) =>
+        maybeOne<StripeWebhookEvent>(
+          db.from("stripe_webhook_events").select("*").eq("id", id).maybeSingle(),
+          "webhookEvents.getById",
+        ),
+      insert: (row) => insertReturning("stripe_webhook_events", row),
     },
   };
 }
