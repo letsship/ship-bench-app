@@ -33,12 +33,16 @@ export function publicStudioUrl(slug: string): string {
 }
 
 // Resolve a studio by its public slug plus its upcoming classes, or null when no
-// studio owns that slug (the page turns null into a 404).
-export async function resolvePublicStudio(slug: string): Promise<PublicStudio | null> {
+// studio owns that slug (the page turns null into a 404). "now" is injectable so
+// tests can pin it to the seed's clock.
+export async function resolvePublicStudio(
+  slug: string,
+  now: Date = new Date(),
+): Promise<PublicStudio | null> {
   const repos = await resolveRepositories();
   const studio = await repos.studios.getBySlug(slug);
   if (!studio) return null;
-  const sessions = await listSessions(repos, studio.id, { from: new Date().toISOString() });
+  const sessions = await listSessions(repos, studio.id, { from: now.toISOString() });
   const classes: PublicClass[] = sessions.map((session) => ({
     id: session.id,
     name: session.classTypeName,
