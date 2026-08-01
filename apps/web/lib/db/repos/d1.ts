@@ -20,9 +20,19 @@ import type { Repositories } from "./types";
 export function createD1Repositories(db: D1Database): Repositories {
   const database = drizzle(db, { schema: tables.schema });
 
+  function normalizeRow<T>(row: Record<string, unknown>): T {
+    const values = Object.values(row);
+    const unwrapped = values.length === 1 && isRecord(values[0]) ? values[0] : row;
+    return toCamelRow<T>(unwrapped);
+  }
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
   async function insertReturning<T>(table: AnySQLiteTable, row: T): Promise<T> {
     const [inserted] = await database.insert(table).values(row as never).returning();
-    return toCamelRow<T>(inserted as Record<string, unknown>);
+    return normalizeRow<T>(inserted as Record<string, unknown>);
   }
 
   async function updateReturning<T>(
@@ -36,16 +46,16 @@ export function createD1Repositories(db: D1Database): Repositories {
       .set(patch as never)
       .where(eq(column, value))
       .returning();
-    return toCamelRow<T>(updated as Record<string, unknown>);
+    return normalizeRow<T>(updated as Record<string, unknown>);
   }
 
   async function selectOne<T>(query: PromiseLike<Record<string, unknown>[]>): Promise<T | null> {
     const [row] = await query;
-    return row ? toCamelRow<T>(row) : null;
+    return row ? normalizeRow<T>(row) : null;
   }
 
   function selectMany<T>(rows: Record<string, unknown>[]): T[] {
-    return rows.map((row) => toCamelRow<T>(row));
+    return rows.map((row) => normalizeRow<T>(row));
   }
 
   return {
