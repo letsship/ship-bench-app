@@ -8,6 +8,7 @@ import type {
   NotificationOutboxRow,
   Studio,
   StudioSettings,
+  WebhookEvent,
 } from "../types";
 import type { Repositories, SessionRange } from "./types";
 
@@ -38,6 +39,7 @@ interface Store {
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  webhookEvents: WebhookEvent[];
 }
 
 const clone = <T>(row: T): T => ({ ...row });
@@ -67,6 +69,8 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
+    // Webhook deliveries are runtime state, never seeded.
+    webhookEvents: [],
   };
 
   return {
@@ -209,6 +213,16 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
+      },
+    },
+    webhookEvents: {
+      async getById(id) {
+        const found = store.webhookEvents.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(row) {
+        store.webhookEvents.push(clone(row));
+        return clone(row);
       },
     },
   };

@@ -95,6 +95,14 @@ export interface InvoiceLineItem {
   bookingId: string | null;
 }
 
+// Idempotency ledger for received Stripe webhook deliveries. The id is the
+// Stripe event id; a row's existence means that event was already processed.
+export interface WebhookEvent {
+  id: string;
+  type: string;
+  receivedAt: string;
+}
+
 export interface NotificationOutboxRow {
   id: string;
   memberId: string;
