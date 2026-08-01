@@ -1,4 +1,5 @@
 import { and, count, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
+import type { InferInsertModel } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { AnySQLiteColumn, AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import type {
@@ -132,7 +133,13 @@ export function createD1Repositories(db: D1Database): Repositories {
         selectMany<InvoiceLineItem>(await database.select().from(tables.invoiceLineItems).where(eq(tables.invoiceLineItems.invoiceId, invoiceId))),
       insertMany: async (items) => {
         if (items.length === 0) return [];
-        const rows = await database.insert(tables.invoiceLineItems).values(items.map((item) => toSnakeRow(item as Record<string, unknown>))).returning();
+        const values = items.map(
+          (item) =>
+            toSnakeRow(item as unknown as Record<string, unknown>) as InferInsertModel<
+              typeof tables.invoiceLineItems
+            >,
+        );
+        const rows = await database.insert(tables.invoiceLineItems).values(values).returning();
         return selectMany<InvoiceLineItem>(rows as Record<string, unknown>[]);
       },
     },
