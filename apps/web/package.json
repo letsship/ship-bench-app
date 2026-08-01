@@ -38,7 +38,7 @@
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^6.1.0",
-    "miniflare": "^4.20250718.0",
+    "miniflare": "4.20250712.2",
     "tailwindcss": "^4.1.8",
     "tsx": "^4.19.2",
     "typescript": "^5.9.2",
