@@ -35,6 +35,13 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("finds a member by calendar token", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const found = await repos.members.findByCalendarToken(members[0].calendarToken);
+    expect(found?.id).toBe(members[0].id);
+    expect(await repos.members.findByCalendarToken("unknown")).toBeNull();
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
@@ -51,6 +58,12 @@ describe("in-memory repositories", () => {
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
   });
 
+  it("lists bookings by member", async () => {
+    const members = await repos.members.listByStudio(studioId);
+    const bookings = await repos.bookings.listByMember(members[0].id);
+    expect(bookings.every((booking) => booking.memberId === members[0].id)).toBe(true);
+  });
+
   it("inserts then reads back by id", async () => {
     const member = {
       id: "mem_new",
@@ -59,6 +72,7 @@ describe("in-memory repositories", () => {
       email: "new@example.com",
       phone: null,
       status: "active",
+      calendarToken: "cal-new",
       notificationsOptedOut: false,
       createdAt: NOW.toISOString(),
     };

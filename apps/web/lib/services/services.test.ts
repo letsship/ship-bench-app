@@ -54,6 +54,7 @@ const member = (id: string, over: Partial<Member> = {}): Member => ({
   email: `${id}@e.co`,
   phone: null,
   status: "active",
+  calendarToken: `cal-${id}`,
   notificationsOptedOut: false,
   createdAt: ISO,
   ...over,

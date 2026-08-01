@@ -94,6 +94,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
     email: member.email,
     phone: member.phone,
     status: member.status,
+    calendarToken: `cal-token-${index + 1}`,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
