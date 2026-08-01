@@ -20,7 +20,7 @@ describe("processStripeWebhook", () => {
   beforeEach(() => {
     const seed = buildSeed(NOW);
     repos = createInMemoryRepositories(seed);
-    invoiceId = seed.invoices[0].id;
+    invoiceId = seed.invoices.find((invoice) => invoice.status === "open")!.id;
   });
 
   it("marks the named invoice paid", async () => {

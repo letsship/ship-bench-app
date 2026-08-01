@@ -40,7 +40,7 @@ describe("POST /api/webhooks/stripe", () => {
   beforeEach(() => {
     const seed = buildSeed(NOW);
     repositories = createInMemoryRepositories(seed);
-    invoiceId = seed.invoices[0].id;
+    invoiceId = seed.invoices.find((invoice) => invoice.status === "open")!.id;
     __setTestRepositories(repositories);
     process.env.STRIPE_WEBHOOK_SECRET = SECRET;
   });
