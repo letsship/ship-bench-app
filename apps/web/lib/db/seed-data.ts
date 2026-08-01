@@ -92,6 +92,7 @@ function buildMembers(now: Date, studioId: string): Member[] {
     studioId,
     name: member.name,
     email: member.email,
+    calendarToken: `seed-calendar-token-${index + 1}`,
     phone: member.phone,
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.

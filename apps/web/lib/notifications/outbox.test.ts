@@ -33,6 +33,7 @@ function seedWith(
         studioId: "s1",
         name: "M1",
         email: "m1@e.co",
+        calendarToken: "token-m1",
         phone: null,
         status: "active",
         notificationsOptedOut: false,

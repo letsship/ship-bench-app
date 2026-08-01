@@ -35,6 +35,12 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("finds a member by calendar token", async () => {
+    const member = (await repos.members.listByStudio(studioId))[0];
+    expect(await repos.members.findByCalendarToken(member.calendarToken)).toEqual(member);
+    expect(await repos.members.findByCalendarToken("unknown-token")).toBeNull();
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
@@ -51,12 +57,20 @@ describe("in-memory repositories", () => {
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
   });
 
+  it("lists bookings for one member", async () => {
+    const member = (await repos.members.listByStudio(studioId))[0];
+    const bookings = await repos.bookings.listByMember(member.id);
+    expect(bookings.length).toBeGreaterThan(0);
+    expect(bookings.every((booking) => booking.memberId === member.id)).toBe(true);
+  });
+
   it("inserts then reads back by id", async () => {
     const member = {
       id: "mem_new",
       studioId,
       name: "New Person",
       email: "new@example.com",
+      calendarToken: "token-new",
       phone: null,
       status: "active",
       notificationsOptedOut: false,

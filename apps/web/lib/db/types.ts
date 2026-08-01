@@ -28,6 +28,7 @@ export interface Member {
   studioId: string;
   name: string;
   email: string;
+  calendarToken: string;
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;

@@ -52,6 +52,7 @@ const member = (id: string, over: Partial<Member> = {}): Member => ({
   studioId: "s1",
   name: id,
   email: `${id}@e.co`,
+  calendarToken: `token-${id}`,
   phone: null,
   status: "active",
   notificationsOptedOut: false,
@@ -116,6 +117,10 @@ describe("members service", () => {
     });
     const updated = await updateMember(repos, created.id, { status: "paused" });
     expect(updated.status).toBe("paused");
+    expect(created.calendarToken).toHaveLength(64);
+    expect(created.calendarToken).not.toBe(
+      (await repos.members.getById("00000000-0000-4000-8000-000000000002"))?.calendarToken,
+    );
   });
 
   it("getMember 404s for an unknown id", async () => {
