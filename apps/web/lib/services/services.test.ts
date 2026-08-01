@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -248,6 +248,39 @@ describe("bookings service", () => {
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+  });
+});
+
+describe("listBookingsForExport", () => {
+  it("includes email, orders by start, and filters inclusive endpoints", async () => {
+    const from = "2026-06-01T08:00:00.000Z";
+    const to = "2026-06-01T12:00:00.000Z";
+    const justPastTo = "2026-06-01T12:00:00.001Z";
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [
+          session("cs3", { startsAt: justPastTo }),
+          session("cs2", { startsAt: to }),
+          session("cs1", { startsAt: from }),
+        ],
+        members: [
+          member("m1", { email: "first@example.com" }),
+          member("m2", { email: "second@example.com" }),
+          member("m3", { email: "third@example.com" }),
+        ],
+        bookings: [
+          booking("b3", "m3", { sessionId: "cs3" }),
+          booking("b2", "m2", { sessionId: "cs2" }),
+          booking("b1", "m1", { sessionId: "cs1" }),
+        ],
+      }),
+    );
+
+    const rows = await listBookingsForExport(repos, "s1", { from, to });
+
+    expect(rows.map((row) => row.startsAt)).toEqual([from, to]);
+    expect(rows.map((row) => row.email)).toEqual(["first@example.com", "second@example.com"]);
   });
 });
 
