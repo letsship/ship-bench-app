@@ -80,6 +80,7 @@ function buildStudio(now: Date): { studio: Studio; settings: StudioSettings } {
       waitlistEnabled: true,
       notifyBookingConfirmations: true,
       notifyCancellations: true,
+      notifyBookingReminders: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
     },

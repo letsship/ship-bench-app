@@ -194,6 +194,11 @@ export function createSupabaseRepositories(): Repositories {
     },
     outbox: {
       insert: (row) => insertReturning("notification_outbox", row),
+      listByKind: (kind) =>
+        rows<NotificationOutboxRow>(
+          db.from("notification_outbox").select("*").eq("kind", kind),
+          "outbox.listByKind",
+        ),
       listPending: () =>
         rows<NotificationOutboxRow>(
           db.from("notification_outbox").select("*").is("sent_at", null),

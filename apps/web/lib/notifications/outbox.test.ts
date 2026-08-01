@@ -23,6 +23,7 @@ function seedWith(
       waitlistEnabled: true,
       notifyBookingConfirmations: true,
       notifyCancellations: true,
+      notifyBookingReminders: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
       ...settingsOverrides,
@@ -66,6 +67,7 @@ describe("shouldSend", () => {
     memberOptedOut: false,
     notifyBookingConfirmations: true,
     notifyCancellations: false,
+    notifyBookingReminders: true,
     notifyWaitlistPromotions: true,
     notifyInvoices: false,
   };

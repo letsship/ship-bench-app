@@ -19,6 +19,7 @@ export interface StudioSettings {
   waitlistEnabled: boolean;
   notifyBookingConfirmations: boolean;
   notifyCancellations: boolean;
+  notifyBookingReminders: boolean;
   notifyWaitlistPromotions: boolean;
   notifyInvoices: boolean;
 }

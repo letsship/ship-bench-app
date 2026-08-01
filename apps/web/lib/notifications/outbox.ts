@@ -6,6 +6,7 @@ import type { NotificationKind, NotificationMessage, NotificationProvider } from
 const SETTING_FOR_KIND = {
   booking_confirmation: "notifyBookingConfirmations",
   booking_cancellation: "notifyCancellations",
+  booking_reminder: "notifyBookingReminders",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
 } as const satisfies Record<NotificationKind, string>;
@@ -14,6 +15,7 @@ export interface OptOutContext {
   memberOptedOut: boolean;
   notifyBookingConfirmations: boolean;
   notifyCancellations: boolean;
+  notifyBookingReminders: boolean;
   notifyWaitlistPromotions: boolean;
   notifyInvoices: boolean;
 }

@@ -33,6 +33,7 @@ function baseSeed(over: Partial<SeedData> = {}): SeedData {
       waitlistEnabled: true,
       notifyBookingConfirmations: true,
       notifyCancellations: true,
+      notifyBookingReminders: true,
       notifyWaitlistPromotions: true,
       notifyInvoices: true,
     },
