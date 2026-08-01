@@ -1,6 +1,6 @@
 // Plain domain row types (camelCase). These are the contract every repository
-// speaks — the Supabase implementation maps them to/from snake_case Postgres
-// columns, and the in-memory fakes store them directly. Domain logic and
+// speaks — the Drizzle schema maps them to/from snake_case D1 columns, and the
+// in-memory fakes store them directly. Domain logic and
 // services depend only on these, never on any database driver.
 
 export interface Studio {

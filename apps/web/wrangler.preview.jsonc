@@ -2,10 +2,8 @@
   // Route-less preview config — deploys to *.workers.dev ONLY. The per-PR worker
   // name is supplied by the SHIP orchestrator via `wrangler deploy --name`.
   //
-  // Preview environments share ONE seeded Supabase project (there is no ephemeral
-  // per-PR database). The deploy-preview workflow supplies the NEXT_PUBLIC_*
-  // Supabase vars at build time and sets SUPABASE_SECRET_KEY + RESEND_API_KEY as
-  // Worker secrets after deploy. See the README's deploy section.
+  // Preview environments use a dedicated D1 database binding. RESEND_API_KEY is
+  // set as a Worker secret after deploy. See the README's deploy section.
   "name": "studiobook-preview",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-06-01",
@@ -14,6 +12,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS",
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "studiobook-preview",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
   "observability": {
     "enabled": true,
   },
