@@ -49,7 +49,7 @@ export function createSupabaseRepositories(): Repositories {
       .select()
       .single();
     if (error?.code === "23505") {
-      throw new UniqueViolationError(error.message, error.constraint);
+      throw new UniqueViolationError(error.message);
     }
     if (error) fail(`insert into ${table}`, error);
     return toCamelRow<T>(data as Record<string, unknown>);
