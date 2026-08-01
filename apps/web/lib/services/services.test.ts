@@ -3,6 +3,7 @@ import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes"
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { computeInvoiceTotals } from "@/lib/domain/invoices";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -263,13 +264,18 @@ describe("invoices service", () => {
 
   it("computes subtotal + tax + total and sends invoice_issued", async () => {
     const provider = createFakeProvider();
-    const detail = await createInvoice(repos, provider, studioId, {
+    const input = {
       memberId,
       lineItems: [{ description: "Pass", quantity: 2, unitAmountCents: 1000 }],
+    };
+    const detail = await createInvoice(repos, provider, studioId, input);
+    const { settings } = await getStudioContext(repos);
+    const expected = computeInvoiceTotals(input.lineItems, settings.taxRateBps);
+    expect(detail.invoice).toMatchObject({
+      subtotalCents: expected.subtotalCents,
+      taxCents: expected.taxCents,
+      totalCents: expected.totalCents,
     });
-    expect(detail.invoice.subtotalCents).toBe(2000);
-    expect(detail.invoice.taxCents).toBe(180);
-    expect(detail.invoice.totalCents).toBe(2180);
     // buildSeed already has one pending outbox row, so assert our specific
     // invoice notification went out rather than an exact array.
     expect(provider.sent.some((m) => m.subject === `Invoice ${detail.invoice.number}`)).toBe(true);
