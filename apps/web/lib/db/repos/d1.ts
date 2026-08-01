@@ -13,7 +13,7 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
-import { toCamelRow, toSnakeRow } from "./mapping";
+import { toCamelRow } from "./mapping";
 import * as tables from "./schema";
 import type { Repositories } from "./types";
 
@@ -21,7 +21,7 @@ export function createD1Repositories(db: D1Database): Repositories {
   const database = drizzle(db, { schema: tables.schema });
 
   async function insertReturning<T>(table: AnySQLiteTable, row: T): Promise<T> {
-    const [inserted] = await database.insert(table).values(toSnakeRow(row as Record<string, unknown>)).returning();
+    const [inserted] = await database.insert(table).values(row as never).returning();
     return toCamelRow<T>(inserted as Record<string, unknown>);
   }
 
@@ -33,7 +33,7 @@ export function createD1Repositories(db: D1Database): Repositories {
   ): Promise<T> {
     const [updated] = await database
       .update(table)
-      .set(toSnakeRow(patch as Record<string, unknown>))
+      .set(patch as never)
       .where(eq(column, value))
       .returning();
     return toCamelRow<T>(updated as Record<string, unknown>);
@@ -135,9 +135,7 @@ export function createD1Repositories(db: D1Database): Repositories {
         if (items.length === 0) return [];
         const values = items.map(
           (item) =>
-            toSnakeRow(item as unknown as Record<string, unknown>) as InferInsertModel<
-              typeof tables.invoiceLineItems
-            >,
+            item as unknown as InferInsertModel<typeof tables.invoiceLineItems>,
         );
         const rows = await database.insert(tables.invoiceLineItems).values(values).returning();
         return selectMany<InvoiceLineItem>(rows as Record<string, unknown>[]);
