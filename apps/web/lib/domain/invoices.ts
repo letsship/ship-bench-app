@@ -27,8 +27,9 @@ export function computeInvoiceTotals(
   let subtotalCents = 0;
   let refundedCents = 0;
   for (const item of items) {
-    if (item.refunded) refundedCents += lineAmountCents(item);
-    else subtotalCents += lineAmountCents(item);
+    const amountCents = lineAmountCents(item);
+    if (item.refunded) refundedCents += amountCents;
+    else subtotalCents += amountCents;
   }
   const taxCents = Math.round((subtotalCents * taxRateBps) / 10_000);
   return { subtotalCents, refundedCents, taxCents, totalCents: subtotalCents + taxCents };

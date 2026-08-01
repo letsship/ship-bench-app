@@ -15,6 +15,23 @@ describe("lineAmountCents", () => {
 });
 
 describe("computeInvoiceTotals", () => {
+  it("matches the canonical total for billable and refunded lines", () => {
+    expect(
+      computeInvoiceTotals(
+        [
+          { quantity: 1, unitAmountCents: 10000 },
+          { quantity: 1, unitAmountCents: 5000, refunded: true },
+        ],
+        900,
+      ),
+    ).toEqual({
+      subtotalCents: 10000,
+      refundedCents: 5000,
+      taxCents: 900,
+      totalCents: 10900,
+    });
+  });
+
   it("excludes refunded lines from the subtotal but tracks them", () => {
     const totals = computeInvoiceTotals(
       [
