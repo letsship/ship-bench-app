@@ -81,6 +81,29 @@ describe("in-memory repositories", () => {
     expect(count).toBe(list.length);
   });
 
+  it("inserts, lists, and updates class packs", async () => {
+    const member = (await repos.members.listByStudio(studioId))[0];
+    const pack = {
+      id: "pack-1",
+      studioId,
+      memberId: member.id,
+      creditsTotal: 5,
+      creditsRemaining: 5,
+      priceCents: 5000,
+      status: "active" as const,
+      purchasedAt: NOW.toISOString(),
+      createdAt: NOW.toISOString(),
+    };
+
+    await repos.packs.insert(pack);
+    expect(await repos.packs.listByMember(member.id)).toEqual([pack]);
+    await repos.packs.update(pack.id, { creditsRemaining: 0, status: "refunded" });
+    expect(await repos.packs.getById(pack.id)).toMatchObject({
+      creditsRemaining: 0,
+      status: "refunded",
+    });
+  });
+
   it("listPending returns only unsent outbox rows", async () => {
     const pending = await repos.outbox.listPending();
     expect(pending.every((row) => row.sentAt === null)).toBe(true);

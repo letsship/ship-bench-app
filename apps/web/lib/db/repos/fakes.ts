@@ -1,5 +1,6 @@
 import type {
   Booking,
+  ClassPack,
   ClassSession,
   ClassType,
   Invoice,
@@ -23,6 +24,7 @@ export interface SeedData {
   classTypes: ClassType[];
   sessions: ClassSession[];
   bookings: Booking[];
+  packs: ClassPack[];
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
@@ -35,6 +37,7 @@ interface Store {
   classTypes: ClassType[];
   classSessions: ClassSession[];
   bookings: Booking[];
+  packs: ClassPack[];
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
@@ -64,6 +67,7 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     classTypes: seed ? cloneAll(seed.classTypes) : [],
     classSessions: seed ? cloneAll(seed.sessions) : [],
     bookings: seed ? cloneAll(seed.bookings) : [],
+    packs: seed ? cloneAll(seed.packs) : [],
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
     outbox: seed ? cloneAll(seed.outbox) : [],
@@ -165,6 +169,26 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.bookings, (row) => row.id === id, patch, "Booking");
+      },
+    },
+    packs: {
+      async listByMember(memberId) {
+        return cloneAll(
+          store.packs
+            .filter((row) => row.memberId === memberId)
+            .sort((a, b) => a.purchasedAt.localeCompare(b.purchasedAt)),
+        );
+      },
+      async getById(id) {
+        const found = store.packs.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(pack) {
+        store.packs.push(clone(pack));
+        return clone(pack);
+      },
+      async update(id, patch) {
+        return patched(store.packs, (row) => row.id === id, patch, "Class pack");
       },
     },
     invoices: {

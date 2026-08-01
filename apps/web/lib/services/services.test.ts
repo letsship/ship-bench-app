@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type { Booking, ClassPack, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -40,6 +40,7 @@ function baseSeed(over: Partial<SeedData> = {}): SeedData {
     classTypes: [],
     sessions: [],
     bookings: [],
+    packs: [],
     invoices: [],
     lineItems: [],
     outbox: [],
@@ -91,6 +92,19 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   status: "booked",
   bookedAt: ISO,
   cancelledAt: null,
+  ...over,
+});
+
+const pack = (id: string, memberId: string, over: Partial<ClassPack> = {}): ClassPack => ({
+  id,
+  studioId: "s1",
+  memberId,
+  creditsTotal: 5,
+  creditsRemaining: 5,
+  priceCents: 5000,
+  status: "active",
+  purchasedAt: ISO,
+  createdAt: ISO,
   ...over,
 });
 
@@ -187,18 +201,57 @@ describe("bookings service", () => {
     expect(provider.sent).toHaveLength(0);
   });
 
-  it("rejects a double booking with 409", async () => {
+  it("spends one credit from the oldest active pack", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packs: [
+          pack("p1", "m1", { purchasedAt: "2026-01-01T00:00:00.000Z" }),
+          pack("p2", "m1", { purchasedAt: "2026-02-01T00:00:00.000Z" }),
+        ],
+      }),
+    );
+
+    await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" });
+
+    expect((await repos.packs.getById("p1"))?.creditsRemaining).toBe(4);
+    expect((await repos.packs.getById("p2"))?.creditsRemaining).toBe(5);
+  });
+
+  it("rejects a double booking with 409 without spending another credit", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
         classTypes: [classType("ct1")],
         sessions: [session("cs1")],
         members: [member("m1")],
         bookings: [booking("b1", "m1")],
+        packs: [pack("p1", "m1")],
       }),
     );
     await expect(
       createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+    expect((await repos.packs.getById("p1"))?.creditsRemaining).toBe(5);
+  });
+
+  it("rejects booking when all owned packs are exhausted or refunded", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        packs: [
+          pack("p1", "m1", { creditsRemaining: 0 }),
+          pack("p2", "m1", { status: "refunded" }),
+        ],
+      }),
+    );
+
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" }),
+    ).rejects.toMatchObject({ status: 402, code: "pack_exhausted" });
   });
 
   it("marks a far-off cancellation refund-eligible", async () => {

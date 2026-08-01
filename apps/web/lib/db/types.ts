@@ -67,6 +67,18 @@ export interface Booking {
   cancelledAt: string | null;
 }
 
+export interface ClassPack {
+  id: string;
+  studioId: string;
+  memberId: string;
+  creditsTotal: number;
+  creditsRemaining: number;
+  priceCents: number;
+  status: "active" | "refunded";
+  purchasedAt: string;
+  createdAt: string;
+}
+
 export interface Invoice {
   id: string;
   studioId: string;
