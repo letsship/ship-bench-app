@@ -9,6 +9,8 @@ import type {
   Studio,
   StudioSettings,
 } from "../types";
+import { ACTIVE_BOOKING_STATUSES } from "../../domain/booking-rules";
+import { UniqueViolationError } from "./errors";
 import type { Repositories, SessionRange } from "./types";
 
 // In-memory implementation of the repository seam. Used by the test suite
@@ -160,6 +162,18 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         return found ? clone(found) : null;
       },
       async insert(booking) {
+        const hasActiveBooking = store.bookings.some(
+          (row) =>
+            row.sessionId === booking.sessionId &&
+            row.memberId === booking.memberId &&
+            ACTIVE_BOOKING_STATUSES.has(row.status),
+        );
+        if (ACTIVE_BOOKING_STATUSES.has(booking.status) && hasActiveBooking) {
+          throw new UniqueViolationError(
+            "A member can only have one active booking per class session",
+            "bookings_active_session_member_unique",
+          );
+        }
         store.bookings.push(clone(booking));
         return clone(booking);
       },

@@ -1,9 +1,22 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSeed } from "../seed-data";
+import type { Booking } from "../types";
+import { UniqueViolationError } from "./errors";
 import { createInMemoryRepositories } from "./fakes";
 import type { Repositories } from "./types";
 
 const NOW = new Date("2026-03-15T12:00:00.000Z");
+
+function booking(id: string, status: string): Booking {
+  return {
+    id,
+    sessionId: "session-1",
+    memberId: "member-1",
+    status,
+    bookedAt: NOW.toISOString(),
+    cancelledAt: status === "cancelled" ? NOW.toISOString() : null,
+  };
+}
 
 describe("in-memory repositories", () => {
   let repos: Repositories;
@@ -84,6 +97,24 @@ describe("in-memory repositories", () => {
   it("listPending returns only unsent outbox rows", async () => {
     const pending = await repos.outbox.listPending();
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
+  });
+
+  it("rejects a second active booking for the same member and session", async () => {
+    const empty = createInMemoryRepositories();
+    await empty.bookings.insert(booking("booking-1", "waitlisted"));
+
+    await expect(empty.bookings.insert(booking("booking-2", "booked"))).rejects.toBeInstanceOf(
+      UniqueViolationError,
+    );
+  });
+
+  it("allows a new booking after the prior booking is cancelled", async () => {
+    const empty = createInMemoryRepositories();
+    await empty.bookings.insert(booking("booking-1", "cancelled"));
+
+    await expect(empty.bookings.insert(booking("booking-2", "waitlisted"))).resolves.toMatchObject({
+      id: "booking-2",
+    });
   });
 
   it("empty repositories return nulls / empty lists", async () => {
