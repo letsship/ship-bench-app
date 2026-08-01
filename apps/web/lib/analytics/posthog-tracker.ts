@@ -7,10 +7,15 @@ export interface PostHogTrackerConfig {
 }
 
 export function createPostHogTracker(config: PostHogTrackerConfig): AnalyticsTracker {
-  const posthog = new PostHog(config.apiKey, { host: config.host });
+  const posthog = new PostHog(config.apiKey, {
+    host: config.host,
+    flushAt: 1,
+    flushInterval: 0,
+  });
   return {
-    capture({ distinctId, event, properties }) {
+    async capture({ distinctId, event, properties }) {
       posthog.capture({ distinctId, event, properties });
+      await posthog.shutdown();
     },
   };
 }
