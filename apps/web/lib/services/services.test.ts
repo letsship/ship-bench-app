@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,39 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("lists booking export rows with inclusive date bounds and member emails", async () => {
+    const from = "2026-06-01T00:00:00.000Z";
+    const to = "2026-06-30T00:00:00.000Z";
+    repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member("m1", { email: "chiara@example.com" })],
+        sessions: [
+          session("before", { startsAt: "2026-05-31T23:59:59.000Z" }),
+          session("at-from", { startsAt: from }),
+          session("at-to", { startsAt: to }),
+          session("after", { startsAt: "2026-07-01T00:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b-before", "m1", { sessionId: "before" }),
+          booking("b-from", "m1", { sessionId: "at-from" }),
+          booking("b-to", "m1", { sessionId: "at-to" }),
+          booking("b-after", "m1", { sessionId: "after" }),
+        ],
+      }),
+    );
+    studioId = "s1";
+
+    const bounded = await listBookingsForExport(repos, studioId, { from, to });
+    expect(bounded.map((row) => row.id)).toEqual(["b-from", "b-to"]);
+    expect(bounded[0].email).toBe("chiara@example.com");
+
+    const fromOnly = await listBookingsForExport(repos, studioId, { from });
+    expect(fromOnly.map((row) => row.id)).toEqual(["b-from", "b-to", "b-after"]);
+
+    const toOnly = await listBookingsForExport(repos, studioId, { to });
+    expect(toOnly.map((row) => row.id)).toEqual(["b-before", "b-from", "b-to"]);
   });
 });
