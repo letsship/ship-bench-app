@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
-import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import type { Booking, ClassSession, ClassType, Invoice, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -94,6 +94,24 @@ const booking = (id: string, memberId: string, over: Partial<Booking> = {}): Boo
   ...over,
 });
 
+const invoice = (id: string, memberId: string, over: Partial<Invoice> = {}): Invoice => ({
+  id,
+  studioId: "s1",
+  memberId,
+  number: "INV-0001",
+  status: "open",
+  currency: "EUR",
+  taxRateBps: 900,
+  subtotalCents: 1000,
+  taxCents: 90,
+  totalCents: 1090,
+  issuedAt: ISO,
+  dueAt: FUTURE,
+  paidAt: null,
+  createdAt: ISO,
+  ...over,
+});
+
 describe("members service", () => {
   let repos: Repositories;
   let studioId: string;
@@ -114,12 +132,20 @@ describe("members service", () => {
       email: "new@example.com",
       status: "active",
     });
-    const updated = await updateMember(repos, created.id, { status: "paused" });
+    const updated = await updateMember(repos, created.id, { status: "paused" }, studioId);
     expect(updated.status).toBe("paused");
   });
 
   it("getMember 404s for an unknown id", async () => {
-    await expect(getMember(repos, "nope")).rejects.toMatchObject({ status: 404 });
+    await expect(getMember(repos, "nope", studioId)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("getMember 404s for a member in another studio", async () => {
+    const scopedRepos = createInMemoryRepositories(
+      baseSeed({ members: [member("m-other", { studioId: "other" })] }),
+    );
+
+    await expect(getMember(scopedRepos, "m-other", "s1")).rejects.toMatchObject({ status: 404 });
   });
 });
 
@@ -210,7 +236,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "b1", "s1");
     expect(result.refundEligible).toBe(true);
   });
 
@@ -223,7 +249,7 @@ describe("bookings service", () => {
         bookings: [booking("b1", "m1")],
       }),
     );
-    const result = await cancelBooking(repos, createFakeProvider(), "b1");
+    const result = await cancelBooking(repos, createFakeProvider(), "b1", "s1");
     expect(result.refundEligible).toBe(false);
   });
 
@@ -241,13 +267,27 @@ describe("bookings service", () => {
       }),
     );
     const provider = createFakeProvider();
-    const result = await cancelBooking(repos, provider, "b1");
+    const result = await cancelBooking(repos, provider, "b1", "s1");
     expect(result.promotedMemberId).toBe("m2");
     expect((await repos.bookings.getById("b2"))?.status).toBe("booked");
     expect(provider.sent.map((m) => m.kind).sort()).toEqual([
       "booking_cancellation",
       "waitlist_promotion",
     ]);
+  });
+
+  it("does not cancel a booking in another studio", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        sessions: [session("cs1", { studioId: "other" })],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+
+    await expect(cancelBooking(repos, createFakeProvider(), "b1", "s1")).rejects.toMatchObject({
+      status: 404,
+    });
+    expect((await repos.bookings.getById("b1"))?.status).toBe("booked");
   });
 });
 
@@ -281,9 +321,11 @@ describe("invoices service", () => {
       memberId,
       lineItems: [{ description: "Pass", quantity: 1, unitAmountCents: 1000 }],
     });
-    const paid = await updateInvoiceStatus(repos, detail.invoice.id, "paid");
+    const paid = await updateInvoiceStatus(repos, detail.invoice.id, "paid", studioId);
     expect(paid.status).toBe("paid");
-    await expect(updateInvoiceStatus(repos, detail.invoice.id, "open")).rejects.toMatchObject({
+    await expect(
+      updateInvoiceStatus(repos, detail.invoice.id, "open", studioId),
+    ).rejects.toMatchObject({
       status: 409,
       code: "invalid_transition",
     });
@@ -292,8 +334,21 @@ describe("invoices service", () => {
   it("lists invoices with member names and reads a detail", async () => {
     const list = await listInvoices(repos, studioId);
     expect(list.length).toBeGreaterThan(0);
-    const detail = await getInvoiceDetail(repos, list[0].id);
+    const detail = await getInvoiceDetail(repos, list[0].id, studioId);
     expect(detail.member.id).toBe(detail.invoice.memberId);
+  });
+
+  it("getInvoiceDetail 404s for an invoice in another studio", async () => {
+    const scopedRepos = createInMemoryRepositories(
+      baseSeed({
+        members: [member("m-other", { studioId: "other" })],
+        invoices: [invoice("i-other", "m-other", { studioId: "other" })],
+      }),
+    );
+
+    await expect(getInvoiceDetail(scopedRepos, "i-other", "s1")).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });
 
