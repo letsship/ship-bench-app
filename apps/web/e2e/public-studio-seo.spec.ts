@@ -12,8 +12,8 @@ test.describe("public studio SEO", () => {
 
     await page.goto("/s/riverbank");
     await expect(page.getByRole("heading", { name: "Riverbank Movement" })).toBeVisible();
-    await expect(page.getByText("Vinyasa Flow", { exact: true })).toBeVisible();
-    await expect(page.getByText("Noor", { exact: true })).toBeVisible();
+    await expect(page.getByText("Vinyasa Flow", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Noor", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Sign in to book a class/i })).toBeVisible();
   });
 
