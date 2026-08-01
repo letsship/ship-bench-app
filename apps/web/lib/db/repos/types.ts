@@ -11,8 +11,8 @@ import type {
 } from "../types";
 
 // The repository seam. Route handlers, services, and the outbox depend ONLY on
-// these interfaces — never on supabase-js (or any driver) directly. Two
-// implementations exist: `supabase/` (the production Postgres impl) and
+// these interfaces — never on Drizzle (or any driver) directly. Two
+// implementations exist: `d1.ts` (the production Cloudflare D1 impl) and
 // `fakes.ts` (in-memory, for hermetic tests + the local fake-backends mode).
 // Swapping the persistence layer means writing a new set of these; nothing
 // upstream changes. Services build full rows (ids + timestamps set app-side)
