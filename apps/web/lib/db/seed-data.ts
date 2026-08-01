@@ -96,6 +96,9 @@ function buildMembers(now: Date, studioId: string): Member[] {
     status: member.status,
     // Gonzalo has opted out of all notifications — exercises the outbox skip.
     notificationsOptedOut: member.email === "gonzalo@example.com",
+    // Deterministic (like the ids above) so the emitted seed.sql stays
+    // byte-stable; real members get random tokens via newCalendarToken().
+    calendarToken: `seedcaltoken${(index + 1).toString(16).padStart(20, "0")}`,
     createdAt: new Date(now.getTime() - (index + 1) * 15 * DAY_MS).toISOString(),
   }));
 }

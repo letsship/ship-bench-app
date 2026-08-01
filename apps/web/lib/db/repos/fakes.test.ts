@@ -51,6 +51,22 @@ describe("in-memory repositories", () => {
     expect(bookings.every((b) => ids.includes(b.sessionId))).toBe(true);
   });
 
+  it("finds a member by calendar token, null for empty/unknown", async () => {
+    const [member] = await repos.members.listByStudio(studioId);
+    const found = await repos.members.findByCalendarToken(member.calendarToken);
+    expect(found?.id).toBe(member.id);
+    expect(await repos.members.findByCalendarToken("not-a-real-token")).toBeNull();
+    expect(await repos.members.findByCalendarToken("")).toBeNull();
+  });
+
+  it("lists only the given member's bookings", async () => {
+    const [member] = await repos.members.listByStudio(studioId);
+    const bookings = await repos.bookings.listByMember(member.id);
+    expect(bookings.length).toBeGreaterThan(0);
+    expect(bookings.every((b) => b.memberId === member.id)).toBe(true);
+    expect(await repos.bookings.listByMember("mem_missing")).toEqual([]);
+  });
+
   it("inserts then reads back by id", async () => {
     const member = {
       id: "mem_new",
@@ -60,6 +76,7 @@ describe("in-memory repositories", () => {
       phone: null,
       status: "active",
       notificationsOptedOut: false,
+      calendarToken: "tok_new",
       createdAt: NOW.toISOString(),
     };
     await repos.members.insert(member);

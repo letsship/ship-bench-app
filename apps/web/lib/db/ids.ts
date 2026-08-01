@@ -5,3 +5,12 @@
 export function newId(): string {
   return crypto.randomUUID();
 }
+
+// Per-member secret for the private calendar feed URL: 128 bits of
+// cryptographic randomness rendered as 32 lowercase hex characters. URL-safe
+// and unguessable — the token alone authorizes the feed, so it must not be
+// derivable or enumerable.
+export function newCalendarToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
