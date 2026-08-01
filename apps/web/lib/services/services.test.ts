@@ -295,6 +295,29 @@ describe("invoices service", () => {
     const detail = await getInvoiceDetail(repos, list[0].id);
     expect(detail.member.id).toBe(detail.invoice.memberId);
   });
+
+  it("reads the fully refunded Pottery intensive invoice with zero totals", async () => {
+    const femke = (await repos.members.listByStudio(studioId)).find(
+      (member) => member.name === "Femke Jansen",
+    );
+    if (!femke) throw new Error("Femke fixture not found");
+
+    const refundedInvoice = (await repos.invoices.listByStudio(studioId)).find(
+      (invoice) => invoice.memberId === femke.id && invoice.status === "refunded",
+    );
+    if (!refundedInvoice) throw new Error("Fully refunded invoice fixture not found");
+
+    const detail = await getInvoiceDetail(repos, refundedInvoice.id);
+
+    expect(detail.invoice).toMatchObject({
+      subtotalCents: 0,
+      taxCents: 0,
+      totalCents: 0,
+    });
+    expect(detail.lineItems).toHaveLength(1);
+    expect(detail.lineItems[0]).toMatchObject({ description: "Pottery intensive", refunded: true });
+    expect(detail.lineItems.every((lineItem) => lineItem.refunded)).toBe(true);
+  });
 });
 
 describe("reports + dashboard + booking list", () => {
