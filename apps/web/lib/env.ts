@@ -3,8 +3,8 @@ import { z } from "zod";
 // Zod-validated environment access, split into a client schema (NEXT_PUBLIC_*,
 // safe for the browser bundle) and a server schema (everything). Vars are read
 // by explicit property access so Next inlines NEXT_PUBLIC_* at build time.
-// Parsing is lazy + cached, and only happens when a Supabase/email client is
-// actually constructed — so the fake-backends mode needs none of these set.
+// Parsing is lazy + cached, and only happens when a Supabase, email, or analytics
+// client is actually constructed — so fake-backends mode needs none of these set.
 
 const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
@@ -22,11 +22,18 @@ const serverSchema = clientSchema.extend({
   SUPABASE_SCHEMA: z.string().min(1).default("public"),
 });
 
+const analyticsSchema = z.object({
+  POSTHOG_API_KEY: z.string().min(1),
+  POSTHOG_HOST: z.string().url(),
+});
+
 type ClientEnv = z.infer<typeof clientSchema>;
 type ServerEnv = z.infer<typeof serverSchema>;
+type AnalyticsEnv = z.infer<typeof analyticsSchema>;
 
 let cachedClientEnv: ClientEnv | undefined;
 let cachedServerEnv: ServerEnv | undefined;
+let cachedAnalyticsEnv: AnalyticsEnv | undefined;
 
 const getClientVars = () => ({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -42,6 +49,11 @@ const getServerVars = () => ({
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
 });
 
+const getAnalyticsVars = () => ({
+  POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
+  POSTHOG_HOST: process.env.POSTHOG_HOST,
+});
+
 export const clientEnv = (): ClientEnv => {
   if (!cachedClientEnv) cachedClientEnv = clientSchema.parse(getClientVars());
   return cachedClientEnv;
@@ -50,4 +62,9 @@ export const clientEnv = (): ClientEnv => {
 export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
+};
+
+export const analyticsEnv = (): AnalyticsEnv => {
+  if (!cachedAnalyticsEnv) cachedAnalyticsEnv = analyticsSchema.parse(getAnalyticsVars());
+  return cachedAnalyticsEnv;
 };

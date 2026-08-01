@@ -2,6 +2,12 @@ import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { ClassSession, Member } from "@/lib/db/types";
 import {
+  bookingCancelled,
+  bookingCreated,
+  waitlistJoined,
+} from "@/lib/analytics/events";
+import type { CaptureEvent, Tracker } from "@/lib/analytics/types";
+import {
   type BookingDenyReason,
   canBook,
   canCancel,
@@ -21,6 +27,14 @@ import type { CreateBookingInput } from "@/lib/validation";
 import { getStudioContext } from "./studio";
 
 const nowIso = (): string => new Date().toISOString();
+
+async function captureAnalytics(tracker: Tracker, event: CaptureEvent): Promise<void> {
+  try {
+    await tracker.capture(event);
+  } catch (error) {
+    console.error("Analytics capture failed", error);
+  }
+}
 
 const DENY_MESSAGES: Record<BookingDenyReason, string> = {
   session_cancelled: "This class session has been cancelled",
@@ -63,6 +77,7 @@ export interface BookingResult {
 export async function createBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   input: CreateBookingInput,
 ): Promise<BookingResult> {
   const { settings } = await getStudioContext(repos);
@@ -93,6 +108,13 @@ export async function createBooking(
     cancelledAt: null,
   });
 
+  await captureAnalytics(
+    tracker,
+    decision.status === "booked"
+      ? bookingCreated(member, session)
+      : waitlistJoined(member, session),
+  );
+
   if (decision.status === "booked") {
     await enqueueAndDispatch(
       repos,
@@ -111,6 +133,7 @@ export interface CancelResult {
 export async function cancelBooking(
   repos: Repositories,
   provider: NotificationProvider,
+  tracker: Tracker,
   bookingId: string,
 ): Promise<CancelResult> {
   const booking = await repos.bookings.getById(bookingId);
@@ -134,11 +157,13 @@ export async function cancelBooking(
 
   await repos.bookings.update(bookingId, { status: "cancelled", cancelledAt: nowIso() });
 
+  const member = await loadMember(repos, booking.memberId);
+  await captureAnalytics(tracker, bookingCancelled(member, session));
+
   const promotedMemberId = isSeatTaking(booking.status)
     ? await promoteFromWaitlist(repos, provider, session)
     : null;
 
-  const member = await loadMember(repos, booking.memberId);
   await enqueueAndDispatch(
     repos,
     provider,
