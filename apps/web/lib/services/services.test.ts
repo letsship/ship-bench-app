@@ -3,6 +3,7 @@ import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes"
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
+import { ACTIVE_MEMBER_BOOKING_STATUSES } from "@/lib/domain/booking-rules";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
@@ -222,7 +223,7 @@ describe("bookings service", () => {
     });
 
     const memberBookings = (await repos.bookings.listBySession("cs1")).filter(
-      (row) => row.memberId === "m2" && ["booked", "waitlisted", "attended"].includes(row.status),
+      (row) => row.memberId === "m2" && ACTIVE_MEMBER_BOOKING_STATUSES.has(row.status),
     );
     expect(memberBookings).toHaveLength(1);
     expect(memberBookings[0]?.status).toBe("waitlisted");

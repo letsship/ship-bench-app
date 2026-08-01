@@ -32,7 +32,12 @@ export interface BookingContext {
 }
 
 // Any active entry blocks another booking attempt for the same member + session.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "waitlisted", "attended"]);
+// The fake repository reuses this set to mirror the database uniqueness rule.
+export const ACTIVE_MEMBER_BOOKING_STATUSES: ReadonlySet<string> = new Set<BookingStatus>([
+  "booked",
+  "waitlisted",
+  "attended",
+]);
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
@@ -42,7 +47,11 @@ export function canBook(context: BookingContext): BookingDecision {
     return { ok: false, reason: "session_started" };
   }
   if (context.memberStatus !== "active") return { ok: false, reason: "member_inactive" };
-  if (context.memberBookings.some((booking) => ACTIVE_MEMBER_BOOKING.has(booking.status))) {
+  if (
+    context.memberBookings.some((booking) =>
+      ACTIVE_MEMBER_BOOKING_STATUSES.has(booking.status),
+    )
+  ) {
     return { ok: false, reason: "already_booked" };
   }
   if (context.occupancy.isFull) {
