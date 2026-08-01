@@ -149,7 +149,7 @@ export function createSupabaseRepositories(): Repositories {
       insert: async (booking) => {
         const { data, error } = await db
           .from("bookings")
-          .insert(toSnakeRow(booking as Record<string, unknown>))
+          .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
           .select()
           .single();
         if (error) {
