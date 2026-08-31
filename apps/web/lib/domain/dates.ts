@@ -85,6 +85,13 @@ export function isBefore(a: string, b: string): boolean {
   return toDate(a).getTime() < toDate(b).getTime();
 }
 
+// Advance an ISO instant by a whole number of hours (negative allowed). UTC
+// math — no timezone involved — so the result is a stable ISO string usable as
+// a window boundary.
+export function addHours(iso: string, hours: number): string {
+  return new Date(toDate(iso).getTime() + hours * 3_600_000).toISOString();
+}
+
 // Group items by their calendar day (in `timeZone`), preserving input order
 // within each day. Returns days sorted ascending.
 export function groupByDay<T>(

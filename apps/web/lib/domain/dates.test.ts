@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addHours,
   dayKey,
   durationMinutes,
   groupByDay,
@@ -58,7 +59,7 @@ describe("isSameDay", () => {
   });
 });
 
-describe("hoursBetween / durationMinutes / isBefore", () => {
+describe("hoursBetween / durationMinutes / isBefore / addHours", () => {
   it("returns positive hours forward", () => {
     expect(hoursBetween("2026-01-01T00:00:00Z", "2026-01-01T06:00:00Z")).toBe(6);
   });
@@ -74,6 +75,25 @@ describe("hoursBetween / durationMinutes / isBefore", () => {
   it("orders instants", () => {
     expect(isBefore("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z")).toBe(true);
     expect(isBefore("2026-01-02T00:00:00Z", "2026-01-01T00:00:00Z")).toBe(false);
+  });
+
+  it("addHours advances the instant by the given hours", () => {
+    expect(addHours("2026-01-01T00:00:00.000Z", 24)).toBe("2026-01-02T00:00:00.000Z");
+    expect(addHours("2026-01-01T00:00:00.000Z", 1)).toBe("2026-01-01T01:00:00.000Z");
+  });
+
+  it("addHours accepts a negative offset", () => {
+    expect(addHours("2026-01-02T00:00:00.000Z", -24)).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("addHours returns a valid ISO string", () => {
+    const result = addHours("2026-01-01T00:00:00.000Z", 6);
+    expect(() => new Date(result).toISOString()).not.toThrow();
+    expect(new Date(result).toISOString()).toBe(result);
+  });
+
+  it("addHours throws on an invalid timestamp", () => {
+    expect(() => addHours("not-a-date", 1)).toThrow(RangeError);
   });
 });
 

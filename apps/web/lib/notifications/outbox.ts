@@ -2,13 +2,16 @@ import { newId } from "@/lib/db/ids";
 import type { Repositories } from "@/lib/db/repos/types";
 import type { NotificationKind, NotificationMessage, NotificationProvider } from "./types";
 
-// Which studio setting gates each notification kind.
+// Which studio setting gates each notification kind. A `null` mapping means the
+// kind has no studio-level toggle — it is gated only by the member opt-out
+// (e.g. booking reminders, which the PM wants driven purely by opt-in/opt-out).
 const SETTING_FOR_KIND = {
   booking_confirmation: "notifyBookingConfirmations",
   booking_cancellation: "notifyCancellations",
   waitlist_promotion: "notifyWaitlistPromotions",
   invoice_issued: "notifyInvoices",
-} as const satisfies Record<NotificationKind, string>;
+  booking_reminder: null,
+} as const satisfies Record<NotificationKind, string | null>;
 
 export interface OptOutContext {
   memberOptedOut: boolean;
@@ -18,11 +21,14 @@ export interface OptOutContext {
   notifyInvoices: boolean;
 }
 
-// A member opt-out wins over everything; otherwise the studio-level setting for
-// the kind decides. Pure so both the dispatcher and tests share one rule.
+// A member opt-out wins over everything; otherwise a kind with a studio-level
+// setting sends when that setting is on, and a kind with no setting (`null`)
+// sends whenever the member hasn't opted out. Pure so both the dispatcher and
+// tests share one rule.
 export function shouldSend(kind: NotificationKind, context: OptOutContext): boolean {
   if (context.memberOptedOut) return false;
-  return context[SETTING_FOR_KIND[kind]];
+  const setting = SETTING_FOR_KIND[kind];
+  return setting === null ? true : context[setting];
 }
 
 // Persist a notification as a pending outbox row. Delivery happens later in
