@@ -71,8 +71,14 @@ jobs:
       - name: E2E user journeys (fake backends)
         run: pnpm --filter @studiobook/web e2e
 
+      # The report is a diagnostic aid, never a test-result gate. The benchmark
+      # reads this workflow's check_suite as ci_passed/ci_failed, so an Actions
+      # storage-quota outage on the upload would turn a green e2e run red and
+      # send the builder off to "fix" an infrastructure error it cannot fix.
+      # Mirrors the ship-platform repo's trace-upload guard.
       - name: Upload Playwright report + traces
         if: ${{ !cancelled() }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
