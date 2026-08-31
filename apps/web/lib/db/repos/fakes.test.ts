@@ -86,6 +86,18 @@ describe("in-memory repositories", () => {
     expect(pending.every((row) => row.sentAt === null)).toBe(true);
   });
 
+  it("webhookEvents returns null for an unrecorded id then reads back after insert", async () => {
+    expect(await repos.webhookEvents.getById("evt_none")).toBeNull();
+    const inserted = await repos.webhookEvents.insert({
+      id: "evt_one",
+      type: "invoice.paid",
+      processedAt: NOW.toISOString(),
+    });
+    expect(inserted.id).toBe("evt_one");
+    const found = await repos.webhookEvents.getById("evt_one");
+    expect(found?.type).toBe("invoice.paid");
+  });
+
   it("empty repositories return nulls / empty lists", async () => {
     const empty = createInMemoryRepositories();
     expect(await empty.studios.getFirst()).toBeNull();

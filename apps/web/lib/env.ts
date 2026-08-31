@@ -16,6 +16,9 @@ const serverSchema = clientSchema.extend({
   SUPABASE_SECRET_KEY: z.string().min(1),
   RESEND_API_KEY: z.string().min(1).optional(),
   STUDIOBOOK_FROM_EMAIL: z.string().min(1).optional(),
+  // Stripe webhook signing secret (whsec_...). Optional so fake-backends/test
+  // mode needs nothing set; the webhook route reads it on demand.
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   // Postgres schema the data lives in. Defaults to "public"; overridden per
   // deployment when a single database hosts several isolated copies of the app
   // (e.g. one schema per preview environment).
@@ -39,6 +42,7 @@ const getServerVars = () => ({
   SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   STUDIOBOOK_FROM_EMAIL: process.env.STUDIOBOOK_FROM_EMAIL,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
 });
 
