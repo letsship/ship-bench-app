@@ -5,9 +5,10 @@ pottery). Members, a class schedule with live occupancy and waitlists,
 invoicing with tax and refunds, monthly revenue reports, a public iCalendar
 feed, and CSV exports — all backed by a real database and a thorough test suite.
 
-Studiobook is a **benchmark fixture** for SHIP's software-delivery pipeline: a
-realistic, working, tested codebase that autonomous agents are asked to modify.
-Everything here is hand-authored.
+Studiobook is the **benchmark fixture** for
+[SWE-in-a-team](https://letsship.ai/blog/swe-in-a-team), SHIP's
+software-delivery benchmark: a realistic, working, tested codebase that
+autonomous agents are asked to modify. Everything here is hand-authored.
 
 ## Stack
 
