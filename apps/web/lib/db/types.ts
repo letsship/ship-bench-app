@@ -1,7 +1,7 @@
 // Plain domain row types (camelCase). These are the contract every repository
-// speaks — the Supabase implementation maps them to/from snake_case Postgres
-// columns, and the in-memory fakes store them directly. Domain logic and
-// services depend only on these, never on any database driver.
+// speaks — the D1 schema's columns already match these fields 1:1, and the
+// in-memory fakes store them directly. Domain logic and services depend only
+// on these, never on any database driver.
 
 export interface Studio {
   id: string;

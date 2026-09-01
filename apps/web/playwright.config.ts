@@ -38,7 +38,7 @@ export default defineConfig({
   ],
   // Smoke specs run against a production `next start` server in fake-backends
   // mode (seeded in-memory repositories + fake email provider), so the suite is
-  // self-contained — no Supabase/Postgres or Resend account needed.
+  // self-contained — no D1/Postgres or Resend account needed.
   webServer: {
     command: "pnpm run build && pnpm run start",
     url: BASE_URL,
