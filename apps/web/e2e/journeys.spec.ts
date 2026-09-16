@@ -43,6 +43,36 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("renders an HTML line-item description as inert text (stored XSS regression)", async ({
+    page,
+    request,
+  }) => {
+    // Staff-entered descriptions are free text; markup must never be parsed as HTML.
+    const membersResponse = await request.get("/api/members");
+    expect(membersResponse.ok()).toBe(true);
+    const members = (await membersResponse.json()) as Array<{ id: string }>;
+    expect(members.length).toBeGreaterThan(0);
+
+    const payload = '<img src=x onerror="window.__xss=true">';
+    const createResponse = await request.post("/api/invoices", {
+      data: {
+        memberId: members[0].id,
+        lineItems: [{ description: payload, quantity: 1, unitAmountCents: 1200 }],
+      },
+    });
+    expect(createResponse.status()).toBe(201);
+    const created = (await createResponse.json()) as { invoice: { id: string } };
+
+    await page.goto(`/invoices/${created.invoice.id}`);
+
+    // The markup shows up verbatim as text…
+    await expect(page.getByText(payload, { exact: false })).toBeVisible();
+    // …but no element is created from it…
+    await expect(page.locator('img[src="x"]')).toHaveCount(0);
+    // …and no handler ever executed.
+    expect(await page.evaluate(() => (window as { __xss?: boolean }).__xss)).toBeUndefined();
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
