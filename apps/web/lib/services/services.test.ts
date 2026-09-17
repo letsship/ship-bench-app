@@ -201,6 +201,29 @@ describe("bookings service", () => {
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
   });
 
+  it("rejects a double submit onto the waitlist with 409", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [
+          booking("b1", "m1"),
+          booking("b2", "m2", { status: "waitlisted" }),
+        ],
+      }),
+    );
+    const provider = createFakeProvider();
+    await expect(
+      createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+
+    const rows = await repos.bookings.listBySession("cs1");
+    const m2Rows = rows.filter((r) => r.memberId === "m2");
+    expect(m2Rows).toHaveLength(1);
+    expect(m2Rows[0].status).toBe("waitlisted");
+  });
+
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
