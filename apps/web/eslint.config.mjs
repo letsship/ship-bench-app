@@ -20,8 +20,18 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  reactHooks.configs["recommended-latest"],
-  next.configs["core-web-vitals"],
+  {
+    ...reactHooks.configs["recommended-latest"],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
+  },
+  {
+    ...next.configs["core-web-vitals"],
+    plugins: {
+      "@next/next": next,
+    },
+  },
   {
     // TypeScript checks undefined references far better than eslint's no-undef,
     // which otherwise flags web + node globals.
