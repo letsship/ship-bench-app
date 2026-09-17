@@ -43,6 +43,52 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("invoice line descriptions render as escaped text, not HTML", async ({ request, page }) => {
+    // Fetch a member to use in the invoice creation
+    const membersRes = await request.get("/api/members");
+    const members = await membersRes.json();
+    const memberId = members[0]?.id;
+    expect(memberId).toBeDefined();
+
+    // Create an invoice with a malicious HTML description and an ordinary description
+    const maliciousPayload = '<img src=x onerror="alert(document.cookie)">';
+    const ordinaryDescription = "Guest pass";
+
+    const invoiceRes = await request.post("/api/invoices", {
+      data: {
+        memberId,
+        lineItems: [
+          {
+            description: maliciousPayload,
+            quantity: 1,
+            unitAmountCents: 10000,
+          },
+          {
+            description: ordinaryDescription,
+            quantity: 1,
+            unitAmountCents: 5000,
+          },
+        ],
+      },
+    });
+    const result = await invoiceRes.json();
+    const invoiceId = result.invoice.id;
+    expect(invoiceId).toBeDefined();
+
+    // Navigate to the invoice detail page
+    await page.goto(`/invoices/${invoiceId}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    // Assert the malicious string appears as literal text (not parsed as HTML)
+    await expect(page.getByText(maliciousPayload)).toBeVisible();
+
+    // Assert no img element with src="x" was created (proving the HTML wasn't parsed)
+    await expect(page.locator('img[src="x"]')).toHaveCount(0);
+
+    // Assert the ordinary description is visible as readable text
+    await expect(page.getByText(ordinaryDescription)).toBeVisible();
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
