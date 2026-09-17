@@ -1,6 +1,24 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Source the lib directory so Tailwind v4 auto-detects utility classes used there. */
+@source "../lib";
+
+/* Re-declare custom theme tokens as v4 @theme variables pointing at the same
+   :root custom properties so bg-parchment, text-ink, font-serif, etc. work. */
+@theme {
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --color-parchment: var(--color-parchment);
+  --color-surface: var(--color-surface);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-clay: var(--color-clay);
+  --color-clay-soft: var(--color-clay-soft);
+  --color-sage: var(--color-sage);
+  --color-sage-soft: var(--color-sage-soft);
+  --color-line: var(--color-line);
+  --color-danger: var(--color-danger);
+}
 
 /* Studiobook design tokens — a warm, tactile studio aesthetic: parchment
    surfaces, espresso ink, clay + sage accents drawn from pottery and yoga. */
