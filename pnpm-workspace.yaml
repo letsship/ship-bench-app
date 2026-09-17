@@ -7,3 +7,22 @@ onlyBuiltDependencies:
   - sharp
   - supabase
   - workerd
+
+# Security overrides: force patched releases for transitive dependencies whose
+# consumers still pin vulnerable ranges. Keeps `pnpm audit --audit-level=high`
+# clean without waiting on upstream releases.
+overrides:
+  # GHSA-3jxr-9vmj-r5cp, GHSA-p9j2-gv94-2wf4 (eslint>minimatch,
+  # typescript-eslint, @opennextjs/cloudflare>glob)
+  brace-expansion@1: 1.1.21
+  brace-expansion@2: 2.1.7
+  brace-expansion@>=4: 5.0.12
+  # GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx
+  # (eslint-plugin-react-hooks>@babel/core)
+  browserslist@4: 4.29.0
+  # GHSA-2883-xcg3-v3hh, GHSA-5p4m-2wfm-xmqj (eslint>@eslint/eslintrc)
+  js-yaml@4: 4.3.2
+  # GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 (@tailwindcss/postcss>postcss)
+  nanoid@3: 3.3.19
+  # GHSA-r28c-9q8g-f849 (@tailwindcss/postcss)
+  postcss: 8.5.28
