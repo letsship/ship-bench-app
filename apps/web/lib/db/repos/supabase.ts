@@ -87,6 +87,13 @@ export function createSupabaseRepositories(): Repositories {
           db.from("members").select("*").eq("studio_id", studioId).order("name"),
           "members.listByStudio",
         ),
+      listByIds: async (ids) => {
+        if (ids.length === 0) return [];
+        return rows<Member>(
+          db.from("members").select("*").in("id", ids),
+          "members.listByIds",
+        );
+      },
       getById: (id) =>
         maybeOne<Member>(
           db.from("members").select("*").eq("id", id).maybeSingle(),

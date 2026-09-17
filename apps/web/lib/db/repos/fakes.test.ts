@@ -35,6 +35,15 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("members.listByIds returns matching members, dedupes, ignores unknowns, and empties to []", async () => {
+    const all = await repos.members.listByStudio(studioId);
+    const [a, b] = all;
+    const got = await repos.members.listByIds([a.id, b.id, a.id, "does-not-exist"]);
+    expect(new Set(got.map((m) => m.id))).toEqual(new Set([a.id, b.id]));
+    expect(got).toHaveLength(2);
+    expect(await repos.members.listByIds([])).toEqual([]);
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
