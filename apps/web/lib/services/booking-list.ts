@@ -19,15 +19,20 @@ export async function listBookingRows(
   range: SessionRange = {},
 ): Promise<BookingRow[]> {
   const sessions = await repos.classSessions.listByStudio(studioId, range);
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
   const classTypes = await repos.classTypes.listByStudio(studioId);
   const typeById = new Map(classTypes.map((type) => [type.id, type]));
   const bookings = await repos.bookings.listBySessionIds(sessions.map((session) => session.id));
 
+  const memberIds = [...new Set(bookings.map((booking) => booking.memberId))];
+  const members = await repos.members.listByIds(memberIds);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+
   const rows: BookingRow[] = [];
   for (const booking of bookings) {
-    const session = await repos.classSessions.getById(booking.sessionId);
+    const session = sessionById.get(booking.sessionId);
     const classType = session ? typeById.get(session.classTypeId) : undefined;
-    const member = await repos.members.getById(booking.memberId);
+    const member = memberById.get(booking.memberId);
     rows.push({
       id: booking.id,
       memberName: member?.name ?? "—",
