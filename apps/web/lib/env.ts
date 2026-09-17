@@ -7,9 +7,9 @@ import { z } from "zod";
 // actually constructed — so the fake-backends mode needs none of these set.
 
 const clientSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+  NEXT_PUBLIC_SITE_URL: z.url().optional(),
 });
 
 const serverSchema = clientSchema.extend({

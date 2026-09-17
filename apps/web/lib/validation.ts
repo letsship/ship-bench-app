@@ -8,6 +8,7 @@ const isoDatetime = z
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid ISO datetime" });
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb hex color");
+const normalizedEmail = z.string().trim().toLowerCase().pipe(z.email());
 
 export const createClassTypeSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -35,14 +36,14 @@ export const createSessionSchema = z
 
 export const createMemberSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  email: z.string().trim().toLowerCase().email(),
+  email: normalizedEmail,
   phone: z.string().trim().max(40).optional(),
   status: z.enum(["active", "paused", "cancelled"]).default("active"),
 });
 
 export const updateMemberSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  email: z.string().trim().toLowerCase().email().optional(),
+  email: normalizedEmail.optional(),
   phone: z.string().trim().max(40).nullable().optional(),
   status: z.enum(["active", "paused", "cancelled"]).optional(),
   notificationsOptedOut: z.boolean().optional(),
