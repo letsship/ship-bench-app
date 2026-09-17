@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingExportRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,66 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+});
+
+describe("listBookingExportRows", () => {
+  const FROM = "2026-07-01T00:00:00.000Z";
+  const TO = "2026-07-01T23:59:59.000Z";
+  let repos: Repositories;
+  let studioId: string;
+
+  beforeEach(async () => {
+    repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        members: [member("m1", { email: "m1@e.co" }), member("m2", { email: "m2@e.co" })],
+        sessions: [
+          session("cs-before", { startsAt: "2026-06-30T23:00:00.000Z", endsAt: "2026-07-01T00:00:00.000Z" }),
+          session("cs-from", { startsAt: FROM, endsAt: "2026-07-01T01:00:00.000Z" }),
+          session("cs-mid", { startsAt: "2026-07-01T12:00:00.000Z", endsAt: "2026-07-01T13:00:00.000Z" }),
+          session("cs-to", { startsAt: TO, endsAt: "2026-07-02T00:59:59.000Z" }),
+          session("cs-after", { startsAt: "2026-07-02T00:00:00.000Z", endsAt: "2026-07-02T01:00:00.000Z" }),
+        ],
+        bookings: [
+          booking("b-before", "m1", { sessionId: "cs-before" }),
+          booking("b-from", "m1", { sessionId: "cs-from" }),
+          booking("b-mid", "m2", { sessionId: "cs-mid" }),
+          booking("b-to", "m2", { sessionId: "cs-to" }),
+          booking("b-after", "m1", { sessionId: "cs-after" }),
+        ],
+      }),
+    );
+    studioId = (await repos.studios.getFirst())?.id ?? "";
+  });
+
+  it("returns every booking with the member's email when unbounded", async () => {
+    const rows = await listBookingExportRows(repos, studioId);
+    expect(rows.length).toBe(5);
+    expect(rows.every((row) => row.email.endsWith("@e.co"))).toBe(true);
+    // sorted by startsAt ascending
+    expect(rows.map((row) => row.startsAt)).toEqual([...rows].map((row) => row.startsAt).sort());
+  });
+
+  it("includes the exact `from` and `to` boundaries (inclusive)", async () => {
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM, to: TO });
+    expect(rows.map((row) => row.memberName).sort()).toEqual(["m1", "m2", "m2"]);
+    expect(rows.some((row) => row.startsAt === FROM)).toBe(true);
+    expect(rows.some((row) => row.startsAt === TO)).toBe(true);
+  });
+
+  it("excludes sessions outside the range", async () => {
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM, to: TO });
+    expect(rows.some((row) => row.startsAt === "2026-06-30T23:00:00.000Z")).toBe(false);
+    expect(rows.some((row) => row.startsAt === "2026-07-02T00:00:00.000Z")).toBe(false);
+  });
+
+  it("is unbounded on the omitted side when only one bound is given", async () => {
+    const fromOnly = await listBookingExportRows(repos, studioId, { from: FROM });
+    expect(fromOnly.some((row) => row.startsAt === "2026-07-02T00:00:00.000Z")).toBe(true);
+    expect(fromOnly.some((row) => row.startsAt === "2026-06-30T23:00:00.000Z")).toBe(false);
+    const toOnly = await listBookingExportRows(repos, studioId, { to: TO });
+    expect(toOnly.some((row) => row.startsAt === "2026-06-30T23:00:00.000Z")).toBe(true);
+    expect(toOnly.some((row) => row.startsAt === "2026-07-02T00:00:00.000Z")).toBe(false);
   });
 });

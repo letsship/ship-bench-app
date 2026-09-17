@@ -6,6 +6,7 @@ import {
   hoursBetween,
   isBefore,
   isSameDay,
+  isWithinInclusiveRange,
   monthKey,
   zonedParts,
 } from "./dates";
@@ -85,6 +86,45 @@ describe("zonedParts", () => {
 
   it("throws on an invalid timestamp", () => {
     expect(() => zonedParts("not-a-date", "UTC")).toThrow(RangeError);
+  });
+});
+
+describe("isWithinInclusiveRange", () => {
+  const from = "2026-06-01T00:00:00.000Z";
+  const to = "2026-06-30T23:59:59.000Z";
+
+  it("includes a value inside the range", () => {
+    expect(isWithinInclusiveRange("2026-06-15T12:00:00.000Z", from, to)).toBe(true);
+  });
+
+  it("includes the exact `from` boundary", () => {
+    expect(isWithinInclusiveRange(from, from, to)).toBe(true);
+  });
+
+  it("includes the exact `to` boundary", () => {
+    expect(isWithinInclusiveRange(to, from, to)).toBe(true);
+  });
+
+  it("excludes a value just before `from`", () => {
+    expect(isWithinInclusiveRange("2026-05-31T23:59:59.000Z", from, to)).toBe(false);
+  });
+
+  it("excludes a value just after `to`", () => {
+    expect(isWithinInclusiveRange("2026-07-01T00:00:00.000Z", from, to)).toBe(false);
+  });
+
+  it("is always true with both bounds omitted", () => {
+    expect(isWithinInclusiveRange("2026-01-01T00:00:00.000Z")).toBe(true);
+  });
+
+  it("is unbounded before when only `to` is given", () => {
+    expect(isWithinInclusiveRange("2000-01-01T00:00:00.000Z", undefined, to)).toBe(true);
+    expect(isWithinInclusiveRange("2026-07-01T00:00:00.000Z", undefined, to)).toBe(false);
+  });
+
+  it("is unbounded after when only `from` is given", () => {
+    expect(isWithinInclusiveRange("2026-07-01T00:00:00.000Z", from, undefined)).toBe(true);
+    expect(isWithinInclusiveRange("2026-05-01T00:00:00.000Z", from, undefined)).toBe(false);
   });
 });
 
