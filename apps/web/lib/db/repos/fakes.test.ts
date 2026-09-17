@@ -29,6 +29,16 @@ describe("in-memory repositories", () => {
     expect(members.length).toBeGreaterThan(0);
   });
 
+  it("members.listByIds returns matching members, tolerates misses and empty input", async () => {
+    expect(await repos.members.listByIds([])).toEqual([]);
+    const all = await repos.members.listByStudio(studioId);
+    const wanted = [all[0].id, all[1].id, "does-not-exist"];
+    const got = await repos.members.listByIds(wanted);
+    const gotIds = got.map((m) => m.id).sort();
+    expect(gotIds).toEqual([all[0].id, all[1].id].sort());
+    expect(got.length).toBe(2);
+  });
+
   it("finds a member by email within the studio", async () => {
     const found = await repos.members.findByEmail(studioId, "amara@example.com");
     expect(found?.name).toBe("Amara Okafor");

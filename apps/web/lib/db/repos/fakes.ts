@@ -97,6 +97,10 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
             .sort((a, b) => a.name.localeCompare(b.name)),
         );
       },
+      async listByIds(ids) {
+        const set = new Set(ids);
+        return cloneAll(store.members.filter((row) => set.has(row.id)));
+      },
       async getById(id) {
         const found = store.members.find((row) => row.id === id);
         return found ? clone(found) : null;
