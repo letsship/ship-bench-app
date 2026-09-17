@@ -71,6 +71,14 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+// Query params for GET /api/export?type=bookings. `from`/`to` are optional
+// ISO-8601 timestamps (any valid form — bare date, Z, offset, with or without
+// milliseconds); the service layer parses them to instants before comparing.
+export const exportBookingsQuerySchema = z.object({
+  from: isoDatetime.optional(),
+  to: isoDatetime.optional(),
+});
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;

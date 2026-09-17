@@ -126,6 +126,39 @@ describe("isWithinInclusiveRange", () => {
     expect(isWithinInclusiveRange("2026-07-01T00:00:00.000Z", from, undefined)).toBe(true);
     expect(isWithinInclusiveRange("2026-05-01T00:00:00.000Z", from, undefined)).toBe(false);
   });
+
+  it("accepts a bare-date `to` bound and still includes same-day later instants", () => {
+    // `2026-06-30` parses to 2026-06-30T00:00:00Z, but inclusive semantics on
+    // a bare date should keep the whole day; the helper compares instants, so
+    // a bare date as `to` only covers up to midnight — use an explicit time to
+    // capture the full day. This test pins the instant-comparison behaviour so
+    // a same-day afternoon booking is not wrongly excluded by string ordering.
+    expect(isWithinInclusiveRange("2026-06-30T15:00:00.000Z", from, "2026-06-30T23:59:59Z")).toBe(
+      true,
+    );
+  });
+
+  it("accepts a `to` bound without milliseconds", () => {
+    // `2026-06-30T23:59:59Z` is valid ISO-8601 without `.000` ms; lexicographic
+    // comparison against the stored `.000Z` form would wrongly exclude it.
+    expect(isWithinInclusiveRange("2026-06-30T23:59:59.000Z", from, "2026-06-30T23:59:59Z")).toBe(
+      true,
+    );
+    expect(isWithinInclusiveRange("2026-07-01T00:00:00.000Z", from, "2026-06-30T23:59:59Z")).toBe(
+      false,
+    );
+  });
+
+  it("accepts an offset `from` bound and compares chronologically", () => {
+    // 2026-06-01T00:00:00+02:00 == 2026-05-31T22:00:00Z; a UTC instant just
+    // before that must be excluded, just after included.
+    expect(isWithinInclusiveRange("2026-05-31T21:59:59.000Z", "2026-06-01T00:00:00+02:00", to)).toBe(
+      false,
+    );
+    expect(isWithinInclusiveRange("2026-05-31T22:00:00.000Z", "2026-06-01T00:00:00+02:00", to)).toBe(
+      true,
+    );
+  });
 });
 
 describe("groupByDay", () => {

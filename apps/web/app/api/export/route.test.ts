@@ -134,6 +134,32 @@ describe("GET /api/export?type=bookings", () => {
     expect(body).not.toContain("2026-07-15T10:00:00.000Z");
   });
 
+  it("accepts a non-canonical `to` bound (no milliseconds) and still includes same-day bookings", async () => {
+    // `2026-06-30T23:59:59Z` is valid ISO-8601 without `.000` ms; the June
+    // session at 10:00 UTC must remain included. Lexicographic string
+    // comparison against the stored `.000Z` form would wrongly drop it.
+    setSessionCookie(await createSessionToken("owner@example.com"));
+    const { GET } = await import("./route");
+    const url =
+      "http://localhost/api/export?type=bookings&from=2026-06-01T00:00:00.000Z&to=2026-06-30T23:59:59Z";
+    const response = await GET(request(url));
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("2026-06-15T10:00:00.000Z");
+    expect(body).not.toContain("2026-07-15T10:00:00.000Z");
+  });
+
+  it("responds 400 when a `from`/`to` bound is not a valid ISO-8601 timestamp", async () => {
+    setSessionCookie(await createSessionToken("owner@example.com"));
+    const { GET } = await import("./route");
+    const url = "http://localhost/api/export?type=bookings&from=not-a-date";
+    const response = await GET(request(url));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "bad_request" } });
+  });
+
   it("responds 401 without a signed-in session", async () => {
     const { GET } = await import("./route");
     const response = await GET(request("http://localhost/api/export?type=bookings"));

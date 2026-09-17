@@ -86,17 +86,21 @@ export function isBefore(a: string, b: string): boolean {
 }
 
 // True when `iso` falls within [from, to] inclusive of both bounds. An omitted
-// bound is unbounded on that side. Uses lexicographic comparison, which is
-// correct for the app's fixed-format UTC ISO-8601 storage strings. Unlike the
-// exclusive-on-`to` `SessionRange` used by calendar views, this is the
-// inclusive semantics accounting exports need.
+// bound is unbounded on that side. Parses each value to an instant before
+// comparing, so any valid ISO-8601 form works as a bound — a bare date like
+// `2026-06-30`, a timestamp missing milliseconds like `2026-06-30T23:59:59Z`,
+// or an offset timestamp like `2026-06-01T00:00:00+02:00` — without the
+// lexicographic-ordering pitfalls of comparing raw strings of differing
+// formats. Unlike the exclusive-on-`to` `SessionRange` used by calendar views,
+// this is the inclusive semantics accounting exports need.
 export function isWithinInclusiveRange(
   iso: string,
   from?: string,
   to?: string,
 ): boolean {
-  if (from && iso < from) return false;
-  if (to && iso > to) return false;
+  const t = toDate(iso).getTime();
+  if (from && t < toDate(from).getTime()) return false;
+  if (to && t > toDate(to).getTime()) return false;
   return true;
 }
 
