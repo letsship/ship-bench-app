@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingExportRows, listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,49 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("listBookingExportRows includes email and the five export fields", async () => {
+    const rows = await listBookingExportRows(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row).toHaveProperty("startsAt");
+      expect(row).toHaveProperty("className");
+      expect(row).toHaveProperty("memberName");
+      expect(row).toHaveProperty("email");
+      expect(row).toHaveProperty("status");
+      expect(row.email).toMatch(/@/);
+    }
+    // ordered by session start ascending
+    const starts = rows.map((row) => row.startsAt);
+    const sorted = [...starts].sort();
+    expect(starts).toEqual(sorted);
+  });
+
+  it("listBookingExportRows includes a session starting exactly at `to` (inclusive)", async () => {
+    const all = await listBookingExportRows(repos, studioId);
+    const latest = all[all.length - 1].startsAt;
+    const rows = await listBookingExportRows(repos, studioId, { to: latest });
+    const starts = rows.map((row) => row.startsAt);
+    expect(starts).toContain(latest);
+    expect(rows.every((row) => row.startsAt <= latest)).toBe(true);
+  });
+
+  it("listBookingExportRows includes a session starting exactly at `from` (inclusive)", async () => {
+    const all = await listBookingExportRows(repos, studioId);
+    const earliest = all[0].startsAt;
+    const rows = await listBookingExportRows(repos, studioId, { from: earliest });
+    const starts = rows.map((row) => row.startsAt);
+    expect(starts).toContain(earliest);
+    expect(rows.every((row) => row.startsAt >= earliest)).toBe(true);
+  });
+
+  it("listBookingExportRows narrows to a `[from, to]` window", async () => {
+    const all = await listBookingExportRows(repos, studioId);
+    const from = all[2].startsAt;
+    const to = all[all.length - 3].startsAt;
+    const rows = await listBookingExportRows(repos, studioId, { from, to });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.startsAt >= from && row.startsAt <= to)).toBe(true);
   });
 });
