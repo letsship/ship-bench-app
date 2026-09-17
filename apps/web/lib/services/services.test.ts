@@ -201,6 +201,39 @@ describe("bookings service", () => {
     ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
   });
 
+  it("rejects a second booking when the member is already waitlisted (double click)", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1"), booking("b2", "m2", { status: "waitlisted" })],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+
+    const memberBookings = (await repos.bookings.listBySession("cs1")).filter(
+      (b) => b.memberId === "m2",
+    );
+    expect(memberBookings).toHaveLength(1);
+    expect(memberBookings[0].status).toBe("waitlisted");
+  });
+
+  it("allows a member with a cancelled booking to book the same session again", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1", { status: "cancelled", cancelledAt: "2026-01-01T00:00:00Z" })],
+      }),
+    );
+    const result = await createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m1" });
+    expect(result.status).toBe("booked");
+  });
+
   it("marks a far-off cancellation refund-eligible", async () => {
     const repos = createInMemoryRepositories(
       baseSeed({
