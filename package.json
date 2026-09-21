@@ -21,9 +21,9 @@
     "supabase:types": "supabase gen types typescript --local --schema public > apps/web/lib/db/database.types.ts"
   },
   "devDependencies": {
-    "prettier": "^3.4.2",
-    "supabase": "^2.20.0",
-    "turbo": "^2.8.3"
+    "prettier": "^3.9.8",
+    "supabase": "^2.117.0",
+    "turbo": "^2.11.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
