@@ -30,7 +30,9 @@ describe("resend provider", () => {
 
   beforeEach(() => {
     send.mockReset();
-    vi.mocked(Resend).mockImplementation(() => ({ emails: { send } }) as unknown as Resend);
+    vi.mocked(Resend).mockImplementation(function () {
+      return { emails: { send } };
+    } as unknown as typeof Resend);
   });
 
   it("maps a message onto the Resend send params", async () => {
