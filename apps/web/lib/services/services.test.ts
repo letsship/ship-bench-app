@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingsForExport } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,52 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("lists bookings for export with email, unbounded by default", async () => {
+    const rows = await listBookingsForExport(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("email");
+    expect(rows.every((row) => row.email.length > 0)).toBe(true);
+  });
+
+  it("includes a session whose startsAt is exactly on a bound (inclusive both ends)", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const target = sessions[Math.floor(sessions.length / 2)];
+    const rows = await listBookingsForExport(repos, studioId, {
+      from: target.startsAt,
+      to: target.startsAt,
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.startsAt === target.startsAt)).toBe(true);
+  });
+
+  it("excludes sessions outside the inclusive [from, to] range", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const sorted = [...sessions].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    const from = sorted[2].startsAt;
+    const to = sorted[sorted.length - 3].startsAt;
+    const rows = await listBookingsForExport(repos, studioId, { from, to });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.startsAt >= from && row.startsAt <= to)).toBe(true);
+  });
+
+  it("matches an exact boundary even when bound and startsAt use different ISO suffixes", async () => {
+    // Reproduces the QA defect: the live backend serializes startsAt with a
+    // "+00:00" offset suffix while a caller may pass the same instant as a
+    // "Z"-suffixed timestamp (or vice versa). Raw string comparison would drop
+    // the exact-boundary match because "+" (0x2B) and "Z" (0x5A) sort
+    // differently; the service must compare instants via Date.parse, not
+    // strings. The fakes store startsAt with a "Z" suffix (toISOString), so we
+    // build the bound with a "+00:00" suffix to force the mismatch.
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const target = sessions[Math.floor(sessions.length / 2)];
+    const offsetBound = target.startsAt.replace(/Z$/, "+00:00");
+    const rows = await listBookingsForExport(repos, studioId, {
+      from: offsetBound,
+      to: offsetBound,
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.startsAt === target.startsAt)).toBe(true);
   });
 });
