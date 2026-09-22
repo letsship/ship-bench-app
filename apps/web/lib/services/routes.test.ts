@@ -45,4 +45,44 @@ describe("GET route handlers (against injected fake repositories)", () => {
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
   });
+
+  it("GET /api/public/schedule returns unauthenticated public classes", async () => {
+    const { GET: publicScheduleGet } = await import("@/app/api/public/schedule/route");
+    const res = await publicScheduleGet(
+      new NextRequest("http://localhost/api/public/schedule?studio=s1"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown[];
+    expect(Array.isArray(body)).toBe(true);
+    if (body.length > 0) {
+      expect(body[0]).toHaveProperty("title");
+      expect(body[0]).toHaveProperty("startsAt");
+      expect(body[0]).toHaveProperty("durationMinutes");
+      expect(body[0]).toHaveProperty("instructor");
+      expect(body[0]).toHaveProperty("seatsAvailable");
+    }
+  });
+
+  it("GET /api/public/schedule returns 400 when studio param is missing", async () => {
+    const { GET: publicScheduleGet } = await import("@/app/api/public/schedule/route");
+    const res = await publicScheduleGet(new NextRequest("http://localhost/api/public/schedule"));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as unknown;
+    expect(body).toHaveProperty("error");
+  });
+
+  it("GET /api/public/schedule excludes member/booking/invoice PII", async () => {
+    const { GET: publicScheduleGet } = await import("@/app/api/public/schedule/route");
+    const res = await publicScheduleGet(
+      new NextRequest("http://localhost/api/public/schedule?studio=s1"),
+    );
+    expect(res.status).toBe(200);
+    const responseText = await res.clone().text();
+    // Assert that sensitive fields are not present
+    expect(responseText).not.toContain("email");
+    expect(responseText).not.toContain("memberId");
+    expect(responseText).not.toContain("priceCents");
+    expect(responseText).not.toContain("invoice");
+    expect(responseText).not.toContain("booking");
+  });
 });
