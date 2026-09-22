@@ -83,3 +83,23 @@ export function pickWaitlistPromotion(
   if (waitlisted.length === 0) return null;
   return [...waitlisted].sort((a, b) => a.bookedAt.localeCompare(b.bookedAt))[0].id;
 }
+
+export type SessionCancelDenyReason = "already_cancelled" | "session_started";
+
+export type SessionCancelDecision = { ok: true } | { ok: false; reason: SessionCancelDenyReason };
+
+export interface SessionCancelContext {
+  sessionStatus: string;
+  sessionStartsAt: string;
+  now: string;
+}
+
+// Decide whether a scheduled session may be cancelled. Returns ok only for a
+// 'scheduled' session that has not started.
+export function canCancelSession(context: SessionCancelContext): SessionCancelDecision {
+  if (context.sessionStatus !== "scheduled") return { ok: false, reason: "already_cancelled" };
+  if (!isBefore(context.now, context.sessionStartsAt)) {
+    return { ok: false, reason: "session_started" };
+  }
+  return { ok: true };
+}

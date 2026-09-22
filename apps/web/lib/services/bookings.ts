@@ -30,11 +30,14 @@ const DENY_MESSAGES: Record<BookingDenyReason, string> = {
   session_full_no_waitlist: "This class is full and the waitlist is closed",
 };
 
-function recipientOf(member: Member): { memberId: string; email: string; name: string } {
+export function recipientOf(member: Member): { memberId: string; email: string; name: string } {
   return { memberId: member.id, email: member.email, name: member.name };
 }
 
-async function summaryOf(repos: Repositories, session: ClassSession): Promise<SessionSummary> {
+export async function summaryOf(
+  repos: Repositories,
+  session: ClassSession,
+): Promise<SessionSummary> {
   const classType = await repos.classTypes.getById(session.classTypeId);
   return {
     title: classType?.name ?? "Class",
@@ -43,7 +46,7 @@ async function summaryOf(repos: Repositories, session: ClassSession): Promise<Se
   };
 }
 
-async function loadMember(repos: Repositories, memberId: string): Promise<Member> {
+export async function loadMember(repos: Repositories, memberId: string): Promise<Member> {
   const member = await repos.members.getById(memberId);
   if (!member) throw new HttpError(404, "not_found", "Member not found");
   return member;

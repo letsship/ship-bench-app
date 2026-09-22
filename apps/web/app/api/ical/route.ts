@@ -1,5 +1,5 @@
 import { handle } from "@/lib/http";
-import { listSessions } from "@/lib/services/classes";
+import { listBookableSessions } from "@/lib/services/classes";
 import { resolveStudio } from "@/lib/services/context";
 import { type CalendarEvent, toICalendar } from "@/lib/domain/ical";
 
@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
   return handle(async () => {
     const { repos, ctx } = await resolveStudio();
-    const sessions = await listSessions(repos, ctx.studio.id, { from: new Date().toISOString() });
+    const sessions = await listBookableSessions(repos, ctx.studio.id, {
+      from: new Date().toISOString(),
+    });
     const events: CalendarEvent[] = sessions.map((session) => ({
       uid: `${session.id}@studiobook`,
       title: session.classTypeName,

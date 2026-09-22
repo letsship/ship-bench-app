@@ -6,7 +6,7 @@ import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
 import { listBookingRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
-import { createSession, getSessionView, listSessions } from "./classes";
+import { cancelSession, createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
 import { createInvoice, getInvoiceDetail, listInvoices, updateInvoiceStatus } from "./invoices";
 import { createMember, getMember, updateMember } from "./members";
@@ -154,6 +154,63 @@ describe("classes service", () => {
   it("getSessionView 404s for an unknown id", async () => {
     const repos = createInMemoryRepositories(baseSeed());
     await expect(getSessionView(repos, "nope")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("cancels a scheduled session and notifies affected members", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1"), member("m2"), member("m3")],
+        bookings: [
+          booking("b1", "m1", { status: "booked" }),
+          booking("b2", "m2", { status: "waitlisted" }),
+          booking("b3", "m3", { status: "cancelled" }),
+        ],
+      }),
+    );
+    const provider = createFakeProvider();
+    const result = await cancelSession(repos, provider, "cs1");
+    expect(result.cancelledBookingCount).toBe(2);
+    expect(result.notifiedMemberCount).toBe(2);
+    expect((await repos.classSessions.getById("cs1"))?.status).toBe("cancelled");
+    expect((await repos.bookings.getById("b1"))?.status).toBe("cancelled");
+    expect((await repos.bookings.getById("b2"))?.status).toBe("cancelled");
+    expect((await repos.bookings.getById("b3"))?.status).toBe("cancelled");
+    expect(provider.sent.every((m) => m.kind === "booking_cancellation")).toBe(true);
+    expect(provider.sent.length).toBe(2);
+  });
+
+  it("rejects cancellation of a session that has already started", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { startsAt: "2026-03-15T11:00:00.000Z" })],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    await expect(cancelSession(repos, provider, "cs1")).rejects.toMatchObject({
+      status: 409,
+      code: "cancel_session_session_started",
+    });
+  });
+
+  it("rejects cancellation of an already-cancelled session", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { status: "cancelled" })],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    await expect(cancelSession(repos, provider, "cs1")).rejects.toMatchObject({
+      status: 409,
+      code: "cancel_session_already_cancelled",
+    });
   });
 });
 

@@ -126,6 +126,7 @@ export function createSupabaseRepositories(): Repositories {
           "classSessions.getById",
         ),
       insert: (session) => insertReturning("class_sessions", session),
+      update: (id, patch) => updateReturning<ClassSession>("class_sessions", "id", id, patch),
     },
     bookings: {
       listBySessionIds: async (sessionIds) => {
