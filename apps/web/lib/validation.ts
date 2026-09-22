@@ -3,7 +3,7 @@ import { z } from "zod";
 // Zod schemas for every API input boundary. Route handlers parse request bodies
 // through these before touching the database.
 
-const isoDatetime = z
+export const isoDatetime = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Invalid ISO datetime" });
 
@@ -70,6 +70,15 @@ export const createInvoiceSchema = z.object({
 export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
+
+// Optional ISO-8601 from/to bounds for the bookings export. An omitted bound is
+// unbounded on that side; the service applies both bounds inclusively.
+export const exportBookingsQuerySchema = z.object({
+  from: isoDatetime.optional(),
+  to: isoDatetime.optional(),
+});
+
+export type ExportBookingsQuery = z.infer<typeof exportBookingsQuerySchema>;
 
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
