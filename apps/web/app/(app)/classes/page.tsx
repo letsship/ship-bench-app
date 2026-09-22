@@ -1,4 +1,4 @@
-import { occupancyPercent } from "@/lib/domain/capacity";
+import { occupancyPercent, seatsAvailableLabel } from "@/lib/domain/capacity";
 import { groupByDay } from "@/lib/domain/dates";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import { listClassTypes, listSessions } from "@/lib/services/classes";
@@ -50,6 +50,20 @@ export default async function ClassesPage() {
                             {session.occupancy.booked}/{session.occupancy.capacity} booked
                             <span className="ml-2 text-[var(--color-muted)]">
                               ({occupancyPercent(session.occupancy)}%)
+                            </span>
+                            <span className="ml-3">
+                              {session.occupancy.isFull ? (
+                                <span
+                                  data-testid="class-full"
+                                  className="inline-block rounded-full bg-[var(--color-danger-light)] px-2 py-1 text-sm font-medium text-[var(--color-danger)]"
+                                >
+                                  Full
+                                </span>
+                              ) : (
+                                <span className="text-[var(--color-muted)]">
+                                  {seatsAvailableLabel(session.occupancy)}
+                                </span>
+                              )}
                             </span>
                           </td>
                         </tr>
