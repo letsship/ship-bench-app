@@ -35,6 +35,23 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("lists members by id in a single batch read", async () => {
+    const all = await repos.members.listByStudio(studioId);
+    const wanted = all.slice(0, 2);
+    const result = await repos.members.listByIds(wanted.map((m) => m.id));
+    expect(result.map((m) => m.id).sort()).toEqual(wanted.map((m) => m.id).sort());
+  });
+
+  it("listByIds ignores unknown ids", async () => {
+    const all = await repos.members.listByStudio(studioId);
+    const result = await repos.members.listByIds([all[0].id, "does-not-exist"]);
+    expect(result.map((m) => m.id)).toEqual([all[0].id]);
+  });
+
+  it("listByIds returns [] for an empty input array", async () => {
+    expect(await repos.members.listByIds([])).toEqual([]);
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;
