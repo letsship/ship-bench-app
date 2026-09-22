@@ -7,3 +7,14 @@ onlyBuiltDependencies:
   - sharp
   - supabase
   - workerd
+
+# Pin vulnerable transitive deps to patched releases (high/critical audit
+# findings). Each override stays inside the consumer's required major line.
+overrides:
+  "brace-expansion@>=1.0.0 <1.1.18": "1.1.18"
+  "brace-expansion@>=2.0.0 <2.1.4": "2.1.4"
+  "brace-expansion@>=4.0.0 <5.0.9": "5.0.12"
+  "browserslist@<4.28.7": "4.29.0"
+  "js-yaml@>=4.0.0 <4.3.2": "4.3.2"
+  "nanoid@>=3.0.0 <3.3.18": "3.3.18"
+  "postcss@<8.5.18": "8.5.28"
