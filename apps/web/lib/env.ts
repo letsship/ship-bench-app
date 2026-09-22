@@ -22,11 +22,17 @@ const serverSchema = clientSchema.extend({
   SUPABASE_SCHEMA: z.string().min(1).default("public"),
 });
 
+const sentrySchema = z.object({
+  SENTRY_DSN: z.string().url().optional(),
+});
+
 type ClientEnv = z.infer<typeof clientSchema>;
 type ServerEnv = z.infer<typeof serverSchema>;
+type SentryEnv = z.infer<typeof sentrySchema>;
 
 let cachedClientEnv: ClientEnv | undefined;
 let cachedServerEnv: ServerEnv | undefined;
+let cachedSentryEnv: SentryEnv | undefined;
 
 const getClientVars = () => ({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -42,6 +48,10 @@ const getServerVars = () => ({
   SUPABASE_SCHEMA: process.env.SUPABASE_SCHEMA,
 });
 
+const getSentryVars = () => ({
+  SENTRY_DSN: process.env.SENTRY_DSN,
+});
+
 export const clientEnv = (): ClientEnv => {
   if (!cachedClientEnv) cachedClientEnv = clientSchema.parse(getClientVars());
   return cachedClientEnv;
@@ -51,3 +61,10 @@ export const serverEnv = (): ServerEnv => {
   if (!cachedServerEnv) cachedServerEnv = serverSchema.parse(getServerVars());
   return cachedServerEnv;
 };
+
+export const sentryEnv = (): SentryEnv => {
+  if (!cachedSentryEnv) cachedSentryEnv = sentrySchema.parse(getSentryVars());
+  return cachedSentryEnv;
+};
+
+export const sentryDsn = (): string | undefined => sentryEnv().SENTRY_DSN;
