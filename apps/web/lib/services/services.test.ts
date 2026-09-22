@@ -325,3 +325,116 @@ describe("reports + dashboard + booking list", () => {
     expect(rows[0]).toHaveProperty("className");
   });
 });
+
+describe("public schedule service", () => {
+  it("returns a studio's classes within the 14-day window", async () => {
+    const { listPublicSchedule } = await import("./public-schedule");
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+      }),
+    );
+    const result = await listPublicSchedule(repos, "s1", NOW);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0]).toHaveProperty("title");
+  });
+
+  it("scopes classes to the queried studio only", async () => {
+    const { listPublicSchedule } = await import("./public-schedule");
+    const s2Session = session("cs2", {
+      studioId: "s2",
+      classTypeId: "ct2",
+      startsAt: FUTURE,
+      endsAt: FUTURE_END,
+    });
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1"), { ...classType("ct2"), studioId: "s2" }],
+        sessions: [session("cs1"), s2Session],
+      }),
+    );
+    // Query for studio s1
+    const result = await listPublicSchedule(repos, "s1", NOW);
+    // Should only get s1's classes (cs1), not s2's (cs2)
+    expect(result.length).toBe(1);
+  });
+
+  it("excludes cancelled sessions", async () => {
+    const { listPublicSchedule } = await import("./public-schedule");
+    const cancelledSession = session("cs1-cancelled", { status: "cancelled" });
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1"), cancelledSession],
+      }),
+    );
+    const result = await listPublicSchedule(repos, "s1", NOW);
+    // Should only get the non-cancelled session
+    expect(result.length).toBe(1);
+  });
+
+  it("excludes sessions outside the 14-day window", async () => {
+    const { listPublicSchedule } = await import("./public-schedule");
+    const pastSession = session("cs-past", {
+      startsAt: new Date(NOW.getTime() - 2 * 86_400_000).toISOString(), // 2 days ago
+      endsAt: new Date(NOW.getTime() - 2 * 86_400_000 + 3_600_000).toISOString(),
+    });
+    const futureOutsideWindow = session("cs-far", {
+      startsAt: new Date(NOW.getTime() + 20 * 86_400_000).toISOString(), // 20 days from now
+      endsAt: new Date(NOW.getTime() + 20 * 86_400_000 + 3_600_000).toISOString(),
+    });
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1"), pastSession, futureOutsideWindow],
+      }),
+    );
+    const result = await listPublicSchedule(repos, "s1", NOW);
+    // Should only get cs1 (within the 14-day window), not the past or far future ones
+    expect(result.length).toBe(1);
+    expect(result[0].title).toBe("Yoga");
+  });
+
+  it("computes seatsAvailable correctly", async () => {
+    const { listPublicSchedule } = await import("./public-schedule");
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 10 })],
+        bookings: [
+          booking("b1", "m1"),
+          booking("b2", "m2"),
+          booking("b3", "m3", { status: "waitlisted" }), // waitlist doesn't consume seat
+        ],
+      }),
+    );
+    const result = await listPublicSchedule(repos, "s1", NOW);
+    expect(result.length).toBe(1);
+    expect(result[0].seatsAvailable).toBe(8); // 10 - 2 booked
+  });
+
+  it("returns only the five public fields with no PII", async () => {
+    const { listPublicSchedule } = await import("./public-schedule");
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const result = await listPublicSchedule(repos, "s1", NOW);
+    expect(result.length).toBe(1);
+
+    const item = result[0];
+    const keys = Object.keys(item).sort();
+    expect(keys).toEqual(
+      ["durationMinutes", "instructor", "seatsAvailable", "startsAt", "title"].sort(),
+    );
+
+    // Explicitly assert no sensitive fields are present
+    expect(JSON.stringify(item)).not.toContain("email");
+    expect(JSON.stringify(item)).not.toContain("memberId");
+    expect(JSON.stringify(item)).not.toContain("priceCents");
+  });
+});
