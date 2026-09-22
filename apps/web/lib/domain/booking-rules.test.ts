@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canBook, canCancel, pickWaitlistPromotion } from "./booking-rules";
+import { canBook, canCancel, canCancelSession, pickWaitlistPromotion } from "./booking-rules";
 import { computeOccupancy } from "./capacity";
 
 const FUTURE = "2026-06-01T09:00:00Z";
@@ -134,5 +134,37 @@ describe("pickWaitlistPromotion", () => {
 
   it("returns null for an empty waitlist", () => {
     expect(pickWaitlistPromotion([])).toBeNull();
+  });
+});
+
+describe("canCancelSession", () => {
+  it("allows cancellation of a scheduled future session", () => {
+    expect(
+      canCancelSession({
+        sessionStatus: "scheduled",
+        sessionStartsAt: FUTURE,
+        now: NOW,
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects cancellation when the session has already started", () => {
+    expect(
+      canCancelSession({
+        sessionStatus: "scheduled",
+        sessionStartsAt: "2026-05-30T08:00:00Z",
+        now: NOW,
+      }),
+    ).toEqual({ ok: false, reason: "session_started" });
+  });
+
+  it("rejects cancellation of an already-cancelled session", () => {
+    expect(
+      canCancelSession({
+        sessionStatus: "cancelled",
+        sessionStartsAt: FUTURE,
+        now: NOW,
+      }),
+    ).toEqual({ ok: false, reason: "already_cancelled" });
   });
 });

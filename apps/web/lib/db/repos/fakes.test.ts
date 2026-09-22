@@ -75,6 +75,16 @@ describe("in-memory repositories", () => {
     expect(refetched?.status).toBe("paused");
   });
 
+  it("classSessions.update patches and returns the updated session", async () => {
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const target = sessions[0];
+    const updated = await repos.classSessions.update(target.id, { status: "cancelled" });
+    expect(updated.status).toBe("cancelled");
+    expect(updated.id).toBe(target.id);
+    const refetched = await repos.classSessions.getById(target.id);
+    expect(refetched?.status).toBe("cancelled");
+  });
+
   it("counts invoices for the studio", async () => {
     const count = await repos.invoices.countByStudio(studioId);
     const list = await repos.invoices.listByStudio(studioId);

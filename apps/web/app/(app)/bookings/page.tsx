@@ -1,7 +1,7 @@
 import { groupByDay } from "@/lib/domain/dates";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import { listBookingRows } from "@/lib/services/booking-list";
-import { listSessions } from "@/lib/services/classes";
+import { listBookableSessions } from "@/lib/services/classes";
 import { resolveStudio } from "@/lib/services/context";
 import { listMembers } from "@/lib/services/members";
 import { EmptyState, PageHeader, StatusBadge } from "../_components/ui";
@@ -18,7 +18,7 @@ export default async function BookingsPage() {
   const nowIso = new Date().toISOString();
   const [rows, sessions, members] = await Promise.all([
     listBookingRows(repos, ctx.studio.id, { from: nowIso }),
-    listSessions(repos, ctx.studio.id, { from: nowIso }),
+    listBookableSessions(repos, ctx.studio.id, { from: nowIso }),
     listMembers(repos, ctx.studio.id),
   ]);
   const days = groupByDay(rows, (row) => row.startsAt, timeZone);

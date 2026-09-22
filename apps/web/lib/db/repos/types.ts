@@ -50,6 +50,7 @@ export interface ClassSessionsRepo {
   listByStudio(studioId: string, range?: SessionRange): Promise<ClassSession[]>;
   getById(id: string): Promise<ClassSession | null>;
   insert(session: ClassSession): Promise<ClassSession>;
+  update(id: string, patch: Partial<ClassSession>): Promise<ClassSession>;
 }
 
 export interface BookingsRepo {

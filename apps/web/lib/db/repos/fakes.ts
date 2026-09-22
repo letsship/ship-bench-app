@@ -146,6 +146,9 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
         store.classSessions.push(clone(session));
         return clone(session);
       },
+      async update(id, patch) {
+        return patched(store.classSessions, (row) => row.id === id, patch, "Class session");
+      },
     },
     bookings: {
       async listBySessionIds(sessionIds) {

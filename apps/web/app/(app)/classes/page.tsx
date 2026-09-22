@@ -3,16 +3,22 @@ import { groupByDay } from "@/lib/domain/dates";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import { listClassTypes, listSessions } from "@/lib/services/classes";
 import { resolveStudio } from "@/lib/services/context";
-import { EmptyState, PageHeader } from "../_components/ui";
+import { EmptyState, PageHeader, StatusBadge } from "../_components/ui";
 import { AddClassForm } from "./add-class-form";
+import { CancelClassButton } from "./cancel-class-button";
 
 export const dynamic = "force-dynamic";
+
+const CANCELLABLE = (session: { status: string; startsAt: string }): boolean => {
+  return session.status === "scheduled" && new Date() < new Date(session.startsAt);
+};
 
 export default async function ClassesPage() {
   const { repos, ctx } = await resolveStudio();
   const timeZone = ctx.studio.timezone;
+  const now = new Date().toISOString();
   const [sessions, classTypes] = await Promise.all([
-    listSessions(repos, ctx.studio.id, { from: new Date().toISOString() }),
+    listSessions(repos, ctx.studio.id, { from: now }),
     listClassTypes(repos, ctx.studio.id),
   ]);
   const days = groupByDay(sessions, (session) => session.startsAt, timeZone);
@@ -51,6 +57,14 @@ export default async function ClassesPage() {
                             <span className="ml-2 text-[var(--color-muted)]">
                               ({occupancyPercent(session.occupancy)}%)
                             </span>
+                          </td>
+                          <td>
+                            <StatusBadge status={session.status} />
+                          </td>
+                          <td className="text-right">
+                            {CANCELLABLE(session) ? (
+                              <CancelClassButton sessionId={session.id} />
+                            ) : null}
                           </td>
                         </tr>
                       ))}
