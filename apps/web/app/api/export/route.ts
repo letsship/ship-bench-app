@@ -11,6 +11,7 @@ import { exportBookingsQuerySchema } from "@/lib/validation";
 export const dynamic = "force-dynamic";
 
 // GET /api/export?type=members|invoices|bookings — a CSV download. Bookings
+// additionally accept optional from/to query params (ISO-8601 timestamps).
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
     await requireSession();

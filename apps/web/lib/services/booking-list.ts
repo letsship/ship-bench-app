@@ -62,11 +62,22 @@ export async function listBookingsForExport(
   range: BookingExportRange = {},
 ): Promise<BookingExportRow[]> {
   const sessions = await repos.classSessions.listByStudio(studioId);
-  const inRange = sessions.filter(
-    (session) =>
-      (range.from === undefined || session.startsAt >= range.from) &&
-      (range.to === undefined || session.startsAt <= range.to),
-  );
+  // Compare instants via Date.parse() rather than raw string comparison. The
+  // session start and the caller-supplied bound may be the same instant written
+  // with different ISO-8601 suffixes (e.g. "...+00:00" vs "...Z", or a
+  // date-only "2026-06-30" vs "2026-06-30T08:00:00Z"), which would sort
+  // differently as strings and silently drop an exact-boundary match. Parsing
+  // to epoch milliseconds makes the inclusive-both-ends filter correct
+  // regardless of the precision or offset notation the caller supplies.
+  const fromMs = range.from === undefined ? undefined : Date.parse(range.from);
+  const toMs = range.to === undefined ? undefined : Date.parse(range.to);
+  const inRange = sessions.filter((session) => {
+    const startsMs = Date.parse(session.startsAt);
+    return (
+      (fromMs === undefined || startsMs >= fromMs) &&
+      (toMs === undefined || startsMs <= toMs)
+    );
+  });
   const sessionById = new Map(inRange.map((session) => [session.id, session]));
   const classTypes = await repos.classTypes.listByStudio(studioId);
   const typeById = new Map(classTypes.map((type) => [type.id, type]));

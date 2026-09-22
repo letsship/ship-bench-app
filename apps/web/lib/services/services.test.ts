@@ -352,4 +352,23 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((row) => row.startsAt >= from && row.startsAt <= to)).toBe(true);
   });
+
+  it("matches an exact boundary even when bound and startsAt use different ISO suffixes", async () => {
+    // Reproduces the QA defect: the live backend serializes startsAt with a
+    // "+00:00" offset suffix while a caller may pass the same instant as a
+    // "Z"-suffixed timestamp (or vice versa). Raw string comparison would drop
+    // the exact-boundary match because "+" (0x2B) and "Z" (0x5A) sort
+    // differently; the service must compare instants via Date.parse, not
+    // strings. The fakes store startsAt with a "Z" suffix (toISOString), so we
+    // build the bound with a "+00:00" suffix to force the mismatch.
+    const sessions = await repos.classSessions.listByStudio(studioId);
+    const target = sessions[Math.floor(sessions.length / 2)];
+    const offsetBound = target.startsAt.replace(/Z$/, "+00:00");
+    const rows = await listBookingsForExport(repos, studioId, {
+      from: offsetBound,
+      to: offsetBound,
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.startsAt === target.startsAt)).toBe(true);
+  });
 });
