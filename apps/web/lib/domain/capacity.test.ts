@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeOccupancy, isSeatTaking, occupancyPercent } from "./capacity";
+import { computeOccupancy, isSeatTaking, occupancyPercent, seatsAvailableLabel } from "./capacity";
 
 describe("isSeatTaking", () => {
   it("counts booked, attended, and no_show", () => {
@@ -69,5 +69,40 @@ describe("occupancyPercent", () => {
   it("is 100 for a full class", () => {
     const occupancy = computeOccupancy(2, [{ status: "booked" }, { status: "attended" }]);
     expect(occupancyPercent(occupancy)).toBe(100);
+  });
+});
+
+describe("seatsAvailableLabel", () => {
+  it("returns Full when no seats are available", () => {
+    const occupancy = computeOccupancy(2, [{ status: "booked" }, { status: "booked" }]);
+    expect(seatsAvailableLabel(occupancy)).toBe("Full");
+  });
+
+  it("returns singular form for 1 seat left", () => {
+    const occupancy = computeOccupancy(5, [
+      { status: "booked" },
+      { status: "booked" },
+      { status: "booked" },
+      { status: "booked" },
+    ]);
+    expect(seatsAvailableLabel(occupancy)).toBe("1 seat left");
+  });
+
+  it("returns plural form for multiple seats left", () => {
+    const occupancy = computeOccupancy(10, [
+      { status: "booked" },
+      { status: "booked" },
+      { status: "booked" },
+    ]);
+    expect(seatsAvailableLabel(occupancy)).toBe("7 seats left");
+  });
+
+  it("excludes cancelled bookings from the count", () => {
+    const occupancy = computeOccupancy(5, [
+      { status: "booked" },
+      { status: "booked" },
+      { status: "cancelled" },
+    ]);
+    expect(seatsAvailableLabel(occupancy)).toBe("3 seats left");
   });
 });

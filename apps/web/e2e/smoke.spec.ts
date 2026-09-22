@@ -49,6 +49,21 @@ test.describe("authenticated (seeded studio)", () => {
     await expect(page.getByTestId("schedule").getByText("E2E Tester").first()).toBeVisible();
   });
 
+  test("the classes page displays remaining seats and full class markers", async ({ page }) => {
+    await page.goto("/classes");
+    const schedule = page.getByTestId("schedule");
+
+    // Assert that at least one class row shows remaining seats
+    await expect(schedule.locator("text=/seats? left/").first()).toBeVisible();
+
+    // Assert full class marker exists if there is one (seeded data may or may not have a full class)
+    const fullClassMarker = page.getByTestId("class-full").first();
+    const isVisible = await fullClassMarker.isVisible().catch(() => false);
+    if (isVisible) {
+      await expect(fullClassMarker).toHaveText("Full");
+    }
+  });
+
   test("the dashboard renders with zero console errors", async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (message) => {

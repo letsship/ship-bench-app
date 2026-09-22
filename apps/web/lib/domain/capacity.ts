@@ -41,3 +41,12 @@ export function computeOccupancy(capacity: number, bookings: readonly OccupancyI
 export function occupancyPercent(occupancy: Occupancy): number {
   return Math.round(occupancy.occupancyRate * 100);
 }
+
+// Remaining seats label for display: "Full" when no seats left, otherwise "N seat(s) left".
+export function seatsAvailableLabel(occupancy: Occupancy): string {
+  if (occupancy.isFull) {
+    return "Full";
+  }
+  const count = occupancy.available;
+  return count === 1 ? "1 seat left" : `${count} seats left`;
+}
