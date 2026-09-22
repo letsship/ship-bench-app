@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type SeedData, createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -323,5 +323,88 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+  });
+
+  it("listBookingRows rows match an independent join of the seed data", async () => {
+    const seed = buildSeed(NOW);
+    const seedRepos = createInMemoryRepositories(seed);
+    const rows = await listBookingRows(seedRepos, seed.studio.id);
+
+    const sessionById = new Map(seed.sessions.map((s) => [s.id, s]));
+    const typeById = new Map(seed.classTypes.map((t) => [t.id, t]));
+    const memberById = new Map(seed.members.map((m) => [m.id, m]));
+    const expected = seed.bookings
+      .filter((b) => sessionById.has(b.sessionId))
+      .map((b) => {
+        const s = sessionById.get(b.sessionId)!;
+        const ct = typeById.get(s.classTypeId);
+        const m = memberById.get(b.memberId);
+        return {
+          id: b.id,
+          memberName: m?.name ?? "—",
+          className: ct?.name ?? "Class",
+          classColor: ct?.color ?? "#6b7280",
+          instructor: s.instructor,
+          startsAt: s.startsAt,
+          status: b.status,
+        };
+      })
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+
+    expect(rows).toEqual(expected);
+  });
+
+  it("listBookingRows repo reads stay bounded as the number of bookings grows", async () => {
+    const seed = buildSeed(NOW);
+    const seedRepos = createInMemoryRepositories(seed);
+    const studioIdLocal = seed.studio.id;
+
+    const memberGetById = vi.spyOn(seedRepos.members, "getById");
+    const memberListByIds = vi.spyOn(seedRepos.members, "listByIds");
+    const sessionGetById = vi.spyOn(seedRepos.classSessions, "getById");
+
+    const firstRows = await listBookingRows(seedRepos, studioIdLocal);
+    const firstListByIdsCalls = memberListByIds.mock.calls.length;
+    expect(firstRows.length).toBeGreaterThan(0);
+
+    // Grow N: add many more sessions + bookings reusing existing class type + members.
+    const classTypeId = seed.classTypes[0].id;
+    const memberIds = seed.members.filter((m) => m.status === "active").map((m) => m.id);
+    for (let i = 0; i < 25; i += 1) {
+      const startsAt = new Date(NOW.getTime() + (200 + i) * 86_400_000).toISOString();
+      const s: ClassSession = {
+        id: `extra-sess-${i}`,
+        studioId: studioIdLocal,
+        classTypeId,
+        instructor: "X",
+        startsAt,
+        endsAt: new Date(new Date(startsAt).getTime() + 3_600_000).toISOString(),
+        capacity: 10,
+        priceCents: 1000,
+        status: "scheduled",
+        createdAt: NOW.toISOString(),
+      };
+      await seedRepos.classSessions.insert(s);
+      for (const memberId of memberIds) {
+        await seedRepos.bookings.insert({
+          id: `extra-book-${i}-${memberId}`,
+          sessionId: s.id,
+          memberId,
+          status: "booked",
+          bookedAt: NOW.toISOString(),
+          cancelledAt: null,
+        });
+      }
+    }
+
+    const secondRows = await listBookingRows(seedRepos, studioIdLocal);
+    expect(secondRows.length).toBeGreaterThan(firstRows.length);
+
+    // No per-booking reads on either repo across both runs.
+    expect(memberGetById).not.toHaveBeenCalled();
+    expect(sessionGetById).not.toHaveBeenCalled();
+    // One batch member read per run, regardless of how many bookings there are.
+    expect(firstListByIdsCalls).toBe(1);
+    expect(memberListByIds.mock.calls.length).toBe(2);
   });
 });
