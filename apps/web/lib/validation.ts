@@ -71,9 +71,24 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+export const publicRosterQuerySchema = z.object({
+  sessionIds: z
+    .string()
+    .max(5000)
+    .transform((val) =>
+      val
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.string().min(1).max(128).array().max(100))
+    .optional(),
+});
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+export type PublicRosterQueryInput = z.infer<typeof publicRosterQuerySchema>;

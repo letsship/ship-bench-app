@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { handle, ok } from "@/lib/http";
 import { resolveStudio } from "@/lib/services/context";
 import { listPublicRoster } from "@/lib/services/public-roster";
+import { publicRosterQuerySchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
     const { repos, ctx } = await resolveStudio();
     const raw = request.nextUrl.searchParams.get("sessionIds");
-    const sessionIds = raw ? raw.split(",").filter(Boolean) : undefined;
-    return ok(await listPublicRoster(repos, ctx.studio.id, sessionIds));
+    const query = publicRosterQuerySchema.parse({ sessionIds: raw ?? undefined });
+    return ok(await listPublicRoster(repos, ctx.studio.id, query.sessionIds));
   });
 }

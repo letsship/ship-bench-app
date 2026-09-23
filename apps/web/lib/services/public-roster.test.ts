@@ -93,7 +93,7 @@ describe("listPublicRoster", () => {
     const roster = await listPublicRoster(repos, "s1", ["sess1"]);
 
     expect(roster).toHaveLength(1);
-    expect(roster[0].attendees).toHaveLength(1);
+    expect(roster[0].attendeeCount).toBe(1);
   });
 
   it("omits a cancelled session", async () => {
@@ -113,22 +113,21 @@ describe("listPublicRoster", () => {
 
     const roster = await listPublicRoster(repos, "s1");
 
-    const attendee = roster[0].attendees[0];
-    expect(attendee).toHaveProperty("id");
-    expect(attendee).toHaveProperty("name");
-    expect(attendee).not.toHaveProperty("email");
-    expect(attendee).not.toHaveProperty("phone");
-    expect(attendee).not.toHaveProperty("status");
+    // No member-identifying fields in the response
+    expect(roster[0]).not.toHaveProperty("members");
+    expect(roster[0]).not.toHaveProperty("attendees");
+    expect(roster[0]).toHaveProperty("attendeeCount");
+    expect(roster[0].attendeeCount).toBe(1);
   });
 
-  it("attendees carry only declared fields (AC-2)", async () => {
+  it("roster entries carry only declared fields (AC-2)", async () => {
     const repos = createInMemoryRepositories(seed());
 
     const roster = await listPublicRoster(repos, "s1");
 
-    const attendee = roster[0].attendees[0];
-    const keys = Object.keys(attendee);
-    expect(keys).toEqual(["id", "name"]);
+    const entry = roster[0];
+    const keys = Object.keys(entry);
+    expect(keys).toEqual(["title", "startsAt", "instructor", "seatsAvailable", "attendeeCount"]);
   });
 
   it("sessionIds from another studio return no bookings (AC-3)", async () => {
@@ -182,7 +181,38 @@ describe("listPublicRoster", () => {
 
     // Should only return sess2 (belongs to s2), not sess1 (belongs to s1)
     expect(roster).toHaveLength(1);
-    expect(roster[0].attendees).toHaveLength(1);
-    expect(roster[0].attendees[0].id).toBe("m2");
+    expect(roster[0].attendeeCount).toBe(1);
+  });
+
+  it("excludes cancelled bookings from attendee count", async () => {
+    const base = seed();
+    const repos = createInMemoryRepositories({
+      ...base,
+      bookings: [
+        base.bookings[0],
+        {
+          id: "b2",
+          sessionId: "sess1",
+          memberId: "m1",
+          status: "cancelled",
+          bookedAt: ISO,
+          cancelledAt: ISO,
+        },
+      ],
+    });
+
+    const roster = await listPublicRoster(repos, "s1");
+
+    // Only the booked attendee counts; cancelled does not
+    expect(roster[0].attendeeCount).toBe(1);
+  });
+
+  it("returns empty when supplied sessionIds are all invalid or foreign", async () => {
+    const repos = createInMemoryRepositories(seed());
+
+    const roster = await listPublicRoster(repos, "s1", ["invalid1", "invalid2"]);
+
+    // Fail closed: no results when requested ids are unknown
+    expect(roster).toEqual([]);
   });
 });

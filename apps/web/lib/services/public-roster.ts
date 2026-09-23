@@ -2,20 +2,15 @@
 // Studios asked to show who is coming to a class so members can see friends
 // before booking, so the roster carries the attendee list alongside the class.
 
-import type { Repositories } from "@/lib/db/repos/types";
-import { computeOccupancy } from "@/lib/domain/capacity";
-
-export interface PublicAttendee {
-  id: string;
-  name: string;
-}
+import type { Repositories, SessionRange } from "@/lib/db/repos/types";
+import { computeOccupancy, isSeatTaking } from "@/lib/domain/capacity";
 
 export interface PublicRosterEntry {
   title: string;
   startsAt: string;
   instructor: string;
   seatsAvailable: number;
-  attendees: PublicAttendee[];
+  attendeeCount: number;
 }
 
 // GET-side helper for /api/public/roster. The caller may narrow the response to
@@ -25,19 +20,25 @@ export async function listPublicRoster(
   studioId: string,
   sessionIds?: string[],
 ): Promise<PublicRosterEntry[]> {
-  const sessions = await repos.classSessions.listByStudio(studioId);
+  // Only show upcoming sessions to prevent DoS from unbounded historical reads
+  const range: SessionRange = { from: new Date().toISOString() };
+  const sessions = await repos.classSessions.listByStudio(studioId, range);
   const classTypes = await repos.classTypes.listByStudio(studioId);
   const classTypeById = new Map(classTypes.map((ct) => [ct.id, ct]));
 
   // Only use session IDs that belong to the current studio, so a sessionId from
   // another studio cannot leak bookings for that studio's classes (AC-3).
   const studioSessionIds = new Set(sessions.map((s) => s.id));
-  const requestedIds = sessionIds?.filter((id) => studioSessionIds.has(id)) ?? [];
-  const ids = requestedIds.length > 0 ? requestedIds : Array.from(studioSessionIds);
+  const requestedIds = sessionIds
+    ? new Set(sessionIds.filter((id) => studioSessionIds.has(id)))
+    : undefined;
+  // Fail closed: if sessionIds were supplied but none match, return empty
+  if (sessionIds && (!requestedIds || requestedIds.size === 0)) {
+    return [];
+  }
+  const ids =
+    requestedIds && requestedIds.size > 0 ? Array.from(requestedIds) : Array.from(studioSessionIds);
   const bookings = await repos.bookings.listBySessionIds(ids);
-
-  const members = await repos.members.listByStudio(studioId);
-  const memberById = new Map(members.map((m) => [m.id, m]));
 
   const bookingsBySessionId = new Map<string, typeof bookings>();
   for (const booking of bookings) {
@@ -48,25 +49,21 @@ export async function listPublicRoster(
 
   return sessions
     .filter((session) => session.status !== "cancelled")
+    .filter((session) => !requestedIds || requestedIds.has(session.id))
     .map((session) => {
       const classType = classTypeById.get(session.classTypeId);
       const sessionBookings = bookingsBySessionId.get(session.id) ?? [];
       const occupancy = computeOccupancy(session.capacity, sessionBookings);
+      // Only count seat-taking attendees: booked, attended, no_show
+      // Exclude cancelled and waitlisted (AC-1)
+      const attendeeCount = sessionBookings.filter((b) => isSeatTaking(b.status)).length;
 
       return {
         title: classType?.name ?? "Class",
         startsAt: session.startsAt,
         instructor: session.instructor,
         seatsAvailable: occupancy.available,
-        // Only expose id and name so no private member data (email, phone) leaks
-        // in the public embed (AC-1 & AC-2).
-        attendees: sessionBookings.map((booking) => {
-          const member = memberById.get(booking.memberId);
-          return {
-            id: booking.memberId,
-            name: member?.name ?? "Member",
-          };
-        }),
+        attendeeCount,
       };
     });
 }
