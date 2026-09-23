@@ -29,9 +29,13 @@ export async function GET(request: NextRequest): Promise<Response> {
       csv = membersToCsv(await listMembers(repos, ctx.studio.id));
     } else if (type === "invoices") {
       csv = invoicesToCsv(await listInvoices(repos, ctx.studio.id));
-    } else {
+    } else if (type === "bookings") {
       const rows = await listBookingExportRows(repos, ctx.studio.id, { from, to });
       csv = bookingsToCsv(rows);
+    } else {
+      // Exhaustive fallback: if a fourth type joins exportQuerySchema's enum,
+      // fail loudly (400) instead of silently serving a bookings CSV.
+      return badRequest("Unknown export type");
     }
 
     return new Response(csv, {

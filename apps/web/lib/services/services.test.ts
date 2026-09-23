@@ -379,4 +379,38 @@ describe("listBookingExportRows", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberEmail");
   });
+
+  it("compares `to` as an instant, so a UTC-offset spelling is honored", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    // 2026-03-18T16:00:00-02:00 is 2026-03-18T18:00:00Z — strictly after the
+    // 17:00Z session, so the TO booking must be included even though the
+    // textual hour "16" sorts before "17". A lexicographic compare drops it.
+    const rows = await listBookingExportRows(repos, studioId, {
+      to: "2026-03-18T16:00:00-02:00",
+    });
+    expect(rows.some((row) => row.startsAt === TO)).toBe(true);
+  });
+
+  it("compares `from` as an instant, so a UTC-offset spelling is honored", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    // 2026-03-12T10:00:00+02:00 is 2026-03-12T08:00:00Z — exactly the FROM
+    // session. A lexicographic compare ("10..." > "08...") wrongly drops it.
+    const rows = await listBookingExportRows(repos, studioId, {
+      from: "2026-03-12T10:00:00+02:00",
+    });
+    expect(rows.some((row) => row.startsAt === FROM)).toBe(true);
+  });
+
+  it("treats a date-only bound as the start-of-day instant", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    // "2026-03-19" parses to 2026-03-19T00:00:00Z. The 03-18T17:00:00Z session
+    // precedes that instant (included); the 03-19T08:00:00Z session follows it
+    // (excluded). Per the AC, bounds are instants — date-only is start-of-day.
+    const rows = await listBookingExportRows(repos, studioId, { to: "2026-03-19" });
+    expect(rows.some((row) => row.startsAt === TO)).toBe(true);
+    expect(rows.some((row) => row.startsAt === "2026-03-19T08:00:00.000Z")).toBe(false);
+  });
 });

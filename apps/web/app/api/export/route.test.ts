@@ -85,6 +85,19 @@ describe("GET /api/export", () => {
     expect(starts.some((value) => value > TO)).toBe(true);
   });
 
+  it("honors a `to` bound written with a UTC offset (same instant, other text)", async () => {
+    // 2026-03-18T16:00:00-02:00 == 2026-03-18T18:00:00Z, which is AFTER the
+    // 17:00Z session. Comparing the bound as text ("16..." < "17...") would
+    // drop the TO booking; comparing as an instant must keep it. This is the
+    // QA failure scenario.
+    const res = await GET(exportRequest("bookings", FROM, "2026-03-18T16:00:00-02:00"));
+    expect(res.status).toBe(200);
+    const csv = await res.text();
+    const [, ...rows] = csv.split("\r\n").filter((line) => line.length > 0);
+    const starts = rows.map((row) => row.split(",")[0]);
+    expect(starts.some((value) => value === TO)).toBe(true);
+  });
+
   it("defaults to the members export when type is omitted", async () => {
     const res = await GET(exportRequest());
     expect(res.status).toBe(200);
