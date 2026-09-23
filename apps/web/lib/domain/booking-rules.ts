@@ -31,9 +31,12 @@ export interface BookingContext {
   now: string;
 }
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// Any non-cancelled booking — confirmed, waitlisted, or attended — blocks another
+// booking attempt for the same session. Cancelled bookings (and no-show, per
+// today's policy) are excluded, allowing a rebook. This set is deliberately
+// narrower than SEAT_TAKING_STATUSES in capacity.ts — a waitlist entry consumes
+// no seat but still represents a live claim on the session.
+const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended", "waitlisted"]);
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
