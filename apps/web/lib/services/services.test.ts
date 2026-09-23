@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingExportRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,60 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("memberEmail");
+  });
+});
+
+describe("listBookingExportRows", () => {
+  // Sessions land on hour boundaries relative to NOW (a week back to a week
+  // ahead). Use exact session starts as the closed-interval bounds.
+  const NOW = new Date("2026-03-15T12:00:00.000Z");
+  const FROM = "2026-03-12T08:00:00.000Z";
+  const TO = "2026-03-18T17:00:00.000Z";
+
+  it("includes bookings starting exactly at `from` and `to` (closed interval)", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM, to: TO });
+    expect(rows.some((row) => row.startsAt === FROM)).toBe(true);
+    expect(rows.some((row) => row.startsAt === TO)).toBe(true);
+    for (const row of rows) {
+      expect(row.startsAt >= FROM).toBe(true);
+      expect(row.startsAt <= TO).toBe(true);
+    }
+  });
+
+  it("excludes bookings outside the closed interval", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM, to: TO });
+    expect(rows.some((row) => row.startsAt < FROM)).toBe(false);
+    expect(rows.some((row) => row.startsAt > TO)).toBe(false);
+  });
+
+  it("leaves an omitted lower bound unbounded", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { to: TO });
+    for (const row of rows) expect(row.startsAt <= TO).toBe(true);
+    // sessions a week back exist below NOW, so the absence of a lower bound
+    // means they should be present here.
+    expect(rows.some((row) => row.startsAt < FROM)).toBe(true);
+  });
+
+  it("leaves an omitted upper bound unbounded", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM });
+    for (const row of rows) expect(row.startsAt >= FROM).toBe(true);
+    expect(rows.some((row) => row.startsAt > TO)).toBe(true);
+  });
+
+  it("returns every booking when neither bound is supplied", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("memberEmail");
   });
 });

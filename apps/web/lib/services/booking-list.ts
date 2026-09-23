@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  memberEmail: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        memberEmail: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,19 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Booking rows restricted to a closed `[from, to]` interval on the session
+// start, inclusive of both ends. `listBookingRows` (and the repo layer) treat
+// `to` as EXCLUSIVE, so the lower bound is passed straight through and the
+// upper bound is applied inclusively in memory here — leaving the /bookings
+// page and /api/classes semantics untouched.
+export async function listBookingExportRows(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId, { from: range.from });
+  if (!range.to) return rows;
+  return rows.filter((row) => row.startsAt && row.startsAt <= range.to!);
 }
