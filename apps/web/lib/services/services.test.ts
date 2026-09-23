@@ -4,7 +4,7 @@ import type { Repositories } from "@/lib/db/repos/types";
 import { buildSeed } from "@/lib/db/seed-data";
 import type { Booking, ClassSession, ClassType, Member } from "@/lib/db/types";
 import { createFakeProvider } from "@/lib/notifications/fake-provider";
-import { listBookingRows } from "./booking-list";
+import { listBookingRows, listBookingExportRows } from "./booking-list";
 import { cancelBooking, createBooking } from "./bookings";
 import { createSession, getSessionView, listSessions } from "./classes";
 import { getDashboard } from "./dashboard";
@@ -323,5 +323,94 @@ describe("reports + dashboard + booking list", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]).toHaveProperty("memberName");
     expect(rows[0]).toHaveProperty("className");
+    expect(rows[0]).toHaveProperty("memberEmail");
+  });
+});
+
+describe("listBookingExportRows", () => {
+  // Sessions land on hour boundaries relative to NOW (a week back to a week
+  // ahead). Use exact session starts as the closed-interval bounds.
+  const NOW = new Date("2026-03-15T12:00:00.000Z");
+  const FROM = "2026-03-12T08:00:00.000Z";
+  const TO = "2026-03-18T17:00:00.000Z";
+
+  it("includes bookings starting exactly at `from` and `to` (closed interval)", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM, to: TO });
+    expect(rows.some((row) => row.startsAt === FROM)).toBe(true);
+    expect(rows.some((row) => row.startsAt === TO)).toBe(true);
+    for (const row of rows) {
+      expect(row.startsAt >= FROM).toBe(true);
+      expect(row.startsAt <= TO).toBe(true);
+    }
+  });
+
+  it("excludes bookings outside the closed interval", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM, to: TO });
+    expect(rows.some((row) => row.startsAt < FROM)).toBe(false);
+    expect(rows.some((row) => row.startsAt > TO)).toBe(false);
+  });
+
+  it("leaves an omitted lower bound unbounded", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { to: TO });
+    for (const row of rows) expect(row.startsAt <= TO).toBe(true);
+    // sessions a week back exist below NOW, so the absence of a lower bound
+    // means they should be present here.
+    expect(rows.some((row) => row.startsAt < FROM)).toBe(true);
+  });
+
+  it("leaves an omitted upper bound unbounded", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId, { from: FROM });
+    for (const row of rows) expect(row.startsAt >= FROM).toBe(true);
+    expect(rows.some((row) => row.startsAt > TO)).toBe(true);
+  });
+
+  it("returns every booking when neither bound is supplied", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    const rows = await listBookingExportRows(repos, studioId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("memberEmail");
+  });
+
+  it("compares `to` as an instant, so a UTC-offset spelling is honored", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    // 2026-03-18T16:00:00-02:00 is 2026-03-18T18:00:00Z — strictly after the
+    // 17:00Z session, so the TO booking must be included even though the
+    // textual hour "16" sorts before "17". A lexicographic compare drops it.
+    const rows = await listBookingExportRows(repos, studioId, {
+      to: "2026-03-18T16:00:00-02:00",
+    });
+    expect(rows.some((row) => row.startsAt === TO)).toBe(true);
+  });
+
+  it("compares `from` as an instant, so a UTC-offset spelling is honored", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    // 2026-03-12T10:00:00+02:00 is 2026-03-12T08:00:00Z — exactly the FROM
+    // session. A lexicographic compare ("10..." > "08...") wrongly drops it.
+    const rows = await listBookingExportRows(repos, studioId, {
+      from: "2026-03-12T10:00:00+02:00",
+    });
+    expect(rows.some((row) => row.startsAt === FROM)).toBe(true);
+  });
+
+  it("treats a date-only bound as the start-of-day instant", async () => {
+    const repos = createInMemoryRepositories(buildSeed(NOW));
+    const studioId = (await repos.studios.getFirst())?.id ?? "";
+    // "2026-03-19" parses to 2026-03-19T00:00:00Z. The 03-18T17:00:00Z session
+    // precedes that instant (included); the 03-19T08:00:00Z session follows it
+    // (excluded). Per the AC, bounds are instants — date-only is start-of-day.
+    const rows = await listBookingExportRows(repos, studioId, { to: "2026-03-19" });
+    expect(rows.some((row) => row.startsAt === TO)).toBe(true);
+    expect(rows.some((row) => row.startsAt === "2026-03-19T08:00:00.000Z")).toBe(false);
   });
 });

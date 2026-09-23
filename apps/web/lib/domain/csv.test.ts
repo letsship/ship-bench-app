@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { escapeCsvField, invoicesToCsv, membersToCsv, toCsv } from "./csv";
+import {
+  bookingsToCsv,
+  escapeCsvField,
+  invoicesToCsv,
+  membersToCsv,
+  toCsv,
+} from "./csv";
 
 describe("escapeCsvField", () => {
   it("leaves plain values untouched", () => {
@@ -70,5 +76,68 @@ describe("invoicesToCsv", () => {
     const row = csv.split("\r\n")[1];
     expect(row).toContain("123.45");
     expect(row).toContain("INV-2026-0001");
+  });
+});
+
+describe("bookingsToCsv", () => {
+  it("emits the expected header in column order", () => {
+    const csv = bookingsToCsv([]);
+    expect(csv).toBe("Starts,Class,Member,Email,Status");
+  });
+
+  it("renders a row in the documented column order", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00Z",
+        className: "Yoga",
+        memberName: "Amara",
+        memberEmail: "amara@example.com",
+        status: "booked",
+      },
+    ]);
+    const [header, row] = csv.split("\r\n");
+    expect(header).toBe("Starts,Class,Member,Email,Status");
+    expect(row).toBe("2026-06-01T08:00:00Z,Yoga,Amara,amara@example.com,booked");
+  });
+
+  it("keeps a comma in a member name as a single quoted column", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00Z",
+        className: "Yoga",
+        memberName: "Rossi, Chiara",
+        memberEmail: "chiara@example.com",
+        status: "attended",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toBe('2026-06-01T08:00:00Z,Yoga,"Rossi, Chiara",chiara@example.com,attended');
+  });
+
+  it("doubles embedded double quotes", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00Z",
+        className: 'Yoga "Flow"',
+        memberName: "Amara",
+        memberEmail: "amara@example.com",
+        status: "booked",
+      },
+    ]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain('"Yoga ""Flow"""');
+  });
+
+  it("quotes a field containing a newline", () => {
+    const csv = bookingsToCsv([
+      {
+        startsAt: "2026-06-01T08:00:00Z",
+        className: "Yoga",
+        memberName: "Line1\nLine2",
+        memberEmail: "amara@example.com",
+        status: "booked",
+      },
+    ]);
+    expect(csv).toContain('"Line1\nLine2"');
   });
 });
