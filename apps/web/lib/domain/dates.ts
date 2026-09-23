@@ -85,6 +85,25 @@ export function isBefore(a: string, b: string): boolean {
   return toDate(a).getTime() < toDate(b).getTime();
 }
 
+// True when `iso` falls within [from, to] inclusive of both bounds. An omitted
+// bound is unbounded on that side. Parses each value to an instant before
+// comparing, so any valid ISO-8601 form works as a bound — a bare date like
+// `2026-06-30`, a timestamp missing milliseconds like `2026-06-30T23:59:59Z`,
+// or an offset timestamp like `2026-06-01T00:00:00+02:00` — without the
+// lexicographic-ordering pitfalls of comparing raw strings of differing
+// formats. Unlike the exclusive-on-`to` `SessionRange` used by calendar views,
+// this is the inclusive semantics accounting exports need.
+export function isWithinInclusiveRange(
+  iso: string,
+  from?: string,
+  to?: string,
+): boolean {
+  const t = toDate(iso).getTime();
+  if (from && t < toDate(from).getTime()) return false;
+  if (to && t > toDate(to).getTime()) return false;
+  return true;
+}
+
 // Group items by their calendar day (in `timeZone`), preserving input order
 // within each day. Returns days sorted ascending.
 export function groupByDay<T>(

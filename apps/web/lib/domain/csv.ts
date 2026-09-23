@@ -22,6 +22,24 @@ export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): 
   return [header, ...body].join("\r\n");
 }
 
+export interface BookingCsvRow {
+  startsAt: string;
+  className: string;
+  memberName: string;
+  email: string;
+  status: string;
+}
+
+export function bookingsToCsv(bookings: readonly BookingCsvRow[]): string {
+  return toCsv(bookings, [
+    { header: "Starts", value: (booking) => booking.startsAt },
+    { header: "Class", value: (booking) => booking.className },
+    { header: "Member", value: (booking) => booking.memberName },
+    { header: "Email", value: (booking) => booking.email },
+    { header: "Status", value: (booking) => booking.status },
+  ]);
+}
+
 export interface MemberRow {
   name: string;
   email: string;
