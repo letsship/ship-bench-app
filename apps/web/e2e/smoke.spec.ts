@@ -10,6 +10,7 @@ test.describe("unauthenticated", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: /Run your studio/i })).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(246, 241, 231)");
   });
 
   test("visiting a protected page redirects to login", async ({ page }) => {
