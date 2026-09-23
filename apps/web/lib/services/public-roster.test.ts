@@ -107,4 +107,82 @@ describe("listPublicRoster", () => {
 
     expect(roster).toEqual([]);
   });
+
+  it("does not expose member name, email, or phone (AC-1)", async () => {
+    const repos = createInMemoryRepositories(seed());
+
+    const roster = await listPublicRoster(repos, "s1");
+
+    const attendee = roster[0].attendees[0];
+    expect(attendee).toHaveProperty("id");
+    expect(attendee).toHaveProperty("name");
+    expect(attendee).not.toHaveProperty("email");
+    expect(attendee).not.toHaveProperty("phone");
+    expect(attendee).not.toHaveProperty("status");
+  });
+
+  it("attendees carry only declared fields (AC-2)", async () => {
+    const repos = createInMemoryRepositories(seed());
+
+    const roster = await listPublicRoster(repos, "s1");
+
+    const attendee = roster[0].attendees[0];
+    const keys = Object.keys(attendee);
+    expect(keys).toEqual(["id", "name"]);
+  });
+
+  it("sessionIds from another studio return no bookings (AC-3)", async () => {
+    const base = seed();
+    const otherStudio = {
+      id: "s2",
+      name: "S2",
+      slug: "s2",
+      timezone: "Europe/Amsterdam",
+      createdAt: ISO,
+    };
+    const otherSession = {
+      id: "sess2",
+      studioId: "s2",
+      classTypeId: "ct1",
+      instructor: "Iris",
+      startsAt: base.sessions[0].startsAt,
+      endsAt: base.sessions[0].endsAt,
+      capacity: 10,
+      priceCents: 1800,
+      status: "scheduled" as const,
+      createdAt: ISO,
+    };
+    const repos = createInMemoryRepositories({
+      studio: otherStudio,
+      settings: { ...base.settings, studioId: "s2" },
+      members: [
+        ...base.members,
+        { ...base.members[0], id: "m2", studioId: "s2", email: "m2@example.com" },
+      ],
+      classTypes: [...base.classTypes, { ...base.classTypes[0], id: "ct2", studioId: "s2" }],
+      sessions: [base.sessions[0], otherSession],
+      bookings: [
+        base.bookings[0],
+        {
+          id: "b2",
+          sessionId: "sess2",
+          memberId: "m2",
+          status: "booked",
+          bookedAt: ISO,
+          cancelledAt: null,
+        },
+      ],
+      invoices: [],
+      lineItems: [],
+      outbox: [],
+    });
+
+    // Request with sessionId from another studio
+    const roster = await listPublicRoster(repos, "s2", ["sess2", "sess1"]);
+
+    // Should only return sess2 (belongs to s2), not sess1 (belongs to s1)
+    expect(roster).toHaveLength(1);
+    expect(roster[0].attendees).toHaveLength(1);
+    expect(roster[0].attendees[0].id).toBe("m2");
+  });
 });

@@ -5,12 +5,17 @@
 import type { Repositories } from "@/lib/db/repos/types";
 import { computeOccupancy } from "@/lib/domain/capacity";
 
+export interface PublicAttendee {
+  id: string;
+  name: string;
+}
+
 export interface PublicRosterEntry {
   title: string;
   startsAt: string;
   instructor: string;
   seatsAvailable: number;
-  attendees: unknown[];
+  attendees: PublicAttendee[];
 }
 
 // GET-side helper for /api/public/roster. The caller may narrow the response to
@@ -24,9 +29,11 @@ export async function listPublicRoster(
   const classTypes = await repos.classTypes.listByStudio(studioId);
   const classTypeById = new Map(classTypes.map((ct) => [ct.id, ct]));
 
-  // When the embed asks for specific sessions, use its list directly so a
-  // single-class widget does not pay for the whole fortnight.
-  const ids = sessionIds && sessionIds.length > 0 ? sessionIds : sessions.map((s) => s.id);
+  // Only use session IDs that belong to the current studio, so a sessionId from
+  // another studio cannot leak bookings for that studio's classes (AC-3).
+  const studioSessionIds = new Set(sessions.map((s) => s.id));
+  const requestedIds = sessionIds?.filter((id) => studioSessionIds.has(id)) ?? [];
+  const ids = requestedIds.length > 0 ? requestedIds : Array.from(studioSessionIds);
   const bookings = await repos.bookings.listBySessionIds(ids);
 
   const members = await repos.members.listByStudio(studioId);
@@ -51,12 +58,15 @@ export async function listPublicRoster(
         startsAt: session.startsAt,
         instructor: session.instructor,
         seatsAvailable: occupancy.available,
-        // Hand the embed the booking with its member attached, so the widget can
-        // render a name and avatar without a second round trip.
-        attendees: sessionBookings.map((booking) => ({
-          ...booking,
-          member: memberById.get(booking.memberId),
-        })),
+        // Only expose id and name so no private member data (email, phone) leaks
+        // in the public embed (AC-1 & AC-2).
+        attendees: sessionBookings.map((booking) => {
+          const member = memberById.get(booking.memberId);
+          return {
+            id: booking.memberId,
+            name: member?.name ?? "Member",
+          };
+        }),
       };
     });
 }
