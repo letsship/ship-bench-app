@@ -97,6 +97,14 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
             .sort((a, b) => a.name.localeCompare(b.name)),
         );
       },
+      async listByIds(studioId, ids) {
+        const wanted = new Set(ids);
+        return cloneAll(
+          store.members
+            .filter((row) => row.studioId === studioId && wanted.has(row.id))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+      },
       async getById(id) {
         const found = store.members.find((row) => row.id === id);
         return found ? clone(found) : null;
@@ -132,11 +140,10 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     },
     classSessions: {
       async listByStudio(studioId, range = {}) {
-        return cloneAll(
-          store.classSessions
-            .filter((row) => row.studioId === studioId && inRange(row.startsAt, range))
-            .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-        );
+        const matched = store.classSessions
+          .filter((row) => row.studioId === studioId && inRange(row.startsAt, range))
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+        return cloneAll(range.limit === undefined ? matched : matched.slice(0, range.limit));
       },
       async getById(id) {
         const found = store.classSessions.find((row) => row.id === id);

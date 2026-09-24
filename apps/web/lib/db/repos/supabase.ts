@@ -87,6 +87,13 @@ export function createSupabaseRepositories(): Repositories {
           db.from("members").select("*").eq("studio_id", studioId).order("name"),
           "members.listByStudio",
         ),
+      listByIds: async (studioId, ids) => {
+        if (ids.length === 0) return [];
+        return rows<Member>(
+          db.from("members").select("*").eq("studio_id", studioId).in("id", ids).order("name"),
+          "members.listByIds",
+        );
+      },
       getById: (id) =>
         maybeOne<Member>(
           db.from("members").select("*").eq("id", id).maybeSingle(),
@@ -118,7 +125,11 @@ export function createSupabaseRepositories(): Repositories {
         let query = db.from("class_sessions").select("*").eq("studio_id", studioId);
         if (range.from) query = query.gte("starts_at", range.from);
         if (range.to) query = query.lt("starts_at", range.to);
-        return rows<ClassSession>(query.order("starts_at"), "classSessions.listByStudio");
+        const ordered = query.order("starts_at");
+        return rows<ClassSession>(
+          range.limit === undefined ? ordered : ordered.limit(range.limit),
+          "classSessions.listByStudio",
+        );
       },
       getById: (id) =>
         maybeOne<ClassSession>(
