@@ -55,13 +55,19 @@ describe("Tailwind CSS v4 migration", () => {
     it("postcss.config.mjs names @tailwindcss/postcss (AC-3) and no bare tailwindcss (AC-4)", () => {
       const cfg = readFileSync(POSTCSS_CONFIG_PATH, "utf8");
       expect(cfg).toContain("@tailwindcss/postcss");
-      expect(cfg).not.toContain('tailwindcss:');
+      // The legacy bare "tailwindcss" plugin key would appear as
+      // `"tailwindcss":` (quoted + colon). Use a quote-agnostic regex
+      // so we do not miss it if the quoting style changes.
+      expect(cfg).not.toMatch(/["']?tailwindcss["']?\s*:/);
     });
 
     it("package.json declares tailwindcss ^4 (AC-1) and @tailwindcss/postcss (AC-3)", () => {
-      const pkg = readFileSync(PACKAGE_JSON_PATH, "utf8");
-      expect(pkg).toContain('"tailwindcss": "^4"');
-      expect(pkg).toContain('"@tailwindcss/postcss": "^4"');
+      const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, "utf8"));
+      // AC-1: range must start with ^4 (any 4.x minor/patch is fine)
+      expect(pkg.devDependencies.tailwindcss).toMatch(/^\^4/);
+      // AC-3: @tailwindcss/postcss must be declared in devDependencies
+      expect(pkg.devDependencies["@tailwindcss/postcss"]).toBeDefined();
+      expect(pkg.devDependencies["@tailwindcss/postcss"]).toMatch(/^\^4/);
     });
 
     it("has a placeholder compatibility rule (AC-11)", () => {
