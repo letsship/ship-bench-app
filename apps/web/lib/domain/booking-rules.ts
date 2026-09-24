@@ -31,9 +31,9 @@ export interface BookingContext {
   now: string;
 }
 
-// A confirmed seat (or attendance already recorded) blocks another booking
-// attempt; a waitlist entry holds no seat, so it doesn't count against the member.
-const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended"]);
+// A confirmed seat, attendance recorded, or a waitlist entry blocks another
+// booking attempt — the waitlist entry is an active claim on the class.
+const ACTIVE_MEMBER_BOOKING = new Set(["booked", "attended", "waitlisted"]);
 
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
