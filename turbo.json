@@ -29,7 +29,7 @@
     "test": {
       "dependsOn": ["^build"],
       "cache": true,
-      "inputs": ["app/**", "lib/**", "vitest.config.*", "package.json"]
+      "inputs": ["app/**", "lib/**", "vitest.config.*", "postcss.config.mjs", "tailwind.config.js", "package.json"]
     },
     "clean": {
       "cache": false

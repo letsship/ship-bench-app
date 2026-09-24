@@ -29,24 +29,26 @@ export default async function LoginPage({
         <p className="mt-2 text-sm text-[var(--color-muted)]">
           Enter your email and we&rsquo;ll send you a magic link. (This demo signs you straight in.)
         </p>
-        <form action={signIn} className="mt-6 space-y-4">
+        <form action={signIn} className="mt-6">
           <input type="hidden" name="next" value={next ?? "/dashboard"} />
-          <div>
-            <label className="sb-label" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              className="sb-input"
-              placeholder="operator@riverbank.studio"
-              autoComplete="email"
-            />
+          <div className="space-y-4">
+            <div>
+              <label className="sb-label" htmlFor="email">
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                className="sb-input"
+                placeholder="operator@riverbank.studio"
+                autoComplete="email"
+              />
+            </div>
+            <button type="submit" className="sb-btn sb-btn-primary w-full">
+              Send magic link
+            </button>
           </div>
-          <button type="submit" className="sb-btn sb-btn-primary w-full">
-            Send magic link
-          </button>
         </form>
       </div>
     </main>
