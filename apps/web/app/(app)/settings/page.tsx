@@ -18,8 +18,7 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle={`${studio.name} · ${studio.timezone}`} />
-      <form action={saveSettings} className="sb-card max-w-xl p-6">
-        <div className="space-y-6">
+      <form action={saveSettings} className="sb-card max-w-xl space-y-6 p-6">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="sb-label" htmlFor="taxPercent">
@@ -68,7 +67,6 @@ export default async function SettingsPage() {
         <button type="submit" className="sb-btn sb-btn-primary">
           Save settings
         </button>
-        </div>
       </form>
     </>
   );

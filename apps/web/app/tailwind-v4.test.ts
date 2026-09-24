@@ -99,6 +99,9 @@ describe("Tailwind CSS v4 migration", () => {
       // Preflight rules are injected (universal-box-sizing reset is a v4 preflight staple)
       expect(output).toContain("*, ::after, ::before");
 
+      // Base element rules (html, body, h1-h3, a, placeholder) land in @layer base
+      expect(output).toContain("@layer base");
+
       // At least one utility from the scanned source
       expect(output).toContain(".rounded-full");
 

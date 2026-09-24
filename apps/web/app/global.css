@@ -24,31 +24,33 @@
   color-scheme: light;
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
-}
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-body {
-  background-color: var(--color-parchment);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  line-height: 1.5;
-}
+  body {
+    background-color: var(--color-parchment);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-serif);
-  letter-spacing: -0.01em;
-}
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
 
-a {
-  color: inherit;
-}
+  a {
+    color: inherit;
+  }
 
-input::placeholder,
-textarea::placeholder {
-  color: #9ca3af;
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+  }
 }
 
 /* --- Components --- */
