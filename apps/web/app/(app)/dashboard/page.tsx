@@ -2,7 +2,8 @@ import { occupancyPercent } from "@/lib/domain/capacity";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { getDashboard } from "@/lib/services/dashboard";
-import { EmptyState, PageHeader, StatCard, StatusBadge } from "../_components/ui";
+import { PageHeader, StatCard, StatusBadge } from "../_components/ui";
+import { DayView } from "../_components/day-view";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,7 @@ export default async function DashboardPage() {
       </div>
 
       <h2 className="mb-3 mt-10 text-xl">Today&rsquo;s classes</h2>
-      {today.length === 0 ? (
-        <EmptyState>No classes scheduled today.</EmptyState>
-      ) : (
+      <DayView hasEntries={today.length > 0}>
         <div className="sb-card overflow-hidden">
           <table className="sb-table" data-testid="today-classes">
             <thead>
@@ -68,7 +67,7 @@ export default async function DashboardPage() {
             </tbody>
           </table>
         </div>
-      )}
+      </DayView>
     </>
   );
 }
