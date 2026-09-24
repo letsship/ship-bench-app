@@ -71,6 +71,22 @@ export const updateInvoiceStatusSchema = z.object({
   status: z.enum(["draft", "open", "paid", "void", "refunded"]),
 });
 
+// Query string for the public roster embed: `?sessionIds=a,b`. The endpoint is
+// unauthenticated, so the list is parsed and bounded here rather than being
+// split raw into an unbounded `IN (...)`.
+export const publicRosterQuerySchema = z.object({
+  sessionIds: z
+    .string()
+    .transform((value) =>
+      value
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().min(1).max(64)).max(50))
+    .optional(),
+});
+
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;

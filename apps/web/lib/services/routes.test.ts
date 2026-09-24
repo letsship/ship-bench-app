@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as classesGet } from "@/app/api/classes/route";
 import { GET as invoicesGet } from "@/app/api/invoices/route";
 import { GET as membersGet } from "@/app/api/members/route";
+import { GET as publicRosterGet } from "@/app/api/public/roster/route";
 import { __setTestRepositories } from "@/lib/db/repos";
 import { createInMemoryRepositories } from "@/lib/db/repos/fakes";
 import { buildSeed } from "@/lib/db/seed-data";
@@ -44,5 +45,34 @@ describe("GET route handlers (against injected fake repositories)", () => {
     const res = await membersGet();
     expect(res.status).toBe(200);
     expect(((await res.json()) as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  // The roster is unauthenticated, so assert on the serialised response a
+  // stranger actually receives — not just on the service's return value.
+  it("GET /api/public/roster leaks no member name, email or phone", async () => {
+    const { members } = buildSeed(NOW);
+    const res = await publicRosterGet(new NextRequest("http://localhost/api/public/roster"));
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { attendees: unknown[] }[];
+    expect(body.length).toBeGreaterThan(0);
+    const serialised = JSON.stringify(body);
+    for (const member of members) {
+      expect(serialised).not.toContain(member.name);
+      expect(serialised).not.toContain(member.email);
+      if (member.phone) expect(serialised).not.toContain(member.phone);
+    }
+
+    const attendees = body.flatMap((entry) => entry.attendees);
+    expect(attendees.length).toBeGreaterThan(0);
+    expect([...new Set(attendees.flatMap((a) => Object.keys(a as object)))]).toEqual(["initials"]);
+  });
+
+  it("GET /api/public/roster rejects an oversized sessionIds list", async () => {
+    const tooMany = Array.from({ length: 51 }, (_, i) => `s${i}`).join(",");
+    const res = await publicRosterGet(
+      new NextRequest(`http://localhost/api/public/roster?sessionIds=${tooMany}`),
+    );
+    expect(res.status).toBe(400);
   });
 });
