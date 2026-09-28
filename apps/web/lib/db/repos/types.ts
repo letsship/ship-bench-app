@@ -21,6 +21,10 @@ import type {
 export interface SessionRange {
   from?: string;
   to?: string;
+  // Caps the rows the query returns (ordered by `startsAt`). Lets an
+  // unauthenticated caller's read be bounded at the database rather than after
+  // the whole table has crossed the wire.
+  limit?: number;
 }
 
 export interface StudioRepo {
@@ -34,6 +38,9 @@ export interface StudioSettingsRepo {
 
 export interface MembersRepo {
   listByStudio(studioId: string): Promise<Member[]>;
+  // Studio-scoped fetch of named members, so a caller that needs a handful does
+  // not pull the whole member table (and its contact details) into the process.
+  listByIds(studioId: string, ids: string[]): Promise<Member[]>;
   getById(id: string): Promise<Member | null>;
   findByEmail(studioId: string, email: string): Promise<Member | null>;
   insert(member: Member): Promise<Member>;

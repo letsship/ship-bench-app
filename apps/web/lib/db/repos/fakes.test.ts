@@ -44,6 +44,21 @@ describe("in-memory repositories", () => {
     expect(windowed.length).toBeLessThan(all.length);
   });
 
+  it("lists only the named members, scoped to the studio", async () => {
+    const all = await repos.members.listByStudio(studioId);
+    const wanted = all.slice(0, 2).map((m) => m.id);
+    expect((await repos.members.listByIds(studioId, wanted)).map((m) => m.id)).toEqual(wanted);
+    expect(await repos.members.listByIds(studioId, [])).toEqual([]);
+    expect(await repos.members.listByIds("other-studio", wanted)).toEqual([]);
+  });
+
+  it("caps sessions to the requested limit, keeping the earliest first", async () => {
+    const all = await repos.classSessions.listByStudio(studioId);
+    const capped = await repos.classSessions.listByStudio(studioId, { limit: 3 });
+    expect(capped).toHaveLength(3);
+    expect(capped.map((s) => s.id)).toEqual(all.slice(0, 3).map((s) => s.id));
+  });
+
   it("lists bookings across multiple session ids", async () => {
     const sessions = await repos.classSessions.listByStudio(studioId);
     const ids = sessions.slice(0, 3).map((s) => s.id);
