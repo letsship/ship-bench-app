@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Studiobook design tokens — a warm, tactile studio aesthetic: parchment
    surfaces, espresso ink, clay + sage accents drawn from pottery and yoga. */
@@ -22,26 +20,65 @@
   --color-danger: #b3402f;
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
+/* Port tailwind.config.js theme.extend into an @theme block so Tailwind v4
+   generates the custom utility classes (e.g. bg-clay, text-ink, font-serif).
+   The unlayered :root declarations above take precedence at runtime. */
+@theme inline {
+  --color-parchment: var(--color-parchment);
+  --color-surface: var(--color-surface);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-clay: var(--color-clay);
+  --color-clay-soft: var(--color-clay-soft);
+  --color-sage: var(--color-sage);
+  --color-sage-soft: var(--color-sage-soft);
+  --color-line: var(--color-line);
+  --color-danger: var(--color-danger);
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
 }
 
-body {
-  background-color: var(--color-parchment);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  line-height: 1.5;
-}
+/* Element rules are layered so that Tailwind v4 utilities (which live in
+   @layer utilities) still override them, matching v3 precedence. */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-serif);
-  letter-spacing: -0.01em;
-}
+  body {
+    background-color: var(--color-parchment);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
 
-a {
-  color: inherit;
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  /* v4 changed default border color from currentColor to gray-200 */
+  *,
+  ::before,
+  ::after {
+    border-color: currentColor;
+  }
+
+  /* v4 changed default placeholder color (use v3's gray-400) */
+  ::placeholder {
+    color: #9ca3af;
+  }
+
+  /* v4 no longer sets cursor:pointer on <button> by default */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* --- Components --- */
