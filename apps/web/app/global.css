@@ -22,7 +22,7 @@
   color-scheme: light;
 }
 
-/* v3-compat: default border color and placeholder color */
+/* v3-compat: default border color, placeholder color, and element defaults */
 @layer base {
   *,
   ::after,
@@ -34,28 +34,28 @@
   ::placeholder {
     color: theme(--color-gray-400);
   }
-}
 
-html {
-  -webkit-text-size-adjust: 100%;
-}
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-body {
-  background-color: var(--color-parchment);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  line-height: 1.5;
-}
+  body {
+    background-color: var(--color-parchment);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-serif);
-  letter-spacing: -0.01em;
-}
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
 
-a {
-  color: inherit;
+  a {
+    color: inherit;
+  }
 }
 
 /* --- Components --- */

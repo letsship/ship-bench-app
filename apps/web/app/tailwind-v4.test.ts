@@ -68,4 +68,15 @@ describe("Tailwind CSS v4 migration", () => {
     // Accept ^4, ~4.0.0, 4.x.x etc.
     expect(tw!.startsWith("^4") || tw!.startsWith("~4") || tw!.startsWith("4")).toBe(true);
   });
+
+  it("resolves tailwindcss to v4 in pnpm-lock.yaml", () => {
+    // Test file is at apps/web/app/, lockfile is at repo root
+    const lockfile = readFileSync(`${ROOT}../../pnpm-lock.yaml`, "utf8");
+    // Find the apps/web importer section and check its tailwindcss devDependency version
+    const match = lockfile.match(
+      / {2}apps\/web:[\s\S]*? {6}tailwindcss:\n {8}specifier: \^4\n {8}version: (4\.[\d.]+)/,
+    );
+    expect(match).not.toBeNull();
+    expect(match![1]).toMatch(/^4\./);
+  });
 });
