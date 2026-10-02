@@ -71,4 +71,44 @@ test.describe("operator journeys (fake backends)", () => {
 
     expect(errors).toEqual([]);
   });
+
+  test("renders invoice line descriptions as escaped text, not HTML", async ({ page }) => {
+    // Navigate to invoices list
+    await page.goto("/invoices");
+    const table = page.getByTestId("invoices-table");
+    await expect(table).toBeVisible();
+
+    // Open the first invoice from the seeded data
+    await table.getByRole("link").first().click();
+    await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+    const invoiceTable = page.getByRole("table").first();
+    await expect(invoiceTable).toBeVisible();
+
+    // Verify that descriptions are rendered as text, not HTML
+    // The seeded invoice has "10-class pass" as a description
+    await expect(invoiceTable).toContainText("10-class pass");
+
+    // Verify there are no img elements (confirming dangerouslySetInnerHTML is not used)
+    const imgElements = await invoiceTable.locator("img").count();
+    expect(imgElements).toBe(0);
+
+    // Verify page source doesn't contain dangerouslySetInnerHTML for descriptions
+    const pageContent = await page.content();
+    // The fix replaced dangerouslySetInnerHTML with plain text rendering
+    expect(pageContent).not.toContain('dangerouslySetInnerHTML');
+    expect(pageContent).toContain("10-class pass");
+
+    // Check that no img element was created
+    const imgElements = await table.locator("img").count();
+    expect(imgElements).toBe(0);
+
+    // Check that the malicious script was not executed
+    const xssExecuted = await page.evaluate(() => {
+      return (globalThis as Record<string, unknown>).__xss;
+    });
+    expect(xssExecuted).toBeUndefined();
+
+    // Check that the ordinary description renders normally
+    await expect(table).toContainText("10-class pass");
+  });
 });
