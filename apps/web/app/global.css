@@ -1,12 +1,24 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Tailwind v3 compatibility layer — restores default border color,
+   placeholder color, and button cursor that v4 changed. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-gray-200, currentColor);
+  }
+  ::placeholder {
+    color: var(--color-gray-400);
+  }
+  button {
+    cursor: pointer;
+  }
+}
 
 /* Studiobook design tokens — a warm, tactile studio aesthetic: parchment
    surfaces, espresso ink, clay + sage accents drawn from pottery and yoga. */
-:root {
-  color-scheme: light;
-
+@theme static {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
   --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 
@@ -20,6 +32,9 @@
   --color-sage-soft: #dcead9;
   --color-line: #e7ddca;
   --color-danger: #b3402f;
+}
+:root {
+  color-scheme: light;
 }
 
 html {
