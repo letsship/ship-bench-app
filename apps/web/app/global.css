@@ -62,6 +62,23 @@
   a {
     color: inherit;
   }
+
+  /* v4 changed default border color from currentColor to gray-200 */
+  *,
+  ::before,
+  ::after {
+    border-color: currentColor;
+  }
+
+  /* v4 changed default placeholder color (use v3's gray-400) */
+  ::placeholder {
+    color: #9ca3af;
+  }
+
+  /* v4 no longer sets cursor:pointer on <button> by default */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* --- Components --- */
@@ -193,22 +210,4 @@
   background-color: var(--color-clay-soft);
   color: #8a4324;
   font-weight: 600;
-}
-
-/* --- Tailwind v3-compat base rules --- */
-/* v4 changed default border color from currentColor to gray-200 */
-*,
-::before,
-::after {
-  border-color: currentColor;
-}
-
-/* v4 changed default placeholder color (use v3's gray-400) */
-::placeholder {
-  color: #9ca3af;
-}
-
-/* v4 no longer sets cursor:pointer on <button> by default */
-button:not(:disabled) {
-  cursor: pointer;
 }

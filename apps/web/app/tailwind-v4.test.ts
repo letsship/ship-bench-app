@@ -15,23 +15,10 @@ describe("Tailwind CSS v4 setup", () => {
     expect(css).not.toMatch(/@tailwind\s+/);
   });
 
-  it("postcss.config.mjs uses @tailwindcss/postcss and not the legacy tailwindcss plugin", () => {
-    const postcss = readFileSync(postcssPath, "utf-8");
-    // The export default should have "@tailwindcss/postcss" as a plugin key
-    expect(postcss).toContain("@tailwindcss/postcss");
-    // The legacy plugin key 'tailwindcss:' (without the @scope) must not appear
-    // in the plugins object. We check that the only occurrence of 'tailwindcss'
-    // is the scoped one.
-    const occurrences = postcss.match(/tailwindcss/g);
-    expect(occurrences).not.toBeNull();
-    // Each occurrence should be part of "@tailwindcss/postcss"
-    for (const occ of occurrences!) {
-      expect(occ).toBe("tailwindcss");
-      // Verify the context: @tailwindcss/postcss is the only form present
-    }
-    // Check the legacy plugin name is absent as a plugin key
-    expect(postcss).not.toContain("tailwindcss: {}");
-    expect(postcss).not.toContain("tailwindcss: {");
+  it("postcss.config.mjs uses @tailwindcss/postcss and not the legacy tailwindcss plugin", async () => {
+    const mod = await import(postcssPath);
+    const plugins = mod.default.plugins;
+    expect(Object.keys(plugins)).toEqual(["@tailwindcss/postcss"]);
   });
 
   it("tailwind.config.js has been deleted", () => {
@@ -41,13 +28,13 @@ describe("Tailwind CSS v4 setup", () => {
   it("package.json declares tailwindcss with a ^4 range", () => {
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
     const devDeps = pkg.devDependencies || {};
-    expect(devDeps.tailwindcss).toBe("^4");
+    expect(devDeps.tailwindcss).toMatch(/^\^4/);
   });
 
   it("package.json declares @tailwindcss/postcss as a devDependency", () => {
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
     const devDeps = pkg.devDependencies || {};
-    expect(devDeps["@tailwindcss/postcss"]).toBe("^4");
+    expect(devDeps["@tailwindcss/postcss"]).toMatch(/^\^4/);
   });
 
   it("package.json no longer lists autoprefixer", () => {
@@ -87,10 +74,15 @@ describe("Tailwind CSS v4 setup", () => {
     expect(css).toContain("--color-ink: #2c2417");
   });
 
-  it("global.css has v3-compat base rules", () => {
+  it("global.css has v3-compat base rules inside @layer base", () => {
     const css = readFileSync(cssPath, "utf-8");
-    expect(css).toContain("border-color: currentColor");
-    expect(css).toContain("::placeholder");
-    expect(css).toContain("button:not(:disabled)");
+    // Verify the compat rules live inside the @layer base block so v4
+    // utilities still beat them, matching v3 precedence.
+    const layerBaseIndex = css.indexOf("@layer base");
+    expect(layerBaseIndex).not.toBe(-1);
+    const layerSection = css.substring(layerBaseIndex, css.indexOf("/* --- Components --- */"));
+    expect(layerSection).toContain("border-color: currentColor");
+    expect(layerSection).toContain("::placeholder");
+    expect(layerSection).toContain("button:not(:disabled)");
   });
 });
