@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { ZodError } from "zod";
 
 // A consistent JSON error envelope for every API route: { error: { code,
@@ -48,6 +49,15 @@ export const unauthorized = (message = "Sign in required"): NextResponse =>
 export const conflict = (message: string, details?: unknown): NextResponse =>
   apiError(409, "conflict", message, details);
 
+const reportUnexpectedError = async (error: unknown): Promise<void> => {
+  try {
+    Sentry.captureException(error);
+    await Sentry.flush(2000);
+  } catch (reportingError) {
+    console.error("Failed to report API error to Sentry", reportingError);
+  }
+};
+
 // Run an async route body, translating known error types into the envelope and
 // logging (never swallowing) anything unexpected. Accepts any Response so
 // handlers can return non-JSON bodies (CSV, iCalendar).
@@ -62,6 +72,7 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
       return apiError(error.status, error.code, error.message, error.details);
     }
     console.error("Unhandled API error", error);
+    await reportUnexpectedError(error);
     return apiError(500, "internal_error", "Something went wrong");
   }
 }
