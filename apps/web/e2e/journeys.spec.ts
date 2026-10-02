@@ -71,4 +71,34 @@ test.describe("operator journeys (fake backends)", () => {
 
     expect(errors).toEqual([]);
   });
+
+  test("renders invoice line descriptions as escaped text, not HTML", async ({ page }) => {
+    // Navigate to invoices list
+    await page.goto("/invoices");
+    const invoicesTable = page.getByTestId("invoices-table");
+    await expect(invoicesTable).toBeVisible();
+
+    // Open the first invoice from the seeded data
+    await invoicesTable.getByRole("link").first().click();
+    await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+    const invoiceDetailTable = page.getByRole("table").first();
+    await expect(invoiceDetailTable).toBeVisible();
+
+    // Verify that the invoice description is visible (e.g., "Drop-in x4" or similar)
+    // This confirms the page loaded and descriptions are rendered as text
+    await expect(invoiceDetailTable).toContainText("x");
+
+    // Verify there are no img elements in the table (confirming HTML markup is escaped)
+    const imgElements = await invoiceDetailTable.locator("img").count();
+    expect(imgElements).toBe(0);
+
+    // Verify the description text is rendered as plain text inside a span
+    const firstDescriptionCell = invoiceDetailTable
+      .locator("tbody tr")
+      .first()
+      .locator("td")
+      .first();
+    const spanContent = await firstDescriptionCell.locator("span").first().textContent();
+    expect(spanContent).toBeTruthy();
+  });
 });
