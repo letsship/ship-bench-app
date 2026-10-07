@@ -3,6 +3,7 @@ import type { Repositories, SessionRange } from "@/lib/db/repos/types";
 export interface BookingRow {
   id: string;
   memberName: string;
+  memberEmail: string;
   className: string;
   classColor: string;
   instructor: string;
@@ -34,6 +35,7 @@ export async function listBookingRows(
       return {
         id: booking.id,
         memberName: member?.name ?? "—",
+        memberEmail: member?.email ?? "",
         className: classType?.name ?? "Class",
         classColor: classType?.color ?? "#6b7280",
         instructor: session?.instructor ?? "",
@@ -42,4 +44,31 @@ export async function listBookingRows(
       };
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+// Booking rows restricted to a closed `[from, to]` interval on the session
+// start, inclusive of both ends. Both bounds are compared as INSTANTS
+// (`Date.parse`), never as text: ISO-8601 allows several spellings of the same
+// instant (e.g. `2026-06-30T16:00:00-02:00` == `2026-06-30T18:00:00Z`) whose
+// lexicographic order is not their time order, so a string compare would
+// silently drop or admit the wrong rows. The repo layer's `SessionRange.to` is
+// also EXCLUSIVE and `fakes.ts` compares `from` as text, so the whole closed
+// interval is applied here in memory against an UNBOUNDED fetch — leaving the
+// /bookings page and /api/classes semantics untouched. Fine at studio scale.
+export async function listBookingExportRows(
+  repos: Repositories,
+  studioId: string,
+  range: SessionRange = {},
+): Promise<BookingRow[]> {
+  const rows = await listBookingRows(repos, studioId, {});
+  const fromMs = range.from ? Date.parse(range.from) : NaN;
+  const toMs = range.to ? Date.parse(range.to) : NaN;
+  return rows.filter((row) => {
+    if (!row.startsAt) return false;
+    const startsMs = Date.parse(row.startsAt);
+    if (Number.isNaN(startsMs)) return false;
+    if (!Number.isNaN(fromMs) && startsMs < fromMs) return false;
+    if (!Number.isNaN(toMs) && startsMs > toMs) return false;
+    return true;
+  });
 }
