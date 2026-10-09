@@ -7,6 +7,9 @@ export default defineConfig({
     include: ["lib/**/*.test.ts", "app/**/*.test.ts"],
     exclude: ["e2e/**", "node_modules/**", ".next/**", ".open-next/**"],
   },
+  esbuild: {
+    jsx: "automatic",
+  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "."),
