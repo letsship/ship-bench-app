@@ -35,6 +35,14 @@ describe("in-memory repositories", () => {
     expect(await repos.members.findByEmail(studioId, "nobody@example.com")).toBeNull();
   });
 
+  it("finds a member by calendar token", async () => {
+    const member = await repos.members.findByEmail(studioId, "amara@example.com");
+    expect(member?.calendarToken).toBe("caltok0001");
+    const found = await repos.members.getByCalendarToken("caltok0001");
+    expect(found?.id).toBe(member?.id);
+    expect(await repos.members.getByCalendarToken("no-such-token")).toBeNull();
+  });
+
   it("filters sessions by an inclusive-from / exclusive-to range", async () => {
     const all = await repos.classSessions.listByStudio(studioId);
     const from = all[3].startsAt;

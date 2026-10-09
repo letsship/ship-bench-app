@@ -31,6 +31,10 @@ export interface Member {
   phone: string | null;
   status: string;
   notificationsOptedOut: boolean;
+  // Secret per-member token that authorizes the private calendar feed at
+  // /api/ical/[token] — calendar clients can't send cookies, so the token is
+  // the credential. Maps to the calendar_token column.
+  calendarToken: string;
   createdAt: string;
 }
 
