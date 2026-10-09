@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
@@ -62,6 +63,12 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
       return apiError(error.status, error.code, error.message, error.details);
     }
     console.error("Unhandled API error", error);
+    try {
+      Sentry.captureException(error);
+      await Sentry.flush(2000);
+    } catch (reportingError) {
+      console.error("Failed to report API error to Sentry", reportingError);
+    }
     return apiError(500, "internal_error", "Something went wrong");
   }
 }
