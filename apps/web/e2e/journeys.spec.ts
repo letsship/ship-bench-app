@@ -53,6 +53,63 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByTestId("revenue-table")).toBeVisible();
   });
 
+  test("invoice line-item descriptions with HTML markup render as inert text", async ({
+    page,
+    request,
+  }) => {
+    const xssPayload = '<img src=x onerror="window.__xss=1">';
+    const ordinaryDescription = "Monthly unlimited pass";
+
+    const membersRes = await request.get("/api/members");
+    const members = (await membersRes.json()) as unknown[];
+    const firstMember =
+      Array.isArray(members) && members[0] ? (members[0] as Record<string, unknown>) : null;
+    if (!firstMember?.id) {
+      throw new Error("No members in the test dataset");
+    }
+
+    const createRes = await request.post("/api/invoices", {
+      data: {
+        memberId: firstMember.id,
+        lineItems: [
+          {
+            description: xssPayload,
+            quantity: 1,
+            unitAmountCents: 5000,
+          },
+          {
+            description: ordinaryDescription,
+            quantity: 2,
+            unitAmountCents: 3000,
+          },
+        ],
+      },
+    });
+    const invoice = (await createRes.json()) as unknown;
+    const invoiceDetail =
+      invoice && typeof invoice === "object" ? (invoice as Record<string, unknown>) : null;
+    const invoiceId =
+      invoiceDetail?.invoice && typeof invoiceDetail.invoice === "object"
+        ? (invoiceDetail.invoice as Record<string, unknown>).id
+        : null;
+    if (!invoiceId || typeof invoiceId !== "string") {
+      throw new Error("Failed to parse invoice id from response");
+    }
+
+    await page.goto(`/invoices/${invoiceId}`);
+    const table = page.getByRole("table");
+    await expect(table).toBeVisible();
+
+    // The XSS payload should render as visible text, not as a DOM element.
+    await expect(page.getByText(xssPayload)).toBeVisible();
+    // No img element should be created by the payload.
+    expect(await table.locator("img").count()).toBe(0);
+    // The onerror handler should never have fired.
+    expect(await page.evaluate(() => (window as Record<string, unknown>).__xss)).toBeUndefined();
+    // The ordinary description should be visible and readable.
+    await expect(page.getByText(ordinaryDescription)).toBeVisible();
+  });
+
   test("every authenticated page loads, holds the session, and logs zero console errors", async ({
     page,
   }) => {
