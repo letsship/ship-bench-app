@@ -7,8 +7,7 @@ import postcssConfig from "../postcss.config.mjs";
 
 const webRoot = fileURLToPath(new URL("..", import.meta.url));
 
-const read = (relative: string): string =>
-  readFileSync(join(webRoot, relative), "utf8");
+const read = (relative: string): string => readFileSync(join(webRoot, relative), "utf8");
 
 const DESIGN_TOKENS = [
   "--color-parchment",
