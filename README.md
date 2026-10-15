@@ -1,5 +1,7 @@
 # Studiobook
 
+Studiobook is an app where studios publish classes and people book them.
+
 A class-booking and studio-management app for movement studios (yoga, pilates,
 pottery). Members, a class schedule with live occupancy and waitlists,
 invoicing with tax and refunds, monthly revenue reports, a public iCalendar
