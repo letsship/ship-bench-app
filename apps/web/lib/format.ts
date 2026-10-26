@@ -22,6 +22,10 @@ export function formatDayLabel(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
+export function formatBookingCount(count: number): string {
+  return count === 1 ? "(1 booking)" : `(${count} bookings)`;
+}
+
 export function formatDate(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone }).format(new Date(iso));
 }
