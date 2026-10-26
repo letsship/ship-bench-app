@@ -72,6 +72,10 @@ test.describe("operator journeys (fake backends)", () => {
       expect(text).toContain(fragment.toLowerCase());
     }
 
+    await page.getByLabel("Search members").fill("zzzqqq");
+    await expect(page.getByText("No members match your search.")).toBeVisible();
+    await expect(rows).toHaveCount(0);
+
     await page.getByLabel("Search members").fill("");
     await expect(rows).toHaveCount(totalRows);
     await expect(page.getByText("people at the studio")).toBeVisible();
