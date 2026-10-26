@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { monthlyRevenue, revenueTotals } from "./reports";
+import {
+  formatChangePercent,
+  monthlyRevenue,
+  netChangePercents,
+  revenueTotals,
+  type MonthlyRevenueRow,
+} from "./reports";
 
 const INVOICES = [
   { status: "paid", issuedAt: "2026-01-15T12:00:00Z", totalCents: 10000 },
@@ -60,5 +66,58 @@ describe("revenueTotals", () => {
   it("sums across months", () => {
     const totals = revenueTotals(monthlyRevenue(INVOICES, "UTC"));
     expect(totals).toEqual({ paidCents: 18000, refundedCents: 5000, netCents: 13000 });
+  });
+});
+
+function netRow(month: string, netCents: number): MonthlyRevenueRow {
+  return { month, invoiceCount: 1, paidCents: netCents, refundedCents: 0, netCents };
+}
+
+describe("netChangePercents", () => {
+  it("is null for the earliest month", () => {
+    expect(netChangePercents([netRow("2026-01", 5000)])).toEqual([null]);
+  });
+
+  it("gives a positive percent for a rise and a negative one for a fall", () => {
+    const changes = netChangePercents([
+      netRow("2026-01", 5000),
+      netRow("2026-02", 8000),
+      netRow("2026-03", 6000),
+    ]);
+    expect(changes).toEqual([null, 60, -25]);
+  });
+
+  it("rounds to a whole percent", () => {
+    const changes = netChangePercents([netRow("2026-01", 3000), netRow("2026-02", 2000)]);
+    expect(changes).toEqual([null, -33]);
+  });
+
+  it("is null when the previous month had zero net", () => {
+    const changes = netChangePercents([netRow("2026-01", 0), netRow("2026-02", 5000)]);
+    expect(changes).toEqual([null, null]);
+  });
+
+  it("is null when the previous calendar month has no row", () => {
+    const changes = netChangePercents([netRow("2026-01", 5000), netRow("2026-03", 6000)]);
+    expect(changes).toEqual([null, null]);
+  });
+
+  it("divides by the absolute value of a negative previous net", () => {
+    const changes = netChangePercents([netRow("2026-01", -1000), netRow("2026-02", 1000)]);
+    expect(changes).toEqual([null, 200]);
+  });
+
+  it("compares across a year boundary", () => {
+    const changes = netChangePercents([netRow("2025-12", 4000), netRow("2026-01", 5000)]);
+    expect(changes).toEqual([null, 25]);
+  });
+});
+
+describe("formatChangePercent", () => {
+  it("signs rises and falls and marks missing comparisons", () => {
+    expect(formatChangePercent(12)).toBe("+12%");
+    expect(formatChangePercent(-5)).toBe("-5%");
+    expect(formatChangePercent(0)).toBe("0%");
+    expect(formatChangePercent(null)).toBe("n/a");
   });
 });

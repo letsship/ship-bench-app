@@ -67,3 +67,30 @@ export function revenueTotals(rows: readonly MonthlyRevenueRow[]): RevenueTotals
     { paidCents: 0, refundedCents: 0, netCents: 0 },
   );
 }
+
+function previousMonth(month: string): string {
+  const year = Number(month.slice(0, 4));
+  const monthNumber = Number(month.slice(5, 7));
+  return monthNumber === 1
+    ? `${year - 1}-12`
+    : `${year}-${String(monthNumber - 1).padStart(2, "0")}`;
+}
+
+function percentChange(netCents: number, previousNetCents: number | undefined): number | null {
+  if (!previousNetCents) return null;
+  return Math.round(((netCents - previousNetCents) / Math.abs(previousNetCents)) * 100);
+}
+
+// Whole-percent change in net revenue against the immediately preceding calendar
+// month. Null when that month has no row or zero net. Rows are ascending by month.
+export function netChangePercents(rows: readonly MonthlyRevenueRow[]): (number | null)[] {
+  const netByMonth = new Map(rows.map((row) => [row.month, row.netCents]));
+  return rows.map((row) => percentChange(row.netCents, netByMonth.get(previousMonth(row.month))));
+}
+
+export function formatChangePercent(value: number | null): string {
+  if (value === null) return "n/a";
+  if (value > 0) return `+${value}%`;
+  if (value < 0) return `${value}%`;
+  return "0%";
+}

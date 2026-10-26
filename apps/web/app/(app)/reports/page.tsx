@@ -1,8 +1,14 @@
+import { formatChangePercent, netChangePercents } from "@/lib/domain/reports";
 import { resolveStudio } from "@/lib/services/context";
 import { getRevenueReport } from "@/lib/services/reports";
 import { EmptyState, Money, PageHeader, StatCard } from "../_components/ui";
 
 export const dynamic = "force-dynamic";
+
+function changeClass(change: number | null): string {
+  if (change === null || change === 0) return "text-[var(--color-muted)]";
+  return change > 0 ? "text-[var(--color-sage)]" : "text-[var(--color-danger)]";
+}
 
 function monthLabel(month: string): string {
   const [year, monthNumber] = month.split("-");
@@ -17,6 +23,7 @@ function monthLabel(month: string): string {
 export default async function ReportsPage() {
   const { repos, ctx } = await resolveStudio();
   const report = await getRevenueReport(repos, ctx);
+  const changes = netChangePercents(report.rows);
 
   return (
     <>
@@ -50,10 +57,11 @@ export default async function ReportsPage() {
                 <th className="text-right">Paid</th>
                 <th className="text-right">Refunded</th>
                 <th className="text-right">Net</th>
+                <th className="text-right">Change</th>
               </tr>
             </thead>
             <tbody>
-              {report.rows.map((row) => (
+              {report.rows.map((row, index) => (
                 <tr key={row.month}>
                   <td className="font-medium">{monthLabel(row.month)}</td>
                   <td className="text-right">{row.invoiceCount}</td>
@@ -65,6 +73,12 @@ export default async function ReportsPage() {
                   </td>
                   <td className="text-right font-medium">
                     <Money cents={row.netCents} currency={report.currency} />
+                  </td>
+                  <td
+                    className={`text-right font-medium ${changeClass(changes[index])}`}
+                    data-testid="net-change"
+                  >
+                    {formatChangePercent(changes[index])}
                   </td>
                 </tr>
               ))}

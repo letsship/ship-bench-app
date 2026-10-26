@@ -50,7 +50,9 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(members.locator("tbody tr").first()).toBeVisible();
 
     await page.goto("/reports");
-    await expect(page.getByTestId("revenue-table")).toBeVisible();
+    const revenue = page.getByTestId("revenue-table");
+    await expect(revenue).toBeVisible();
+    await expect(revenue.getByRole("columnheader", { name: "Change" })).toBeVisible();
   });
 
   test("every authenticated page loads, holds the session, and logs zero console errors", async ({
