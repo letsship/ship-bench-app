@@ -1,5 +1,5 @@
 import { groupByDay } from "@/lib/domain/dates";
-import { formatDayLabel, formatTime } from "@/lib/format";
+import { formatBookingCount, formatDayLabel, formatTime } from "@/lib/format";
 import { listBookingRows } from "@/lib/services/booking-list";
 import { listSessions } from "@/lib/services/classes";
 import { resolveStudio } from "@/lib/services/context";
@@ -34,7 +34,8 @@ export default async function BookingsPage() {
             days.map((day) => (
               <section key={day.day}>
                 <h2 className="mb-2 text-sm font-semibold text-[var(--color-muted)]">
-                  {formatDayLabel(day.items[0].startsAt, timeZone)}
+                  {formatDayLabel(day.items[0].startsAt, timeZone)}{" "}
+                  <span>{formatBookingCount(day.items.length)}</span>
                 </h2>
                 <div className="sb-card overflow-x-auto">
                   <table className="sb-table">
