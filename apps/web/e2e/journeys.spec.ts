@@ -53,6 +53,30 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByTestId("revenue-table")).toBeVisible();
   });
 
+  test("searches the members roster by name and clears the search", async ({ page }) => {
+    await page.goto("/members");
+    const members = page.getByTestId("members-table");
+    const rows = members.locator("tbody tr");
+    await expect(rows.first()).toBeVisible();
+
+    // Names come from the shared in-memory store at runtime, not a hard-coded seed.
+    const name = ((await rows.first().locator("td").first().textContent()) ?? "").trim();
+    const fragment = name.slice(0, 3).toUpperCase();
+    const totalRows = await rows.count();
+
+    await page.getByLabel("Search members").fill(fragment);
+    await expect(page.getByText(/\d+ of \d+ people/)).toBeVisible();
+    await expect(rows.first()).toBeVisible();
+    for (const row of await rows.all()) {
+      const text = ((await row.textContent()) ?? "").toLowerCase();
+      expect(text).toContain(fragment.toLowerCase());
+    }
+
+    await page.getByLabel("Search members").fill("");
+    await expect(rows).toHaveCount(totalRows);
+    await expect(page.getByText("people at the studio")).toBeVisible();
+  });
+
   test("every authenticated page loads, holds the session, and logs zero console errors", async ({
     page,
   }) => {

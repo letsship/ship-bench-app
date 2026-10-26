@@ -1,23 +1,38 @@
+import { filterMembers, membersSubtitle } from "@/lib/domain/member-search";
 import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { listMembers } from "@/lib/services/members";
 import { EmptyState, PageHeader, StatusBadge } from "../_components/ui";
 import { AddMemberForm } from "./add-member-form";
+import { MemberSearch } from "./member-search";
 import { OptOutToggle } from "./opt-out-toggle";
 
 export const dynamic = "force-dynamic";
 
-export default async function MembersPage() {
+export default async function MembersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string | string[] }>;
+}) {
+  const { q: rawQuery } = await searchParams;
+  const query = (Array.isArray(rawQuery) ? rawQuery[0] : rawQuery) ?? "";
   const { repos, ctx } = await resolveStudio();
   const members = await listMembers(repos, ctx.studio.id);
+  const visible = filterMembers(members, query);
 
   return (
     <>
-      <PageHeader title="Members" subtitle={`${members.length} people at the studio`} />
+      <PageHeader
+        title="Members"
+        subtitle={membersSubtitle(visible.length, members.length, query)}
+      />
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0">
+          <MemberSearch initialQuery={query} />
           {members.length === 0 ? (
             <EmptyState>No members yet.</EmptyState>
+          ) : visible.length === 0 ? (
+            <EmptyState>No members match your search.</EmptyState>
           ) : (
             <div className="sb-card overflow-x-auto">
               <table className="sb-table" data-testid="members-table">
@@ -31,7 +46,7 @@ export default async function MembersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((member) => (
+                  {visible.map((member) => (
                     <tr key={member.id}>
                       <td className="font-medium">{member.name}</td>
                       <td className="text-[var(--color-muted)]">{member.email}</td>
