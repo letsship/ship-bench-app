@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { AUTHED_PATHS, resetBackend } from "./support/auth";
 
 const PHONE_VIEWPORT = { width: 375, height: 667 };
@@ -13,6 +13,37 @@ async function boxOf(locator: Locator) {
   const box = await locator.boundingBox();
   if (!box) throw new Error("element has no bounding box");
   return box;
+}
+
+// The seed never fills a class to capacity, so schedule a one-seat class and book it.
+async function scheduleFullClass(page: Page): Promise<void> {
+  await page.goto("/bookings");
+  const form = page.getByRole("form", { name: "New booking" });
+  await expect(form).toBeVisible();
+  const memberId =
+    (await form.getByLabel("Member").locator("option").first().getAttribute("value")) ?? "";
+
+  const sessions = (await (await page.request.get("/api/classes")).json()) as {
+    classTypeId: string;
+  }[];
+  const startsAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  const endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
+  const classResponse = await page.request.post("/api/classes", {
+    data: {
+      classTypeId: sessions[0].classTypeId,
+      instructor: "E2E",
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      capacity: 1,
+    },
+  });
+  expect(classResponse.ok()).toBe(true);
+  const { id: sessionId } = (await classResponse.json()) as { id: string };
+
+  const bookingResponse = await page.request.post("/api/bookings", {
+    data: { sessionId, memberId },
+  });
+  expect(bookingResponse.ok()).toBe(true);
 }
 
 // Core operator journeys exercised end-to-end against a production `next start`
@@ -89,9 +120,9 @@ test.describe("operator journeys (fake backends)", () => {
   test("marks full classes on the Classes page and keeps the Full label on one line on a phone", async ({
     page,
   }) => {
+    await scheduleFullClass(page);
     await page.goto("/classes");
     await expect(page.getByTestId("session-row").first()).toBeVisible();
-    // The seed fills an upcoming small session to capacity, so at least one row is full.
     await expect(page.getByTestId("full-badge").first()).toBeVisible();
 
     const cells = page.getByTestId("occupancy");
