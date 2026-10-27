@@ -1,27 +1,40 @@
 import Link from "next/link";
+import { filterInvoicesByStatus } from "@/lib/domain/invoices";
 import { formatDate } from "@/lib/format";
 import { resolveStudio } from "@/lib/services/context";
 import { listInvoices } from "@/lib/services/invoices";
 import { listMembers } from "@/lib/services/members";
+import { invoiceStatusFilterSchema } from "@/lib/validation";
 import { EmptyState, Money, PageHeader, StatusBadge } from "../_components/ui";
+import { InvoiceStatusFilter } from "./invoice-status-filter";
 import { NewInvoiceForm } from "./new-invoice-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string | string[] }>;
+}) {
+  const { status: statusParam } = await searchParams;
+  const status = invoiceStatusFilterSchema.parse(statusParam);
   const { repos, ctx } = await resolveStudio();
-  const [invoices, members] = await Promise.all([
+  const [allInvoices, members] = await Promise.all([
     listInvoices(repos, ctx.studio.id),
     listMembers(repos, ctx.studio.id),
   ]);
+  const invoices = filterInvoicesByStatus(allInvoices, status);
 
   return (
     <>
       <PageHeader title="Invoices" subtitle={`${invoices.length} invoices`} />
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="min-w-0">
-          {invoices.length === 0 ? (
+          <InvoiceStatusFilter value={status} />
+          {allInvoices.length === 0 ? (
             <EmptyState>No invoices yet.</EmptyState>
+          ) : invoices.length === 0 ? (
+            <EmptyState>No invoices have the status {status}.</EmptyState>
           ) : (
             <div className="sb-card overflow-x-auto">
               <table className="sb-table" data-testid="invoices-table">

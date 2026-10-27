@@ -39,7 +39,17 @@ export function formatInvoiceNumber(sequence: number, year: number): string {
   return `INV-${year}-${String(sequence).padStart(4, "0")}`;
 }
 
-export type InvoiceStatus = "draft" | "open" | "paid" | "void" | "refunded";
+export const INVOICE_STATUSES = ["draft", "open", "paid", "void", "refunded"] as const;
+
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
+// A null status means "All": every invoice passes.
+export function filterInvoicesByStatus<T extends { status: string }>(
+  invoices: readonly T[],
+  status: InvoiceStatus | null,
+): T[] {
+  return invoices.filter((invoice) => status === null || invoice.status === status);
+}
 
 const INVOICE_TRANSITIONS: Record<InvoiceStatus, readonly InvoiceStatus[]> = {
   draft: ["open", "void"],

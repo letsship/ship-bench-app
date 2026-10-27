@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { INVOICE_STATUSES } from "@/lib/domain/invoices";
 
 // Zod schemas for every API input boundary. Route handlers parse request bodies
 // through these before touching the database.
@@ -68,8 +69,11 @@ export const createInvoiceSchema = z.object({
 });
 
 export const updateInvoiceStatusSchema = z.object({
-  status: z.enum(["draft", "open", "paid", "void", "refunded"]),
+  status: z.enum(INVOICE_STATUSES),
 });
+
+// Search-param filter: a known status, or null (All) for anything else.
+export const invoiceStatusFilterSchema = z.enum(INVOICE_STATUSES).nullable().catch(null);
 
 export type CreateClassTypeInput = z.infer<typeof createClassTypeSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;

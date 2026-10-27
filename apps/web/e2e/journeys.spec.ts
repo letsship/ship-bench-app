@@ -43,6 +43,38 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("filters invoices by status through the URL and keeps the count in step", async ({
+    page,
+  }) => {
+    // The subtitle must count exactly the table rows, and every row must carry the filtered status.
+    const expectRowsMatchStatus = async (status: string | null) => {
+      const subtitle = (await page.getByText(/^\d+ invoices$/).textContent()) ?? "";
+      const count = Number.parseInt(subtitle, 10);
+      expect(count).toBeGreaterThan(0);
+      const badges = page.getByTestId("invoices-table").locator("tbody .sb-badge");
+      await expect(badges).toHaveCount(count);
+      if (status) await expect(badges).toHaveText(Array(count).fill(status));
+    };
+
+    await page.goto("/invoices");
+    const filter = page.getByLabel("Status", { exact: true });
+    await expect(filter).toHaveValue("all");
+    await expectRowsMatchStatus(null);
+
+    await filter.selectOption("open");
+    await expect(page).toHaveURL(/\/invoices\?status=open$/);
+    await expect(filter).toHaveValue("open");
+    await expectRowsMatchStatus("open");
+
+    await page.reload();
+    await expect(filter).toHaveValue("open");
+    await expectRowsMatchStatus("open");
+
+    await page.goto("/invoices?status=paid");
+    await expect(filter).toHaveValue("paid");
+    await expectRowsMatchStatus("paid");
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
