@@ -1,5 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { AUTHED_PATHS, resetBackend } from "./support/auth";
+
+const PHONE_VIEWPORT = { width: 375, height: 667 };
+
+function parseOccupancy(text: string): { booked: number; capacity: number } {
+  const match = /(\d+)\/(\d+) booked/.exec(text);
+  if (!match) throw new Error(`no occupancy in "${text}"`);
+  return { booked: Number(match[1]), capacity: Number(match[2]) };
+}
+
+async function boxOf(locator: Locator) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("element has no bounding box");
+  return box;
+}
 
 // Core operator journeys exercised end-to-end against a production `next start`
 // server in fake-backends mode. These are happy-path regression checks over the
@@ -70,5 +84,41 @@ test.describe("operator journeys (fake backends)", () => {
     }
 
     expect(errors).toEqual([]);
+  });
+
+  test("marks full classes on the Classes page and keeps the Full label on one line on a phone", async ({
+    page,
+  }) => {
+    await page.goto("/classes");
+    await expect(page.getByTestId("session-row").first()).toBeVisible();
+    // The seed fills an upcoming small session to capacity, so at least one row is full.
+    await expect(page.getByTestId("full-badge").first()).toBeVisible();
+
+    const cells = page.getByTestId("occupancy");
+    const cellCount = await cells.count();
+    for (let index = 0; index < cellCount; index += 1) {
+      const cell = cells.nth(index);
+      const text = await cell.innerText();
+      const { booked, capacity } = parseOccupancy(text);
+      const isFull = (await cell.getByTestId("full-badge").count()) > 0;
+      expect(isFull, text).toBe(booked >= capacity);
+      if (isFull) expect(booked, text).toBe(capacity);
+    }
+
+    await page.setViewportSize(PHONE_VIEWPORT);
+    await page.reload();
+    const cell = page
+      .getByTestId("occupancy")
+      .filter({ has: page.getByTestId("full-badge") })
+      .first();
+    const badge = cell.getByTestId("full-badge");
+    await badge.scrollIntoViewIfNeeded();
+    await expect(badge).toBeVisible();
+
+    const box = await boxOf(badge);
+    const lineHeight = parseFloat(await cell.evaluate((el) => getComputedStyle(el).lineHeight));
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(PHONE_VIEWPORT.width);
+    expect(box.height).toBeLessThan(lineHeight * 2);
   });
 });
