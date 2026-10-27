@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   canTransitionInvoice,
   computeInvoiceTotals,
+  filterInvoicesByStatus,
   formatInvoiceNumber,
+  INVOICE_STATUSES,
   type InvoiceStatus,
   isOverdue,
   lineAmountCents,
@@ -75,6 +77,44 @@ describe("canTransitionInvoice", () => {
 
   it.each(invalid)("rejects %s -> %s", (from, to) => {
     expect(canTransitionInvoice(from, to)).toBe(false);
+  });
+});
+
+describe("INVOICE_STATUSES", () => {
+  it("lists all five invoice statuses", () => {
+    expect([...INVOICE_STATUSES]).toEqual(["draft", "open", "paid", "void", "refunded"]);
+  });
+});
+
+describe("filterInvoicesByStatus", () => {
+  const invoices = [
+    { id: "a", status: "paid" },
+    { id: "b", status: "open" },
+    { id: "c", status: "paid" },
+    { id: "d", status: "refunded" },
+  ];
+
+  it("returns every invoice when the status is null (All)", () => {
+    expect(filterInvoicesByStatus(invoices, null)).toEqual(invoices);
+  });
+
+  it("returns only the invoices with the given status", () => {
+    expect(filterInvoicesByStatus(invoices, "paid").map((invoice) => invoice.id)).toEqual([
+      "a",
+      "c",
+    ]);
+    expect(filterInvoicesByStatus(invoices, "open").map((invoice) => invoice.id)).toEqual(["b"]);
+  });
+
+  it("returns an empty array when no invoice has the status", () => {
+    expect(filterInvoicesByStatus(invoices, "void")).toEqual([]);
+  });
+
+  it("does not mutate the input", () => {
+    const copy = [...invoices];
+    filterInvoicesByStatus(invoices, "paid");
+    filterInvoicesByStatus(invoices, null);
+    expect(invoices).toEqual(copy);
   });
 });
 
