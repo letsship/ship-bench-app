@@ -34,7 +34,7 @@ export default async function ClassesPage() {
                   <table className="sb-table">
                     <tbody>
                       {day.items.map((session) => (
-                        <tr key={session.id}>
+                        <tr key={session.id} data-testid="session-row">
                           <td className="whitespace-nowrap font-medium">
                             {formatTime(session.startsAt, timeZone)}
                           </td>
@@ -46,11 +46,19 @@ export default async function ClassesPage() {
                             {session.classTypeName}
                           </td>
                           <td className="text-[var(--color-muted)]">{session.instructor}</td>
-                          <td className="whitespace-nowrap">
+                          <td className="whitespace-nowrap" data-testid="occupancy">
                             {session.occupancy.booked}/{session.occupancy.capacity} booked
                             <span className="ml-2 text-[var(--color-muted)]">
                               ({occupancyPercent(session.occupancy)}%)
                             </span>
+                            {session.occupancy.isFull && (
+                              <span
+                                className="sb-badge sb-badge-clay ml-2 shrink-0 whitespace-nowrap"
+                                data-testid="full-badge"
+                              >
+                                Full
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
