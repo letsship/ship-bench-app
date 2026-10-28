@@ -8,6 +8,7 @@ import type {
   NotificationOutboxRow,
   Studio,
   StudioSettings,
+  WebhookEvent,
 } from "../types";
 import type { Repositories, SessionRange } from "./types";
 
@@ -26,6 +27,7 @@ export interface SeedData {
   invoices: Invoice[];
   lineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  webhookEvents: WebhookEvent[];
 }
 
 interface Store {
@@ -38,6 +40,7 @@ interface Store {
   invoices: Invoice[];
   invoiceLineItems: InvoiceLineItem[];
   outbox: NotificationOutboxRow[];
+  webhookEvents: WebhookEvent[];
 }
 
 const clone = <T>(row: T): T => ({ ...row });
@@ -66,7 +69,8 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
     bookings: seed ? cloneAll(seed.bookings) : [],
     invoices: seed ? cloneAll(seed.invoices) : [],
     invoiceLineItems: seed ? cloneAll(seed.lineItems) : [],
-    outbox: seed ? cloneAll(seed.outbox) : [],
+    outbox: seed ? cloneAll(seed.outbox ?? []) : [],
+    webhookEvents: seed ? cloneAll(seed.webhookEvents ?? []) : [],
   };
 
   return {
@@ -209,6 +213,16 @@ export function createInMemoryRepositories(seed?: SeedData): Repositories {
       },
       async update(id, patch) {
         return patched(store.outbox, (row) => row.id === id, patch, "Outbox row");
+      },
+    },
+    webhookEvents: {
+      async getById(id) {
+        const found = store.webhookEvents.find((row) => row.id === id);
+        return found ? clone(found) : null;
+      },
+      async insert(row) {
+        store.webhookEvents.push(clone(row));
+        return clone(row);
       },
     },
   };
