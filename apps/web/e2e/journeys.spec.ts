@@ -43,6 +43,25 @@ test.describe("operator journeys (fake backends)", () => {
     await expect(page.getByRole("link", { name: /All invoices/i })).toBeVisible();
   });
 
+  test("opens a fully-refunded invoice and renders zero totals", async ({ page }) => {
+    await page.goto("/invoices");
+    const table = page.getByTestId("invoices-table");
+    await expect(table).toBeVisible();
+
+    const row = table.locator("tbody tr").filter({ hasText: "Femke Jansen" });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("link").click();
+    await expect(page).toHaveURL(/\/invoices\/[^/]+$/);
+
+    const line = page.locator("tbody tr").filter({ hasText: "Pottery intensive" });
+    await expect(line.getByText("refunded", { exact: true })).toBeVisible();
+
+    const summary = page.getByText(/^Subtotal/).locator("..");
+    await expect(summary).toContainText("Subtotal €0.00");
+    await expect(summary).toContainText(/Tax \(.+%\) €0\.00/);
+    await expect(summary).toContainText("Total €0.00");
+  });
+
   test("browses the members roster and the revenue report", async ({ page }) => {
     await page.goto("/members");
     const members = page.getByTestId("members-table");
