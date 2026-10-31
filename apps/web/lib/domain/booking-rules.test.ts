@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canBook, canCancel, pickWaitlistPromotion } from "./booking-rules";
+import { canBook, canCancel, isActiveMemberBooking, pickWaitlistPromotion } from "./booking-rules";
 import { computeOccupancy } from "./capacity";
 
 const FUTURE = "2026-06-01T09:00:00Z";
@@ -56,12 +56,43 @@ describe("canBook", () => {
     });
   });
 
+  it("rejects a member who already holds a waitlisted booking", () => {
+    const occupancy = computeOccupancy(1, [{ status: "booked" }]);
+    const memberBookings = [{ status: "waitlisted" }];
+    expect(canBook(baseContext({ occupancy, memberBookings }))).toEqual({
+      ok: false,
+      reason: "already_booked",
+    });
+  });
+
+  it("allows a member whose only booking was cancelled", () => {
+    expect(canBook(baseContext({ memberBookings: [{ status: "cancelled" }] }))).toEqual({
+      ok: true,
+      status: "booked",
+    });
+  });
+
   it("rejects when full and the waitlist is closed", () => {
     const occupancy = computeOccupancy(1, [{ status: "booked" }]);
     expect(canBook(baseContext({ occupancy, waitlistEnabled: false }))).toEqual({
       ok: false,
       reason: "session_full_no_waitlist",
     });
+  });
+});
+
+describe("isActiveMemberBooking", () => {
+  it("treats booked, waitlisted and attended as active", () => {
+    expect(["booked", "waitlisted", "attended"].map(isActiveMemberBooking)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it("treats cancelled and no_show as inactive", () => {
+    expect(isActiveMemberBooking("cancelled")).toBe(false);
+    expect(isActiveMemberBooking("no_show")).toBe(false);
   });
 });
 
