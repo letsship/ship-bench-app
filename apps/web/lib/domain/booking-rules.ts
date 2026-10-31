@@ -33,6 +33,10 @@ export interface BookingContext {
 
 const ACTIVE_MEMBER_BOOKING = new Set(["booked", "waitlisted", "attended"]);
 
+export function isActiveMemberBooking(status: string): boolean {
+  return ACTIVE_MEMBER_BOOKING.has(status);
+}
+
 // Decide whether a member may book a session, and if so, whether the booking is
 // confirmed or waitlisted.
 export function canBook(context: BookingContext): BookingDecision {
@@ -41,7 +45,7 @@ export function canBook(context: BookingContext): BookingDecision {
     return { ok: false, reason: "session_started" };
   }
   if (context.memberStatus !== "active") return { ok: false, reason: "member_inactive" };
-  if (context.memberBookings.some((booking) => ACTIVE_MEMBER_BOOKING.has(booking.status))) {
+  if (context.memberBookings.some((booking) => isActiveMemberBooking(booking.status))) {
     return { ok: false, reason: "already_booked" };
   }
   if (context.occupancy.isFull) {

@@ -52,10 +52,19 @@ export interface ClassSessionsRepo {
   insert(session: ClassSession): Promise<ClassSession>;
 }
 
+export class DuplicateBookingError extends Error {
+  constructor() {
+    super("This member already holds an active booking for this class session");
+    this.name = "DuplicateBookingError";
+  }
+}
+
 export interface BookingsRepo {
   listBySessionIds(sessionIds: string[]): Promise<Booking[]>;
   listBySession(sessionId: string): Promise<Booking[]>;
   getById(id: string): Promise<Booking | null>;
+  // Throws DuplicateBookingError when the member already holds an active
+  // (booked/waitlisted/attended) booking for the session.
   insert(booking: Booking): Promise<Booking>;
   update(id: string, patch: Partial<Booking>): Promise<Booking>;
 }

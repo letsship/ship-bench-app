@@ -249,6 +249,57 @@ describe("bookings service", () => {
       "waitlist_promotion",
     ]);
   });
+
+  it("rejects a repeat booking for a member already waitlisted on a full class", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1"), booking("b2", "m2", { status: "waitlisted" })],
+      }),
+    );
+    await expect(
+      createBooking(repos, createFakeProvider(), { sessionId: "cs1", memberId: "m2" }),
+    ).rejects.toMatchObject({ status: 409, code: "booking_already_booked" });
+  });
+
+  it("leaves one waitlist row when a double submit races on a full class", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1", { capacity: 1 })],
+        members: [member("m1"), member("m2")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    const submit = () => createBooking(repos, provider, { sessionId: "cs1", memberId: "m2" });
+    const results = await Promise.allSettled([submit(), submit()]);
+    const outcomes = results.map((result) =>
+      result.status === "fulfilled" ? result.value.status : result.reason.code,
+    );
+    expect(outcomes.sort()).toEqual(["booking_already_booked", "waitlisted"]);
+    const activeRows = (await repos.bookings.listBySession("cs1")).filter(
+      (row) => row.memberId === "m2" && row.status !== "cancelled",
+    );
+    expect(activeRows).toHaveLength(1);
+  });
+
+  it("lets a member rebook after cancelling their booking", async () => {
+    const repos = createInMemoryRepositories(
+      baseSeed({
+        classTypes: [classType("ct1")],
+        sessions: [session("cs1")],
+        members: [member("m1")],
+        bookings: [booking("b1", "m1")],
+      }),
+    );
+    const provider = createFakeProvider();
+    await cancelBooking(repos, provider, "b1");
+    const result = await createBooking(repos, provider, { sessionId: "cs1", memberId: "m1" });
+    expect(result.status).toBe("booked");
+  });
 });
 
 describe("invoices service", () => {

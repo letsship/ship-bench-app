@@ -11,7 +11,9 @@ import type {
   StudioSettings,
 } from "../types";
 import { toCamelRow, toSnakeRow } from "./mapping";
-import type { Repositories } from "./types";
+import { DuplicateBookingError, type Repositories } from "./types";
+
+const PG_UNIQUE_VIOLATION = "23505";
 
 // The production repository implementation over supabase-js (service role).
 // Reads come back snake_case and are mapped to camelCase entities; writes map
@@ -49,6 +51,17 @@ export function createSupabaseRepositories(): Repositories {
       .single();
     if (error) fail(`insert into ${table}`, error);
     return toCamelRow<T>(data as Record<string, unknown>);
+  }
+
+  async function insertBooking(booking: Booking): Promise<Booking> {
+    const { data, error } = await db
+      .from("bookings")
+      .insert(toSnakeRow(booking as unknown as Record<string, unknown>))
+      .select()
+      .single();
+    if (error?.code === PG_UNIQUE_VIOLATION) throw new DuplicateBookingError();
+    if (error) fail("insert into bookings", error);
+    return toCamelRow<Booking>(data as Record<string, unknown>);
   }
 
   async function updateReturning<T>(
@@ -145,7 +158,7 @@ export function createSupabaseRepositories(): Repositories {
           db.from("bookings").select("*").eq("id", id).maybeSingle(),
           "bookings.getById",
         ),
-      insert: (booking) => insertReturning("bookings", booking),
+      insert: insertBooking,
       update: (id, patch) => updateReturning<Booking>("bookings", "id", id, patch),
     },
     invoices: {
